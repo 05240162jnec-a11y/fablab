@@ -19,11 +19,28 @@ export default function Courses() {
     const [selectedCourse, setSelectedCourse] = useState(null);
     const [registrationClosed, setRegistrationClosed] = useState(false);
 
+    // ✅ NEW: Enrolled Users States
+    const [enrollments, setEnrollments] = useState([]);
+    const [enrollmentFilter, setEnrollmentFilter] = useState('all');
+    const [enrollmentsLoading, setEnrollmentsLoading] = useState(false);
+    const [enrollmentError, setEnrollmentError] = useState(null);
+
+    // ✅ NEW: Certificate Template States
+    const [certificateTemplate, setCertificateTemplate] = useState(null);
+    const [certificateUploading, setCertificateUploading] = useState(false);
+    const [certificateMessage, setCertificateMessage] = useState('');
+
+    // ✅ NEW: Certificate Generation States
+    const [generatingCertificate, setGeneratingCertificate] = useState(null); // userId being generated
+    const [generatingBulk, setGeneratingBulk] = useState(false);
+
     // Create/Edit Form State
     const [formState, setFormState] = useState({
         title: '',
         instructor: '',
         duration: '',
+        start_date: '',
+        end_date: '',
         schedule: '',
         seatLimit: '',
         description: '',
@@ -70,6 +87,296 @@ export default function Courses() {
         }
     };
 
+    // ✅ UPDATED: Fetch enrolled users for a course (filtered by is_active)
+    const fetchEnrollments = async (courseId) => {
+        try {
+            setEnrollmentsLoading(true);
+            setEnrollmentError(null);
+            const token = localStorage.getItem('admin_token');
+
+            const response = await axios.get(`http://127.0.0.1:8000/api/admin/courses/${courseId}/enrollments`, {
+                headers: {
+                    'Accept': 'application/json',
+                    'Authorization': `Bearer ${token}`,
+                }
+            });
+
+            if (response.data.success) {
+                setEnrollments(response.data.data);
+            }
+        } catch (err) {
+            console.error('Fetch enrollments error:', err);
+            setEnrollmentError('Failed to load enrolled users.');
+        } finally {
+            setEnrollmentsLoading(false);
+        }
+    };
+
+    // ✅ UPDATED: Remove user from course (mark as dropped) - FIXED to use enrollment_id
+    const handleRemoveUser = async (courseId, userId, userName, enrollmentId) => {
+        if (!window.confirm(`Are you sure you want to remove "${userName}" from this course?`)) {
+            return;
+        }
+
+        try {
+            const token = localStorage.getItem('admin_token');
+
+            // ✅ Use enrollment_id instead of user_id for the API endpoint
+            await axios.delete(`http://127.0.0.1:8000/api/admin/courses/${courseId}/enrollments/${enrollmentId}`, {
+                headers: {
+                    'Accept': 'application/json',
+                    'Authorization': `Bearer ${token}`,
+                }
+            });
+
+            // Remove from local state
+            setEnrollments(prev => prev.filter(u => u.enrollment_id !== enrollmentId));
+            alert(`✅ "${userName}" has been removed from the course.`);
+
+            // Refresh courses list to update enrollment count
+            fetchCourses();
+        } catch (err) {
+            console.error('Remove user error:', err);
+            if (err.response?.data?.message) {
+                alert('❌ ' + err.response.data.message);
+            } else {
+                alert('❌ Failed to remove user. Please try again.');
+            }
+        }
+    };
+
+    // ✅ UPDATED: Download enrollments as CSV - FIXED to use axios blob
+    const handleDownloadEnrollments = async (courseId, courseTitle) => {
+        try {
+            const token = localStorage.getItem('admin_token');
+
+            // ✅ Use axios with blob response to send Authorization header
+            const response = await axios.get(
+                `http://127.0.0.1:8000/api/admin/courses/${courseId}/enrollments/download`,
+                {
+                    headers: {
+                        'Accept': 'text/csv',
+                        'Authorization': `Bearer ${token}`,
+                    },
+                    responseType: 'blob'  // ✅ Important for file download
+                }
+            );
+
+            // Create download link
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            // Sanitize filename
+            const safeTitle = courseTitle.replace(/[^a-z0-9]/gi, '_');
+            link.setAttribute('download', `${safeTitle}_enrollments.csv`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(url);
+
+        } catch (err) {
+            console.error('Download error:', err);
+            alert('❌ Failed to download enrollments. Please try again.');
+        }
+    };
+
+    // ✅ NEW: Clear active enrollments
+    const handleClearEnrollments = async (courseId, courseTitle) => {
+        if (!window.confirm(`⚠️ Are you sure you want to CLEAR all active enrollments for "${courseTitle}"?\n\n✅ Completion records will be PRESERVED for machine booking.\n✅ Only active (enrolled) users will be cleared.\n\nThis action cannot be undone.`)) {
+            return;
+        }
+
+        try {
+            const token = localStorage.getItem('admin_token');
+
+            const response = await axios.post(
+                `http://127.0.0.1:8000/api/admin/courses/${courseId}/enrollments/clear`,
+                {},
+                {
+                    headers: {
+                        'Accept': 'application/json',
+                        'Authorization': `Bearer ${token}`,
+                    },
+                }
+            );
+
+            if (response.data.success) {
+                alert(`✅ ${response.data.message}`);
+                // Refresh enrollments list (should now be empty)
+                await fetchEnrollments(courseId);
+                // Refresh courses list to update enrollment count
+                fetchCourses();
+            }
+        } catch (err) {
+            console.error('Clear error:', err);
+            if (err.response?.data?.message) {
+                alert('❌ ' + err.response.data.message);
+            } else {
+                alert('❌ Failed to clear enrollments. Please try again.');
+            }
+        }
+    };
+
+    // ✅ UPDATED: Upload certificate template - FIXED preview
+    const handleUploadCertificateTemplate = async (e) => {
+        e.preventDefault();
+        if (!certificateTemplate) return;
+
+        setCertificateUploading(true);
+        setCertificateMessage('');
+
+        try {
+            const token = localStorage.getItem('admin_token');
+            const formData = new FormData();
+            formData.append('template', certificateTemplate);
+
+            const response = await axios.post(
+                `http://127.0.0.1:8000/api/admin/courses/${selectedCourse.id}/certificate-template`,
+                formData,
+                {
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'multipart/form-data',
+                        'Authorization': `Bearer ${token}`,
+                    },
+                }
+            );
+
+            if (response.data.success) {
+                setCertificateMessage('✅ ' + response.data.message);
+
+                // ✅ FIX: Update selectedCourse with the path (not full URL)
+                setSelectedCourse(prev => ({
+                    ...prev,
+                    certificate_template_path: response.data.data.path  // Just the path, not URL
+                }));
+
+                // Refresh courses list
+                await fetchCourses();
+
+                // Reset file input
+                setCertificateTemplate(null);
+                e.target.reset();
+            }
+        } catch (err) {
+            console.error('Upload error:', err);
+            if (err.response?.data?.message) {
+                setCertificateMessage('❌ ' + err.response.data.message);
+            } else {
+                setCertificateMessage('❌ Failed to upload template. Please try again.');
+            }
+        } finally {
+            setCertificateUploading(false);
+        }
+    };
+
+    // ✅ NEW: Remove certificate template
+    const handleRemoveCertificateTemplate = async () => {
+        if (!window.confirm('Are you sure you want to remove the certificate template?')) {
+            return;
+        }
+
+        try {
+            const token = localStorage.getItem('admin_token');
+
+            const response = await axios.delete(
+                `http://127.0.0.1:8000/api/admin/courses/${selectedCourse.id}/certificate-template`,
+                {
+                    headers: {
+                        'Accept': 'application/json',
+                        'Authorization': `Bearer ${token}`,
+                    },
+                }
+            );
+
+            if (response.data.success) {
+                alert('✅ ' + response.data.message);
+                // ✅ FIX: Update selectedCourse to remove template path
+                setSelectedCourse(prev => ({
+                    ...prev,
+                    certificate_template_path: null
+                }));
+                // Refresh course data
+                await fetchCourses();
+            }
+        } catch (err) {
+            console.error('Remove error:', err);
+            alert('❌ Failed to remove template. Please try again.');
+        }
+    };
+
+    // ✅ UPDATED: Generate single certificate for a user - FIXED auth issue
+    const handleGenerateCertificate = async (userId, userName) => {
+        setGeneratingCertificate(userId);
+
+        try {
+            const token = localStorage.getItem('admin_token');
+
+            // ✅ Use axios with blob response to send Authorization header
+            const response = await axios.get(
+                `http://127.0.0.1:8000/api/admin/courses/${selectedCourse.id}/certificates/${userId}`,
+                {
+                    headers: {
+                        'Accept': 'application/pdf',
+                        'Authorization': `Bearer ${token}`,
+                    },
+                    responseType: 'blob'  // ✅ Important for PDF download
+                }
+            );
+
+            // Create download link
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `Certificate_${userName.replace(/\s+/g, '_')}.pdf`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(url);
+
+            alert(`✅ Certificate for "${userName}" is downloading!`);
+
+        } catch (err) {
+            console.error('Generate certificate error:', err);
+            if (err.response?.status === 404) {
+                alert('❌ User has not completed this course');
+            } else if (err.response?.status === 400) {
+                alert('❌ No certificate template uploaded for this course');
+            } else {
+                alert('❌ Failed to generate certificate. Please try again.');
+            }
+        } finally {
+            setGeneratingCertificate(null);
+        }
+    };
+
+    // ✅ NEW: Generate bulk certificates for all completed users
+    const handleGenerateBulkCertificates = async () => {
+        if (!window.confirm(`Generate certificates for ALL completed users in "${selectedCourse.title}"?\n\nThis may take a moment for large classes.`)) {
+            return;
+        }
+
+        setGeneratingBulk(true);
+
+        try {
+            const token = localStorage.getItem('admin_token');
+
+            // Use window.location to trigger ZIP download
+            window.location.href = `http://127.0.0.1:8000/api/admin/courses/${selectedCourse.id}/certificates/bulk?token=${token}`;
+
+            // Show success message after a delay
+            setTimeout(() => {
+                alert(`✅ Certificates ZIP file is downloading!`);
+            }, 2000);
+
+        } catch (err) {
+            console.error('Bulk generate error:', err);
+            alert('❌ Failed to generate certificates. Please try again.');
+        } finally {
+            setGeneratingBulk(false);
+        }
+    };
+
     // Fetch on mount
     useEffect(() => {
         fetchCourses();
@@ -89,8 +396,37 @@ export default function Courses() {
         }
     };
 
+    // Get enrollment status badge
+    const getEnrollmentStatusClass = (status) => {
+        switch (status) {
+            case 'enrolled':
+                return 'bg-blue-100 text-blue-700';
+            case 'completed':
+                return 'bg-green-100 text-green-700';
+            case 'dropped':
+                return 'bg-red-100 text-red-700';
+            default:
+                return 'bg-gray-100 text-gray-700';
+        }
+    };
+
     // Capitalize first letter
     const capitalize = (str) => str.charAt(0).toUpperCase() + str.slice(1);
+
+    // ✅ Filter enrollments by role
+    const filteredEnrollments = enrollments.filter(user => {
+        if (enrollmentFilter === 'all') return true;
+        return user.role === enrollmentFilter;
+    });
+
+    // ✅ NEW: Check if course is ending soon (within 7 days)
+    const isCourseEndingSoon = (endDate) => {
+        if (!endDate) return false;
+        const end = new Date(endDate);
+        const today = new Date();
+        const sevenDaysFromNow = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
+        return end <= sevenDaysFromNow && end >= today;
+    };
 
     // Open Create Modal
     const handleCreateCourse = () => {
@@ -98,6 +434,8 @@ export default function Courses() {
             title: '',
             instructor: '',
             duration: '',
+            start_date: '',
+            end_date: '',
             schedule: '',
             seatLimit: '',
             description: '',
@@ -108,11 +446,14 @@ export default function Courses() {
         setShowCreateModal(true);
     };
 
-    // Open View Modal
-    const handleViewCourse = (course) => {
+    // Open View Modal - ✅ Fetch enrollments when opening
+    const handleViewCourse = async (course) => {
         setSelectedCourse(course);
         setRegistrationClosed(course.registration_status === 'closed');
         setShowViewModal(true);
+
+        // ✅ Fetch enrolled users for this course
+        await fetchEnrollments(course.id);
     };
 
     // Open Edit Modal
@@ -122,6 +463,8 @@ export default function Courses() {
             title: course.title,
             instructor: course.instructor,
             duration: course.duration,
+            start_date: course.start_date ? course.start_date.split('T')[0] : '',
+            end_date: course.end_date ? course.end_date.split('T')[0] : '',
             schedule: course.schedule,
             seatLimit: course.seat_limit,
             description: course.description || '',
@@ -189,6 +532,8 @@ export default function Courses() {
             formData.append('title', formState.title);
             formData.append('instructor', formState.instructor);
             formData.append('duration', formState.duration);
+            formData.append('start_date', formState.start_date);
+            formData.append('end_date', formState.end_date);
             formData.append('schedule', formState.schedule);
             formData.append('seat_limit', formState.seatLimit);
             formData.append('status', formState.status);
@@ -223,6 +568,8 @@ export default function Courses() {
             formData.append('title', formState.title);
             formData.append('instructor', formState.instructor);
             formData.append('duration', formState.duration);
+            formData.append('start_date', formState.start_date);
+            formData.append('end_date', formState.end_date);
             formData.append('schedule', formState.schedule);
             formData.append('seat_limit', formState.seatLimit);
             formData.append('status', formState.status);
@@ -257,6 +604,12 @@ export default function Courses() {
         setShowEditModal(false);
         setShowDeleteModal(false);
         setSelectedCourse(null);
+        setEnrollments([]);
+        setEnrollmentFilter('all');
+        setCertificateTemplate(null);
+        setCertificateMessage('');
+        setGeneratingCertificate(null);
+        setGeneratingBulk(false);
     };
 
     return (
@@ -522,38 +875,38 @@ export default function Courses() {
                 </main>
             </div>
 
-            {/* ===== VIEW COURSE DETAILS MODAL - YOUR DESIGN PRESERVED ===== */}
+            {/* ===== VIEW COURSE DETAILS MODAL - ✅ UPDATED WITH CERTIFICATE GENERATION ===== */}
             {showViewModal && selectedCourse && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col">
                         {/* Modal Header */}
-                        <div className="flex items-center justify-between p-6 border-b border-gray-100 sticky top-0 bg-white">
+                        <div className="flex items-center justify-between p-6 border-b border-gray-100 sticky top-0 bg-white rounded-t-2xl z-10">
                             <div>
                                 <h3 className="text-xl font-bold text-gray-900">Course Details</h3>
                                 <p className="text-sm text-gray-500 mt-1">View and manage this course</p>
                             </div>
-                            <button onClick={closeAllModals} className="text-gray-400 hover:text-gray-600">
+                            <button onClick={closeAllModals} className="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100">
                                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
                                 </svg>
                             </button>
                         </div>
 
-                        {/* Modal Content */}
-                        <div className="p-6 space-y-6">
+                        {/* Modal Content - Scrollable */}
+                        <div className="p-6 overflow-y-auto flex-1">
                             {/* Course Image */}
                             {selectedCourse.image && (
                                 <img
                                     src={`http://127.0.0.1:8000/storage/${selectedCourse.image}`}
                                     alt={selectedCourse.title}
-                                    className="w-full h-48 object-cover rounded-lg"
+                                    className="w-full h-48 object-cover rounded-lg mb-6"
                                 />
                             )}
 
                             {/* Title & Status */}
-                            <div>
+                            <div className="mb-6">
                                 <h4 className="text-2xl font-bold text-gray-900 mb-2">{selectedCourse.title}</h4>
-                                <div className="flex gap-2">
+                                <div className="flex gap-2 flex-wrap">
                                     <span className={`inline-flex px-3 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(selectedCourse.status)}`}>
                                         {capitalize(selectedCourse.status)}
                                     </span>
@@ -564,7 +917,7 @@ export default function Courses() {
                             </div>
 
                             {/* Instructor */}
-                            <div className="flex items-center gap-3 text-gray-700">
+                            <div className="flex items-center gap-3 text-gray-700 mb-6">
                                 <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                                 </svg>
@@ -572,49 +925,259 @@ export default function Courses() {
                             </div>
 
                             {/* Description */}
-                            <div>
+                            <div className="mb-6 pb-6 border-b border-gray-200">
                                 <h5 className="text-sm font-semibold text-gray-700 mb-2">Description</h5>
                                 <p className="text-gray-600 leading-relaxed">{selectedCourse.description || 'No description available'}</p>
                             </div>
 
                             {/* Course Details Grid */}
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                                 <div className="bg-gray-50 rounded-lg p-4">
-                                    <div className="flex items-center gap-2 text-gray-600 mb-1">
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                        </svg>
-                                        <span className="text-sm font-medium">Duration</span>
-                                    </div>
-                                    <p className="text-gray-900 font-semibold">{selectedCourse.duration}</p>
+                                    <p className="text-xs text-gray-500 mb-1">Duration</p>
+                                    <p className="font-semibold text-gray-900">{selectedCourse.duration}</p>
                                 </div>
                                 <div className="bg-gray-50 rounded-lg p-4">
-                                    <div className="flex items-center gap-2 text-gray-600 mb-1">
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                        </svg>
-                                        <span className="text-sm font-medium">Schedule</span>
-                                    </div>
-                                    <p className="text-gray-900 font-semibold">{selectedCourse.schedule}</p>
+                                    <p className="text-xs text-gray-500 mb-1">Schedule</p>
+                                    <p className="font-semibold text-gray-900">{selectedCourse.schedule}</p>
                                 </div>
                                 <div className="bg-gray-50 rounded-lg p-4">
-                                    <div className="flex items-center gap-2 text-gray-600 mb-1">
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                                        </svg>
-                                        <span className="text-sm font-medium">Enrollment</span>
-                                    </div>
-                                    <p className="text-gray-900 font-semibold">{selectedCourse.enrollment}/{selectedCourse.seat_limit} seats</p>
+                                    <p className="text-xs text-gray-500 mb-1">Enrollment</p>
+                                    <p className="font-semibold text-gray-900">{selectedCourse.enrollment}/{selectedCourse.seat_limit}</p>
                                 </div>
                                 <div className="bg-gray-50 rounded-lg p-4">
-                                    <div className="flex items-center gap-2 text-gray-600 mb-1">
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                        </svg>
-                                        <span className="text-sm font-medium">Status</span>
-                                    </div>
-                                    <p className="text-gray-900 font-semibold">{capitalize(selectedCourse.status)}</p>
+                                    <p className="text-xs text-gray-500 mb-1">Status</p>
+                                    <p className="font-semibold text-gray-900">{capitalize(selectedCourse.status)}</p>
                                 </div>
+                            </div>
+
+                            {/* ✅ CERTIFICATE TEMPLATE SECTION */}
+                            <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                                <h5 className="text-lg font-semibold text-blue-900 mb-4">📜 Certificate Template</h5>
+
+                                {/* Upload Form */}
+                                <form onSubmit={handleUploadCertificateTemplate} className="mb-4">
+                                    <div className="flex items-center gap-4">
+                                        <input
+                                            type="file"
+                                            accept="image/png,image/jpeg"
+                                            onChange={(e) => setCertificateTemplate(e.target.files[0])}
+                                            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                                        />
+                                        <button
+                                            type="submit"
+                                            disabled={certificateUploading || !certificateTemplate}
+                                            className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-400"
+                                        >
+                                            {certificateUploading ? 'Uploading...' : 'Upload'}
+                                        </button>
+                                    </div>
+                                    <p className="text-xs text-blue-700 mt-2">
+                                        Upload a PNG/JPG template (max 5MB). Use placeholders like [NAME], [COURSE], [DATE] for dynamic fields.
+                                    </p>
+                                </form>
+
+                                {/* Current Template Preview */}
+                                {selectedCourse.certificate_template_path && (
+                                    <div className="mt-4 p-3 bg-white rounded border border-blue-200">
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <p className="text-sm font-medium text-gray-900">Current Template</p>
+                                                <p className="text-xs text-gray-500">{selectedCourse.certificate_template_path}</p>
+                                            </div>
+                                            <button
+                                                onClick={handleRemoveCertificateTemplate}
+                                                className="text-red-600 hover:text-red-800 text-sm font-medium hover:underline"
+                                            >
+                                                Remove
+                                            </button>
+                                        </div>
+                                        <img
+                                            src={`http://127.0.0.1:8000/storage/${selectedCourse.certificate_template_path}`}
+                                            alt="Certificate template"
+                                            className="mt-3 w-full max-h-40 object-contain rounded border"
+                                            onError={(e) => {
+                                                console.error('Image failed to load:', e.target.src);
+                                                e.target.onerror = null;
+                                                e.target.src = 'image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect fill="%23f0f0f0" width="100" height="100"/><text fill="%23999" x="50%" y="50%" text-anchor="middle" dy=".3em">No Preview</text></svg>';
+                                            }}
+                                            onLoad={() => console.log('Image loaded successfully!')}
+                                        />
+                                    </div>
+                                )}
+
+                                {/* Status Message */}
+                                {certificateMessage && (
+                                    <p className={`text-sm mt-3 ${certificateMessage.includes('✅') ? 'text-green-700' : 'text-red-700'}`}>
+                                        {certificateMessage}
+                                    </p>
+                                )}
+                            </div>
+
+                            {/* ✅ ENROLLED USERS SECTION */}
+                            <div className="mb-6">
+                                {/* ✅ No-Show Warning */}
+                                {isCourseEndingSoon(selectedCourse.end_date) && filteredEnrollments.length > 0 && (
+                                    <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                        <p className="text-xs text-yellow-800">
+                                            ⚠️ <strong>Course ends soon!</strong> Remove any no-show users before {new Date(selectedCourse.end_date).toLocaleDateString()}
+                                            to prevent them from being auto-marked as completed and gaining machine booking privileges.
+                                        </p>
+                                    </div>
+                                )}
+
+                                <div className="flex items-center justify-between mb-4">
+                                    <h5 className="text-lg font-semibold text-gray-900">
+                                        Enrolled Users ({filteredEnrollments.length})
+                                    </h5>
+
+                                    <div className="flex items-center gap-2">
+                                        {/* Role Filter Dropdown */}
+                                        <select
+                                            value={enrollmentFilter}
+                                            onChange={(e) => setEnrollmentFilter(e.target.value)}
+                                            className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        >
+                                            <option value="all">All Roles</option>
+                                            <option value="student">Students</option>
+                                            <option value="faculty">Faculty</option>
+                                            <option value="outsider">Outsiders</option>
+                                        </select>
+
+                                        {/* ✅ Download Button */}
+                                        <button
+                                            onClick={() => handleDownloadEnrollments(selectedCourse.id, selectedCourse.title)}
+                                            className="flex items-center gap-1 px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors"
+                                            title="Download as CSV"
+                                        >
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                            </svg>
+                                            Download
+                                        </button>
+
+                                        {/* ✅ Clear Button (only show if there are active enrollments) */}
+                                        {filteredEnrollments.length > 0 && (
+                                            <button
+                                                onClick={() => handleClearEnrollments(selectedCourse.id, selectedCourse.title)}
+                                                className="flex items-center gap-1 px-3 py-1.5 bg-orange-600 text-white text-sm rounded-lg hover:bg-orange-700 transition-colors"
+                                                title="Clear active enrollments (preserves completions)"
+                                            >
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                </svg>
+                                                Clear
+                                            </button>
+                                        )}
+
+                                        {/* ✅ Generate Bulk Certificates Button */}
+                                        {selectedCourse.certificate_template_path && filteredEnrollments.some(u => u.status === 'completed') && (
+                                            <button
+                                                onClick={handleGenerateBulkCertificates}
+                                                disabled={generatingBulk}
+                                                className="flex items-center gap-1 px-3 py-1.5 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 transition-colors disabled:bg-gray-400"
+                                                title="Generate certificates for all completed users"
+                                            >
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                </svg>
+                                                {generatingBulk ? 'Generating...' : 'Generate All'}
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Loading/Error States */}
+                                {enrollmentsLoading && (
+                                    <div className="text-center py-8">
+                                        <div className="inline-block animate-spin rounded-full h-8 w-8 border-2 border-blue-500 border-t-transparent"></div>
+                                        <p className="text-gray-500 mt-2">Loading enrolled users...</p>
+                                    </div>
+                                )}
+
+                                {enrollmentError && !enrollmentsLoading && (
+                                    <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg">
+                                        {enrollmentError}
+                                    </div>
+                                )}
+
+                                {/* Users Table */}
+                                {!enrollmentsLoading && !enrollmentError && (
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-sm">
+                                            <thead className="bg-gray-50">
+                                                <tr>
+                                                    <th className="px-4 py-3 text-left font-medium text-gray-600">Name</th>
+                                                    <th className="px-4 py-3 text-left font-medium text-gray-600">Email</th>
+                                                    <th className="px-4 py-3 text-left font-medium text-gray-600">Role</th>
+                                                    <th className="px-4 py-3 text-left font-medium text-gray-600 hidden md:table-cell">Department</th>
+                                                    <th className="px-4 py-3 text-left font-medium text-gray-600 hidden lg:table-cell">Phone</th>
+                                                    <th className="px-4 py-3 text-left font-medium text-gray-600">Status</th>
+                                                    <th className="px-4 py-3 text-right font-medium text-gray-600">Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-gray-100">
+                                                {filteredEnrollments.length === 0 ? (
+                                                    <tr>
+                                                        <td colSpan="7" className="px-4 py-8 text-center text-gray-500">
+                                                            {enrollmentFilter === 'all'
+                                                                ? 'No active users enrolled in this course yet.'
+                                                                : `No ${enrollmentFilter}s found.`}
+                                                        </td>
+                                                    </tr>
+                                                ) : (
+                                                    filteredEnrollments.map((user) => (
+                                                        <tr key={user.enrollment_id} className="hover:bg-gray-50">
+                                                            <td className="px-4 py-3">
+                                                                <div className="font-medium text-gray-900">{user.name}</div>
+                                                                <div className="text-xs text-gray-400 md:hidden">{user.email}</div>
+                                                            </td>
+                                                            <td className="px-4 py-3 text-gray-600 hidden md:table-cell">{user.email}</td>
+                                                            <td className="px-4 py-3">
+                                                                <span className={`inline-flex px-2 py-1 rounded text-xs font-medium ${user.role === 'student' ? 'bg-blue-100 text-blue-700' :
+                                                                        user.role === 'faculty' ? 'bg-purple-100 text-purple-700' :
+                                                                            'bg-orange-100 text-orange-700'
+                                                                    }`}>
+                                                                    {capitalize(user.role)}
+                                                                </span>
+                                                            </td>
+                                                            <td className="px-4 py-3 text-gray-600 hidden lg:table-cell">{user.department || '-'}</td>
+                                                            <td className="px-4 py-3 text-gray-600 hidden lg:table-cell">{user.phone}</td>
+                                                            <td className="px-4 py-3">
+                                                                <span className={`inline-flex px-2 py-1 rounded text-xs font-medium ${getEnrollmentStatusClass(user.status)}`}>
+                                                                    {capitalize(user.status)}
+                                                                </span>
+                                                            </td>
+                                                            <td className="px-4 py-3 text-right">
+                                                                <div className="flex items-center justify-end gap-2">
+                                                                    {/* ✅ Generate Certificate Button (only for completed users with template) */}
+                                                                    {user.status === 'completed' && selectedCourse.certificate_template_path && (
+                                                                        <button
+                                                                            onClick={() => handleGenerateCertificate(user.user_id, user.name)}
+                                                                            disabled={generatingCertificate === user.user_id}
+                                                                            className="text-purple-600 hover:text-purple-800 text-xs font-medium hover:underline disabled:text-gray-400"
+                                                                            title="Generate certificate"
+                                                                        >
+                                                                            {generatingCertificate === user.user_id ? 'Generating...' : '📜 Cert'}
+                                                                        </button>
+                                                                    )}
+
+                                                                    {/* Remove Button */}
+                                                                    <button
+                                                                        onClick={() => handleRemoveUser(selectedCourse.id, user.user_id, user.name, user.enrollment_id)}
+                                                                        className="text-red-600 hover:text-red-800 text-xs font-medium hover:underline"
+                                                                        title="Remove user from course"
+                                                                    >
+                                                                        Remove
+                                                                    </button>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    ))
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
                             </div>
 
                             {/* Close Registration Toggle */}
@@ -639,8 +1202,8 @@ export default function Courses() {
                             </div>
                         </div>
 
-                        {/* ModalFooter */}
-                        <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-100 sticky bottom-0 bg-white">
+                        {/* Modal Footer - Sticky */}
+                        <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-100 sticky bottom-0 bg-white rounded-b-2xl">
                             <button
                                 onClick={() => handleEditCourse(selectedCourse)}
                                 className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
@@ -664,7 +1227,7 @@ export default function Courses() {
                 </div>
             )}
 
-            {/* ===== CREATE COURSE MODAL - YOUR DESIGN PRESERVED ===== */}
+            {/* ===== CREATE COURSE MODAL - SAME AS BEFORE ===== */}
             {showCreateModal && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -704,6 +1267,7 @@ export default function Courses() {
                                     value={formState.title}
                                     onChange={(e) => setFormState({ ...formState, title: e.target.value })}
                                     className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    required
                                 />
                             </div>
 
@@ -717,6 +1281,7 @@ export default function Courses() {
                                         value={formState.instructor}
                                         onChange={(e) => setFormState({ ...formState, instructor: e.target.value })}
                                         className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        required
                                     />
                                 </div>
                                 <div>
@@ -727,32 +1292,63 @@ export default function Courses() {
                                         value={formState.duration}
                                         onChange={(e) => setFormState({ ...formState, duration: e.target.value })}
                                         className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        required
                                     />
                                 </div>
                             </div>
 
-                            {/* Schedule & Seat Limit */}
+                            {/* Course Dates - Required */}
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Schedule</label>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Start Date *</label>
                                     <input
-                                        type="text"
-                                        placeholder="e.g. Mon & Wed, 10-12"
-                                        value={formState.schedule}
-                                        onChange={(e) => setFormState({ ...formState, schedule: e.target.value })}
+                                        type="date"
+                                        name="start_date"
+                                        value={formState.start_date || ''}
+                                        onChange={(e) => setFormState({ ...formState, start_date: e.target.value })}
                                         className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        required
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Seat Limit</label>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">End Date *</label>
                                     <input
-                                        type="number"
-                                        placeholder="30"
-                                        value={formState.seatLimit}
-                                        onChange={(e) => setFormState({ ...formState, seatLimit: e.target.value })}
+                                        type="date"
+                                        name="end_date"
+                                        value={formState.end_date || ''}
+                                        onChange={(e) => setFormState({ ...formState, end_date: e.target.value })}
+                                        min={formState.start_date}
                                         className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        required
                                     />
                                 </div>
+                            </div>
+
+                            {/* Class Schedule - Optional Text */}
+                            <div className="mt-2">
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Class Schedule (optional)</label>
+                                <input
+                                    type="text"
+                                    placeholder="e.g. Mon & Wed, 10:00-12:00"
+                                    value={formState.schedule}
+                                    onChange={(e) => setFormState({ ...formState, schedule: e.target.value })}
+                                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                                <p className="text-xs text-gray-400 mt-1">Describe class times. Start/End dates control auto-complete.</p>
+                            </div>
+
+                            {/* Seat Limit */}
+                            <div className="mt-4">
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Seat Limit *</label>
+                                <input
+                                    type="number"
+                                    placeholder="30"
+                                    value={formState.seatLimit}
+                                    onChange={(e) => setFormState({ ...formState, seatLimit: e.target.value })}
+                                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    required
+                                    min="1"
+                                />
                             </div>
 
                             {/* Status & Registration */}
@@ -763,6 +1359,7 @@ export default function Courses() {
                                         value={formState.status}
                                         onChange={(e) => setFormState({ ...formState, status: e.target.value })}
                                         className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                                        required
                                     >
                                         <option value="upcoming">Upcoming</option>
                                         <option value="active">Active</option>
@@ -775,6 +1372,7 @@ export default function Courses() {
                                         value={formState.registrationStatus}
                                         onChange={(e) => setFormState({ ...formState, registrationStatus: e.target.value })}
                                         className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                                        required
                                     >
                                         <option value="open">Open</option>
                                         <option value="closed">Closed</option>
@@ -814,7 +1412,7 @@ export default function Courses() {
                 </div>
             )}
 
-            {/* ===== EDIT COURSE MODAL - YOUR DESIGN PRESERVED ===== */}
+            {/* ===== EDIT COURSE MODAL - SAME AS BEFORE ===== */}
             {showEditModal && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -841,6 +1439,7 @@ export default function Courses() {
                                     value={formState.title}
                                     onChange={(e) => setFormState({ ...formState, title: e.target.value })}
                                     className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    required
                                 />
                             </div>
 
@@ -853,6 +1452,7 @@ export default function Courses() {
                                         value={formState.instructor}
                                         onChange={(e) => setFormState({ ...formState, instructor: e.target.value })}
                                         className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        required
                                     />
                                 </div>
                                 <div>
@@ -862,30 +1462,61 @@ export default function Courses() {
                                         value={formState.duration}
                                         onChange={(e) => setFormState({ ...formState, duration: e.target.value })}
                                         className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        required
                                     />
                                 </div>
                             </div>
 
-                            {/* Schedule & Seat Limit */}
+                            {/* Course Dates - Required */}
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Schedule</label>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Start Date *</label>
                                     <input
-                                        type="text"
-                                        value={formState.schedule}
-                                        onChange={(e) => setFormState({ ...formState, schedule: e.target.value })}
+                                        type="date"
+                                        name="start_date"
+                                        value={formState.start_date || ''}
+                                        onChange={(e) => setFormState({ ...formState, start_date: e.target.value })}
                                         className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        required
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Seat Limit</label>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">End Date *</label>
                                     <input
-                                        type="number"
-                                        value={formState.seatLimit}
-                                        onChange={(e) => setFormState({ ...formState, seatLimit: e.target.value })}
+                                        type="date"
+                                        name="end_date"
+                                        value={formState.end_date || ''}
+                                        onChange={(e) => setFormState({ ...formState, end_date: e.target.value })}
+                                        min={formState.start_date}
                                         className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        required
                                     />
                                 </div>
+                            </div>
+
+                            {/* Class Schedule - Optional Text */}
+                            <div className="mt-2">
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Class Schedule (optional)</label>
+                                <input
+                                    type="text"
+                                    value={formState.schedule}
+                                    onChange={(e) => setFormState({ ...formState, schedule: e.target.value })}
+                                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                                <p className="text-xs text-gray-400 mt-1">Describe class times. Start/End dates control auto-complete.</p>
+                            </div>
+
+                            {/* Seat Limit */}
+                            <div className="mt-4">
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Seat Limit *</label>
+                                <input
+                                    type="number"
+                                    value={formState.seatLimit}
+                                    onChange={(e) => setFormState({ ...formState, seatLimit: e.target.value })}
+                                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    required
+                                    min="1"
+                                />
                             </div>
 
                             {/* Status & Registration */}
@@ -896,6 +1527,7 @@ export default function Courses() {
                                         value={formState.status}
                                         onChange={(e) => setFormState({ ...formState, status: e.target.value })}
                                         className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                                        required
                                     >
                                         <option value="upcoming">Upcoming</option>
                                         <option value="active">Active</option>
@@ -908,6 +1540,7 @@ export default function Courses() {
                                         value={formState.registrationStatus}
                                         onChange={(e) => setFormState({ ...formState, registrationStatus: e.target.value })}
                                         className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                                        required
                                     >
                                         <option value="open">Open</option>
                                         <option value="closed">Closed</option>
@@ -961,7 +1594,7 @@ export default function Courses() {
                 </div>
             )}
 
-            {/* ===== DELETE CONFIRMATION MODAL - YOUR DESIGN PRESERVED ===== */}
+            {/* ===== DELETE CONFIRMATION MODAL - SAME AS BEFORE ===== */}
             {showDeleteModal && selectedCourse && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full">

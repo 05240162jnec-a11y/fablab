@@ -14,7 +14,7 @@ export default function Courses() {
     const [selectedCourse, setSelectedCourse] = useState(null);
     const [showEnrollModal, setShowEnrollModal] = useState(false);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null); // ✅ Added error state
+    const [error, setError] = useState(null);
     const [userEnrollments, setUserEnrollments] = useState([]);
 
     // User Data State
@@ -46,11 +46,11 @@ export default function Courses() {
         fetchUserData();
         fetchUserEnrollments();
 
-        // ✅ ADD THIS: Auto-refresh courses every 30 seconds
+        // Auto-refresh courses every 30 seconds to stay in sync with admin changes
         const interval = setInterval(() => {
             fetchCourses();
             fetchUserEnrollments();
-        }, 30000); // 30 seconds
+        }, 30000);
 
         // Cleanup interval on unmount
         return () => clearInterval(interval);
@@ -59,7 +59,7 @@ export default function Courses() {
     const fetchCourses = async () => {
         try {
             setLoading(true);
-            setError(null); // ✅ Clear previous errors
+            setError(null);
             const authToken = localStorage.getItem('auth_token');
 
             const response = await axios.get('http://127.0.0.1:8000/api/user/courses', {
@@ -72,7 +72,6 @@ export default function Courses() {
             setCourses(response.data.courses);
         } catch (error) {
             console.error('Error fetching courses:', error);
-            // ✅ FIX: Don't use static sample data - show empty state instead
             setError('Failed to load courses. Please check your connection or try logging in again.');
             setCourses([]);
         } finally {
@@ -84,7 +83,6 @@ export default function Courses() {
         try {
             const authToken = localStorage.getItem('auth_token');
 
-            // Try to get user profile (adjust endpoint as needed)
             const response = await axios.get('http://127.0.0.1:8000/api/user/profile', {
                 headers: {
                     'Accept': 'application/json',
@@ -95,7 +93,7 @@ export default function Courses() {
             setUserData(response.data.user);
         } catch (error) {
             console.error('Error fetching user ', error);
-            // Sample user data for testing (only for profile, not courses)
+            // Fallback sample data for testing only
             setUserData({
                 name: 'Test User',
                 email: '12345678.jnec@rub.edu.bt',
@@ -179,7 +177,7 @@ export default function Courses() {
 
             alert('✅ ' + response.data.message);
 
-            // ✅ FIX: Clear and refetch
+            // Refresh courses and enrollments
             setCourses([]);
             await fetchCourses();
             await fetchUserEnrollments();
@@ -225,12 +223,11 @@ export default function Courses() {
 
             setEnrollMessage('✅ ' + response.data.message);
 
-            // ✅ FIX: Clear courses first, then fetch fresh data
+            // Refresh courses list to update seat count
             setCourses([]);
             await fetchCourses();
             await fetchUserEnrollments();
 
-            // ✅ FIX: Close modal after data is refreshed
             setTimeout(() => {
                 setShowEnrollModal(false);
                 setEnrollMessage('');
@@ -351,18 +348,6 @@ export default function Courses() {
                         <h1 className="text-2xl font-bold text-gray-900">Course Registration</h1>
                         <p className="text-sm text-gray-600 mt-1">Enroll in training courses to unlock machines</p>
                     </div>
-                    {/* ✅ ADD THIS REFRESH BUTTON */}
-                    <button
-                        onClick={() => {
-                            setLoading(true);
-                            fetchCourses();
-                            fetchUserEnrollments();
-                        }}
-                        className="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors text-sm font-medium flex items-center gap-2"
-                        title="Refresh course data"
-                    >
-                        🔄 Refresh
-                    </button>
                 </header>
 
                 {/* Page Content */}
@@ -442,31 +427,28 @@ export default function Courses() {
                                                 })()}
                                             </div>
 
-                                            {/* Enroll/Unenroll Button - SIMPLIFIED & GUARANTEED */}
+                                            {/* Enroll/Unenroll Button */}
                                             <button
                                                 onClick={() => {
-                                                    // Block all actions if registration closed OR course full
-                                                    if (!course.registration_open || course.available_seats === 0) {
-                                                        return; // Do nothing
-                                                    }
-                                                    // If we get here, registration is open and seats available
+                                                    // Only allow action if registration is open AND course has seats
+                                                    if (!course.registration_open || course.available_seats === 0) return;
+
                                                     if (isEnrolled(course.id)) {
                                                         handleUnenrollClick(course);
                                                     } else {
                                                         handleEnrollClick(course);
                                                     }
                                                 }}
-                                                // ✅ Simple disabled rule: disable if closed OR full
+                                                // Disable if course full OR registration closed
                                                 disabled={!course.registration_open || course.available_seats === 0}
-                                                // ✅ Simple style rule: gray if disabled, colored if enabled
                                                 className={`w-full py-2.5 px-4 rounded-lg font-medium transition-colors ${!course.registration_open || course.available_seats === 0
-                                                        ? 'bg-gray-200 text-gray-500 cursor-not-allowed'  // DISABLED: gray
+                                                        ? 'bg-gray-200 text-gray-500 cursor-not-allowed'  // Disabled state
                                                         : isEnrolled(course.id)
-                                                            ? 'bg-red-600 text-white hover:bg-red-700'    // ENABLED: red (unenroll)
-                                                            : 'bg-blue-600 text-white hover:bg-blue-700'  // ENABLED: blue (enroll)
+                                                            ? 'bg-red-600 text-white hover:bg-red-700'    // Unenroll (enabled)
+                                                            : 'bg-blue-600 text-white hover:bg-blue-700'  // Enroll (enabled)
                                                     }`}
                                             >
-                                                {/* ✅ Simple text rule */}
+                                                {/* Button text logic */}
                                                 {!course.registration_open && !isEnrolled(course.id)
                                                     ? 'Registration Closed'
                                                     : course.available_seats === 0

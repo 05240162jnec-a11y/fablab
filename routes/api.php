@@ -49,13 +49,35 @@ Route::prefix('admin')->group(function () {
         Route::apiResource('courses', \App\Http\Controllers\Api\Admin\CourseController::class);
         Route::post('courses/{id}/toggle-registration', [\App\Http\Controllers\Api\Admin\CourseController::class, 'toggleRegistration']);
         
+        
+        // ✅ NEW: Course Enrollments Management
+        Route::get('courses/{id}/enrollments', [\App\Http\Controllers\Api\Admin\CourseController::class, 'getEnrollments']);
+        Route::delete('courses/{courseId}/enrollments/{userId}', [\App\Http\Controllers\Api\Admin\CourseController::class, 'removeEnrollment']);
+
+        // Download enrolled users as CSV
+        Route::get('courses/{id}/enrollments/download', [\App\Http\Controllers\Api\Admin\CourseController::class, 'downloadEnrollments']);
+
+        // Clear active enrollments (set is_active = false)
+        Route::post('courses/{id}/enrollments/clear', [\App\Http\Controllers\Api\Admin\CourseController::class, 'clearActiveEnrollments']);
+
+        // Certificate template management
+        Route::post('courses/{id}/certificate-template', [\App\Http\Controllers\Api\Admin\CourseController::class, 'uploadCertificateTemplate']);
+        Route::delete('courses/{id}/certificate-template', [\App\Http\Controllers\Api\Admin\CourseController::class, 'removeCertificateTemplate']);
+
+        // Certificate generation
+        Route::get('courses/{courseId}/certificates/{userId}', [\App\Http\Controllers\Api\Admin\CourseController::class, 'generateCertificate']);
+        Route::get('courses/{courseId}/certificates/bulk', [\App\Http\Controllers\Api\Admin\CourseController::class, 'generateBulkCertificates']);
+
+        // Duplicate course for new semester
+        Route::post('courses/{id}/duplicate', [\App\Http\Controllers\Api\Admin\CourseController::class, 'duplicate']);
+
         // Inventory routes
         Route::get('inventory', [\App\Http\Controllers\Api\Admin\InventoryController::class, 'index']);
         Route::post('inventory/received', [\App\Http\Controllers\Api\Admin\InventoryController::class, 'addReceived']);
         Route::post('inventory/issued', [\App\Http\Controllers\Api\Admin\InventoryController::class, 'issueMaterial']);
         Route::delete('inventory/received/{id}', [\App\Http\Controllers\Api\Admin\InventoryController::class, 'deleteReceived']);
         Route::delete('inventory/issued/{id}', [\App\Http\Controllers\Api\Admin\InventoryController::class, 'deleteIssued']);
-        });
+        
         // Projects Management (Admin)
         Route::get('/projects', [App\Http\Controllers\Api\ProjectController::class, 'index']);
         Route::get('/projects/{id}', [App\Http\Controllers\Api\ProjectController::class, 'show']);
@@ -79,18 +101,16 @@ Route::prefix('admin')->group(function () {
         
         // Dashboard Statistics (Admin)
         Route::get('/dashboard/stats', [App\Http\Controllers\Api\DashboardController::class, 'index']);
+        
+    }); // ← Close admin auth:sanctum middleware
 }); // ← Close admin prefix
 
-// ... (admin routes end with: }); // ← Close admin prefix)
-
 // ==========================================
-// USER ROUTES (Authenticated) - ADD THIS SECTION
+// USER ROUTES (Authenticated)
 // ==========================================
 Route::middleware('auth:sanctum')->group(function () {
     
-    // User Dashboard (comment out if controller doesn't exist yet)
-    // Route::get('/user/dashboard', [App\Http\Controllers\Api\UserDashboardController::class, 'index']);
-    
+    // User Profile
     Route::get('/user/profile', [App\Http\Controllers\Api\UserController::class, 'profile']);
 
     // User Machines
@@ -98,22 +118,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user/machines/{id}/booked-dates', [App\Http\Controllers\Api\UserMachineController::class, 'bookedDates']);
     
     // User Courses
-    Route::get('/user/my-courses', [App\Http\Controllers\Api\UserCourseController::class, 'myCourses']);
-    
-    // User Bookings
-    Route::post('/user/bookings', [App\Http\Controllers\Api\UserBookingController::class, 'store']);
-    Route::get('/user/my-bookings', [App\Http\Controllers\Api\UserBookingController::class, 'myBookings']);
-
-    Route::middleware('auth:sanctum')->group(function () {
-    
-    // User Dashboard (commented out for now)
-    // Route::get('/user/dashboard', [App\Http\Controllers\Api\UserDashboardController::class, 'index']);
-    
-    // User Machines
-    Route::get('/user/machines', [App\Http\Controllers\Api\UserMachineController::class, 'index']);
-    Route::get('/user/machines/{id}/booked-dates', [App\Http\Controllers\Api\UserMachineController::class, 'bookedDates']);
-    
-    // User Courses - ✅ ADD THESE NEW ROUTES
     Route::get('/user/courses', [App\Http\Controllers\Api\UserCourseController::class, 'index']);
     Route::get('/user/courses/{id}', [App\Http\Controllers\Api\UserCourseController::class, 'show']);
     Route::get('/user/my-courses', [App\Http\Controllers\Api\UserCourseController::class, 'myCourses']);
@@ -125,10 +129,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user/my-bookings', [App\Http\Controllers\Api\UserBookingController::class, 'myBookings']);
     
 });
-    
-});
-
-// ← Email Verification Routes (outside admin group) - continues below...
 
 // ← Email Verification Routes (outside admin group)
 use Illuminate\Auth\Events\Verified;

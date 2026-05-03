@@ -16,9 +16,7 @@ export default function BookMachine() {
     const [showBookingModal, setShowBookingModal] = useState(false);
     const [loading, setLoading] = useState(true);
 
-    // Training & Booking States
-    const [userCourses, setUserCourses] = useState([]);
-    const [hasRequiredTraining, setHasRequiredTraining] = useState(false);
+    // Booking States (training check now comes from API)
     const [bookedDates, setBookedDates] = useState([]);
     const [bookingData, setBookingData] = useState({
         machine_id: '',
@@ -36,10 +34,9 @@ export default function BookMachine() {
         }));
     };
 
-    // Fetch machines and user data on component mount
+    // Fetch machines on component mount
     useEffect(() => {
         fetchMachines();
-        fetchUserCourses();
     }, []);
 
     const fetchMachines = async () => {
@@ -57,7 +54,7 @@ export default function BookMachine() {
             setMachines(response.data.machines);
         } catch (error) {
             console.error('Error fetching machines:', error);
-            // Sample data for testing
+            // Sample data for testing (fallback)
             setMachines([
                 {
                     id: 1,
@@ -69,7 +66,9 @@ export default function BookMachine() {
                     location: 'Lab A - Station 1',
                     specs: 'Build volume: 330 x 240 x 300mm',
                     added_on: '2026-04-20',
-                    required_course: 'Introduction to 3D Printing',
+                    required_courses: [1],
+                    required_course_names: ['Introduction to 3D Printing'],
+                    has_required_training: true,
                 },
                 {
                     id: 2,
@@ -81,43 +80,9 @@ export default function BookMachine() {
                     location: 'Lab B - Station 3',
                     specs: 'Build volume: 250 x 210 x 220mm',
                     added_on: '2026-04-21',
-                    required_course: 'Introduction to 3D Printing',
-                },
-                {
-                    id: 3,
-                    name: 'Epilog Zing 24',
-                    category: 'Laser Cutting',
-                    type: 'Laser Cutter',
-                    status: 'available',
-                    description: 'CO2 laser cutter for wood, acrylic, and paper',
-                    location: 'Lab A - Station 5',
-                    specs: 'Bed size: 610 x 305mm, Power: 30W',
-                    added_on: '2026-04-22',
-                    required_course: 'Laser Cutting Safety & Operation',
-                },
-                {
-                    id: 4,
-                    name: 'Shapeoko 5 Pro',
-                    category: 'CNC Machining',
-                    type: 'CNC Router',
-                    status: 'available',
-                    description: 'Desktop CNC router for wood and soft metals',
-                    location: 'Lab B - Station 1',
-                    specs: 'Work area: 508 x 508 x 114mm',
-                    added_on: '2026-04-23',
-                    required_course: 'CNC Machining Fundamentals',
-                },
-                {
-                    id: 5,
-                    name: 'Bantam Tools PCB Mill',
-                    category: 'PCB Fabrication',
-                    type: 'PCB Mill',
-                    status: 'maintenance',
-                    description: 'Desktop PCB milling machine',
-                    location: 'Lab A - Station 7',
-                    specs: 'Precision: 0.025mm',
-                    added_on: '2026-04-24',
-                    required_course: 'PCB Design & Fabrication',
+                    required_courses: [1],
+                    required_course_names: ['Introduction to 3D Printing'],
+                    has_required_training: false,
                 },
             ]);
         } finally {
@@ -125,46 +90,14 @@ export default function BookMachine() {
         }
     };
 
-    const fetchUserCourses = async () => {
-        try {
-            const authToken = localStorage.getItem('auth_token');
-
-            const response = await axios.get('http://127.0.0.1:8000/api/user/my-courses', {
-                headers: {
-                    'Accept': 'application/json',
-                    'Authorization': `Bearer ${authToken}`,
-                },
-            });
-
-            // Get completed courses
-            const completed = response.data.courses
-                .filter(course => course.status === 'completed' || course.status === 'enrolled')
-                .map(course => course.title);
-
-            setUserCourses(completed);
-        } catch (error) {
-            console.error('Error fetching user courses:', error);
-            // Sample completed courses for testing
-            setUserCourses([
-                'Introduction to 3D Printing',
-                'Laser Cutting Safety & Operation',
-            ]);
-        }
-    };
-
-    // Check if user has required training for a machine
-    const checkTrainingRequirement = (machine) => {
-        if (!machine.required_course) return true; // No requirement
-
-        const hasTraining = userCourses.includes(machine.required_course);
-        setHasRequiredTraining(hasTraining);
-        return hasTraining;
+    // Check training using API-provided has_required_training
+    const hasTrainingForMachine = (machine) => {
+        return machine.has_required_training === true;
     };
 
     // Open details modal
     const handleViewDetails = (machine) => {
         setSelectedMachine(machine);
-        checkTrainingRequirement(machine);
         setShowDetailsModal(true);
     };
 
@@ -194,12 +127,7 @@ export default function BookMachine() {
             setBookedDates(response.data.dates || []);
         } catch (error) {
             console.error('Error fetching booked dates:', error);
-            // Sample booked dates
-            setBookedDates([
-                '2026-05-01',
-                '2026-05-02',
-                '2026-05-05',
-            ]);
+            setBookedDates([]);
         }
     };
 
@@ -234,8 +162,8 @@ export default function BookMachine() {
         setBookingSubmitting(true);
         setBookingMessage('');
 
-        // Check training requirement
-        if (!hasRequiredTraining) {
+        // Check training using API-provided field
+        if (selectedMachine && !hasTrainingForMachine(selectedMachine)) {
             setBookingMessage('❌ You must complete the required training before booking this machine.');
             setBookingSubmitting(false);
             return;
@@ -448,18 +376,30 @@ export default function BookMachine() {
                                                 {machine.status.charAt(0).toUpperCase() + machine.status.slice(1)}
                                             </span>
 
+                                            {/* Show training status badge */}
+                                            {machine.required_courses?.length > 0 && (
+                                                <div className="mb-3">
+                                                    <span className={`inline-block px-2 py-1 rounded text-[10px] font-medium ${machine.has_required_training
+                                                        ? 'bg-green-100 text-green-700'
+                                                        : 'bg-red-100 text-red-700'
+                                                        }`}>
+                                                        {machine.has_required_training ? '✅ Trained' : '🚫 Training Required'}
+                                                    </span>
+                                                </div>
+                                            )}
+
                                             <button
                                                 onClick={() => handleViewDetails(machine)}
                                                 disabled={machine.status !== 'available'}
                                                 className={`w-full py-2.5 px-4 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${machine.status === 'available'
-                                                        ? 'bg-blue-600 text-white hover:bg-blue-700'
-                                                        : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                                    ? 'bg-blue-600 text-white hover:bg-blue-700'
+                                                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                                                     }`}
                                             >
                                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                                 </svg>
-                                                {machine.status === 'available' ? 'Book Now' :
+                                                {machine.status === 'available' ? 'View Details' :
                                                     machine.status === 'busy' ? 'In Use' : 'Maintenance'}
                                             </button>
                                         </div>
@@ -481,12 +421,14 @@ export default function BookMachine() {
                 </main>
             </div>
 
-            {/* Machine Details Modal */}
+            {/* ✅ FIXED: Machine Details Modal - Proper flex layout for scrolling */}
             {showDetailsModal && selectedMachine && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={closeDetailsModal}>
-                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl" onClick={(e) => e.stopPropagation()}>
-                        {/* Modal Header */}
-                        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+                    {/* ✅ FIXED: Single wrapper with flex column layout */}
+                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+
+                        {/* Modal Header - Sticky top */}
+                        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white rounded-t-2xl z-10">
                             <h3 className="text-xl font-bold text-gray-900">Machine Details</h3>
                             <button onClick={closeDetailsModal} className="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100 transition-colors">
                                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -495,18 +437,18 @@ export default function BookMachine() {
                             </button>
                         </div>
 
-                        {/* Modal Body */}
-                        <div className="p-6">
+                        {/* Modal Body - Scrollable content */}
+                        <div className="p-6 overflow-y-auto flex-1">
                             {/* Machine Image */}
-                            <div className="h-64 bg-gradient-to-br from-blue-50 to-cyan-50 rounded-lg mb-6 flex items-center justify-center">
-                                <svg className="w-24 h-24 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <div className="h-48 bg-gradient-to-br from-blue-50 to-cyan-50 rounded-lg mb-6 flex items-center justify-center">
+                                <svg className="w-20 h-20 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                 </svg>
                             </div>
 
                             {/* Machine Info Grid */}
-                            <div className="grid grid-cols-2 gap-6 mb-6">
+                            <div className="grid grid-cols-2 gap-4 mb-6">
                                 <div>
                                     <p className="text-sm text-gray-500 mb-1">Machine Name</p>
                                     <p className="font-semibold text-gray-900">{selectedMachine.name}</p>
@@ -540,51 +482,71 @@ export default function BookMachine() {
                             </div>
 
                             {/* Training Requirement Warning */}
-                            {!hasRequiredTraining && selectedMachine.required_course && (
-                                <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+                            {selectedMachine.required_courses?.length > 0 && (
+                                <div className={`mb-6 p-4 rounded-lg border ${hasTrainingForMachine(selectedMachine)
+                                    ? 'bg-green-50 border-green-200'
+                                    : 'bg-red-50 border-red-200'
+                                    }`}>
                                     <div className="flex items-start gap-3">
-                                        <svg className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                        <svg className={`w-5 h-5 flex-shrink-0 mt-0.5 ${hasTrainingForMachine(selectedMachine) ? 'text-green-600' : 'text-red-600'
+                                            }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={
+                                                hasTrainingForMachine(selectedMachine)
+                                                    ? "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                                                    : "M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                                            } />
                                         </svg>
                                         <div>
-                                            <p className="text-sm font-semibold text-red-800">Training Required</p>
-                                            <p className="text-xs text-red-700 mt-1">
-                                                You must complete <strong>"{selectedMachine.required_course}"</strong> before booking this machine.
+                                            <p className={`text-sm font-semibold ${hasTrainingForMachine(selectedMachine) ? 'text-green-800' : 'text-red-800'
+                                                }`}>
+                                                {hasTrainingForMachine(selectedMachine) ? '✅ Training Completed' : '🚫 Training Required'}
                                             </p>
-                                            <Link to="/user/courses" className="inline-block mt-2 text-xs font-medium text-red-700 underline hover:text-red-800">
-                                                View Available Courses →
-                                            </Link>
+                                            <p className={`text-xs mt-1 ${hasTrainingForMachine(selectedMachine) ? 'text-green-700' : 'text-red-700'
+                                                }`}>
+                                                {hasTrainingForMachine(selectedMachine)
+                                                    ? 'You have completed the required training for this machine.'
+                                                    : `Complete one of these courses to book: ${selectedMachine.required_course_names?.join(', ')}`}
+                                            </p>
+                                            {!hasTrainingForMachine(selectedMachine) && (
+                                                <Link to="/user/courses" className="inline-block mt-2 text-xs font-medium text-red-700 underline hover:text-red-800">
+                                                    View Available Courses →
+                                                </Link>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
                             )}
+                        </div>
 
-                            {/* Book Now Button */}
-                            {selectedMachine.status === 'available' && (
+                        {/* Modal Footer - Sticky bottom */}
+                        {selectedMachine.status === 'available' && (
+                            <div className="px-6 py-4 border-t border-gray-200 sticky bottom-0 bg-white rounded-b-2xl">
                                 <button
                                     onClick={handleBookNow}
-                                    disabled={!hasRequiredTraining && selectedMachine.required_course}
-                                    className={`w-full py-3 font-semibold rounded-lg transition-colors ${hasRequiredTraining || !selectedMachine.required_course
-                                            ? 'bg-blue-600 text-white hover:bg-blue-700'
-                                            : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                    disabled={!hasTrainingForMachine(selectedMachine) && selectedMachine.required_courses?.length > 0}
+                                    className={`w-full py-3 font-semibold rounded-lg transition-colors ${hasTrainingForMachine(selectedMachine) || !selectedMachine.required_courses?.length
+                                        ? 'bg-blue-600 text-white hover:bg-blue-700'
+                                        : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                                         }`}
                                 >
-                                    {hasRequiredTraining || !selectedMachine.required_course
+                                    {hasTrainingForMachine(selectedMachine) || !selectedMachine.required_courses?.length
                                         ? 'Book This Machine'
                                         : 'Complete Required Training First'}
                                 </button>
-                            )}
-                        </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
 
-            {/* Booking Modal with Date Selection */}
+            {/* ✅ FIXED: Booking Modal - Proper flex layout for scrolling */}
             {showBookingModal && selectedMachine && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={closeBookingModal}>
-                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-                        {/* Modal Header */}
-                        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white">
+                    {/* ✅ FIXED: Single wrapper with flex column layout */}
+                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+
+                        {/* Modal Header - Sticky top */}
+                        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white rounded-t-2xl z-10">
                             <div>
                                 <h3 className="text-xl font-bold text-gray-900">Book {selectedMachine.name}</h3>
                                 <p className="text-sm text-gray-500 mt-1">Select your booking dates</p>
@@ -596,9 +558,9 @@ export default function BookMachine() {
                             </button>
                         </div>
 
-                        {/* Modal Body */}
-                        <form onSubmit={handleBookingSubmit}>
-                            <div className="p-6 space-y-6">
+                        {/* Modal Body - Scrollable form content */}
+                        <form onSubmit={handleBookingSubmit} className="flex flex-col flex-1">
+                            <div className="p-6 space-y-6 overflow-y-auto flex-1">
                                 {/* Machine Info */}
                                 <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
                                     <p className="text-sm font-medium text-blue-900">{selectedMachine.name}</p>
@@ -686,8 +648,8 @@ export default function BookMachine() {
                                 </div>
                             </div>
 
-                            {/* Modal Footer */}
-                            <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-end gap-3 sticky bottom-0">
+                            {/* Modal Footer - Sticky bottom */}
+                            <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-end gap-3 sticky bottom-0 bg-white rounded-b-2xl">
                                 <button
                                     type="button"
                                     onClick={closeBookingModal}

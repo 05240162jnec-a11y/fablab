@@ -10,20 +10,21 @@ class Course extends Model
     use HasFactory;
 
     protected $fillable = [
-        'title',
-        'instructor',
-        'duration',
-        'schedule',
-        'seat_limit',
-        'enrollment',
-        'status',
-        'registration_status',
-        'description',
-        'image',
-        'start_date',      // ✅ ADD THIS
-        'end_date',        // ✅ ADD THIS
-        'registration_open', // ✅ ADD THIS
-    ];
+    'title',
+    'instructor',
+    'duration',
+    'start_date',
+    'end_date',
+    'schedule',
+    'seat_limit',
+    'enrollment',
+    'status',
+    'registration_open',
+    'registration_status',
+    'description',
+    'image',
+    'certificate_template_path',  
+];
 
     protected $casts = [
         'start_date' => 'date',           // ✅ ADD THIS

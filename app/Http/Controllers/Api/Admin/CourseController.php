@@ -430,113 +430,39 @@ class CourseController extends Controller
     // ✅ NEW: Generate certificate PDF for a specific user
     public function generateCertificate($courseId, $userId)
     {
-        $course = Course::findOrFail($courseId);
-        $user = \App\Models\User::findOrFail($userId);
-        
-        // Get enrollment record
-        $enrollment = DB::table('course_enrollments')
-            ->where('course_id', $courseId)
-            ->where('user_id', $userId)
-            ->first();
-        
-        if (!$enrollment || $enrollment->status !== 'completed') {
-            return response()->json([
-                'success' => false,
-                'message' => 'User has not completed this course'
-            ], 404);
-        }
-        
-        // Generate unique certificate ID if not exists
-        if (!$enrollment->certificate_id) {
-            $certId = 'CERT-' . date('Y') . '-' . str_pad($enrollment->id, 4, '0', STR_PAD_LEFT);
-            DB::table('course_enrollments')
-                ->where('id', $enrollment->id)
-                ->update([
-                    'certificate_id' => $certId,
-                    'certificate_generated_at' => now()
-                ]);
-            $enrollment->certificate_id = $certId;
-        }
-        
-        // Check if template exists
-        if (!$course->certificate_template_path) {
-            return response()->json([
-                'success' => false,
-                'message' => 'No certificate template uploaded for this course'
-            ], 400);
-        }
-        
-        // Load template image
-        $templatePath = storage_path('app/public/' . $course->certificate_template_path);
-        
-        // Get image dimensions
-        $imageSize = getimagesize($templatePath);
-        $width = $imageSize[0];
-        $height = $imageSize[1];
-        
-        // Create PDF
-        $pdf = Pdf::loadView('admin.certificates.certificate', [
-            'template_path' => $course->certificate_template_path,
-            'student_name' => $user->name,
-            'course_name' => $course->title,
-            'completion_date' => $enrollment->completed_at ? \Carbon\Carbon::parse($enrollment->completed_at)->format('F d, Y') : \Carbon\Carbon::now()->format('F d, Y'),
-            'certificate_id' => $enrollment->certificate_id,
-            'instructor_name' => $course->instructor,
-            'issue_date' => \Carbon\Carbon::now()->format('F d, Y'),
-            'width' => $width,
-            'height' => $height
-        ]);
-        
-        $pdf->setPaper([0, 0, $width, $height], 'portrait');
-        
-        // Return as download
-        $filename = 'Certificate_' . str_replace(' ', '_', $user->name) . '_' . $enrollment->certificate_id . '.pdf';
-        
-        return $pdf->download($filename);
-    }
-
-    // ✅ NEW: Generate certificates for ALL completed users in a course
-    public function generateBulkCertificates($courseId)
-    {
-        $course = Course::findOrFail($courseId);
-        
-        // Get all completed enrollments
-        $enrollments = DB::table('course_enrollments')
-            ->join('users', 'course_enrollments.user_id', '=', 'users.id')
-            ->where('course_enrollments.course_id', $courseId)
-            ->where('course_enrollments.status', 'completed')
-            ->select(
-                'course_enrollments.*',
-                'users.name as user_name',
-                'users.email'
-            )
-            ->get();
-        
-        if ($enrollments->count() === 0) {
-            return response()->json([
-                'success' => false,
-                'message' => 'No completed users found for this course'
-            ], 404);
-        }
-        
-        // Check if template exists
-        if (!$course->certificate_template_path) {
-            return response()->json([
-                'success' => false,
-                'message' => 'No certificate template uploaded for this course'
-            ], 400);
-        }
-        
-        // Create temporary directory for PDFs
-        $tempDir = storage_path('app/temp/certificates_' . $courseId);
-        if (!file_exists($tempDir)) {
-            mkdir($tempDir, 0755, true);
-        }
-        
-        $generatedFiles = [];
-        
-        // Generate PDF for each user
-        foreach ($enrollments as $enrollment) {
+        try {
+            // ✅ DEBUG: Log auth status
+            \Log::info('=== CERTIFICATE REQUEST ===');
+            \Log::info('Course ID: ' . $courseId);
+            \Log::info('User ID: ' . $userId);
+            \Log::info('Auth User ID: ' . (auth()->id() ?? 'GUEST'));
+            \Log::info('Auth Check: ' . (auth()->check() ? 'AUTHENTICATED' : 'NOT AUTHENTICATED'));
+            
+            $course = Course::findOrFail($courseId);
+            $user = \App\Models\User::findOrFail($userId);
+            
+            // Get enrollment record
+            $enrollment = DB::table('course_enrollments')
+                ->where('course_id', $courseId)
+                ->where('user_id', $userId)
+                ->first();
+            
+            if (!$enrollment) {
+                \Log::error('Enrollment not found for course ' . $courseId . ' user ' . $userId);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Enrollment not found'
+                ], 404);
+            }
+            
+            if ($enrollment->status !== 'completed') {
+                \Log::error('User ' . $userId . ' has status ' . $enrollment->status . ' (not completed)');
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User has not completed this course'
+                ], 400);
+            }
+            
             // Generate unique certificate ID if not exists
             if (!$enrollment->certificate_id) {
                 $certId = 'CERT-' . date('Y') . '-' . str_pad($enrollment->id, 4, '0', STR_PAD_LEFT);
@@ -549,54 +475,204 @@ class CourseController extends Controller
                 $enrollment->certificate_id = $certId;
             }
             
+            // Check if template exists
+            if (!$course->certificate_template_path) {
+                \Log::error('No certificate template for course ' . $courseId);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No certificate template uploaded for this course'
+                ], 400);
+            }
+            
             // Load template image
             $templatePath = storage_path('app/public/' . $course->certificate_template_path);
-            $imageSize = getimagesize($templatePath);
-            $width = $imageSize[0];
-            $height = $imageSize[1];
+            
+            if (!file_exists($templatePath)) {
+                \Log::error('Template file not found: ' . $templatePath);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Certificate template file not found'
+                ], 404);
+            }
+            
+            // ✅ Use standard A4 dimensions (in points at 72 DPI)
+            // No need for getimagesize() which can fail with DomPDF
+            $width = 842;   // A4 width
+            $height = 595;  // A4 height
+            
+            // ✅ Parse enrollment data for student number
+            $enrollmentData = json_decode($enrollment->enrollment_data ?? '{}', true);
+            $studentNumber = $enrollmentData['student_number'] ?? $enrollmentData['phone'] ?? 'N/A';
+            
+            // ✅ Extract dates from course
+            $startDate = $course->start_date ? \Carbon\Carbon::parse($course->start_date)->format('jS F Y') : 'N/A';
+            $endDate = $course->end_date ? \Carbon\Carbon::parse($course->end_date)->format('jS F Y') : 'N/A';
             
             // Create PDF
             $pdf = Pdf::loadView('admin.certificates.certificate', [
                 'template_path' => $course->certificate_template_path,
-                'student_name' => $enrollment->user_name,
+                'student_name' => $user->name,
+                'student_number' => $studentNumber,
                 'course_name' => $course->title,
                 'completion_date' => $enrollment->completed_at ? \Carbon\Carbon::parse($enrollment->completed_at)->format('F d, Y') : \Carbon\Carbon::now()->format('F d, Y'),
                 'certificate_id' => $enrollment->certificate_id,
                 'instructor_name' => $course->instructor,
                 'issue_date' => \Carbon\Carbon::now()->format('F d, Y'),
+                'start_date' => $startDate,
+                'end_date' => $endDate,
                 'width' => $width,
                 'height' => $height
             ]);
             
             $pdf->setPaper([0, 0, $width, $height], 'portrait');
             
-            // Save to temp directory
-            $filename = 'Certificate_' . str_replace(' ', '_', $enrollment->user_name) . '_' . $enrollment->certificate_id . '.pdf';
-            $filepath = $tempDir . '/' . $filename;
-            $pdf->save($filepath);
-            $generatedFiles[] = ['path' => $filepath, 'name' => $filename];
+            // Return as download
+            $filename = 'Certificate_' . str_replace(' ', '_', $user->name) . '_' . $enrollment->certificate_id . '.pdf';
+            
+            \Log::info('Certificate generated successfully for user ' . $userId);
+            return $pdf->download($filename);
+            
+        } catch (\Exception $e) {
+            \Log::error('Certificate generation error: ' . $e->getMessage() . ' at ' . $e->getFile() . ':' . $e->getLine());
+            return response()->json([
+                'success' => false,
+                'message' => 'Error generating certificate: ' . $e->getMessage()
+            ], 500);
         }
-        
-        // Create ZIP file
-        $zipFilename = 'Certificates_' . str_replace(' ', '_', $course->title) . '_' . date('Y-m-d') . '.zip';
-        $zipPath = $tempDir . '/../' . $zipFilename;
-        
-        $zip = new ZipArchive();
-        if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) === TRUE) {
+    }
+
+    // ✅ NEW: Generate certificates for ALL completed users in a course
+    public function generateBulkCertificates($courseId)
+    {
+        try {
+            // ✅ DEBUG: Log auth status for bulk generation
+            \Log::info('=== BULK CERTIFICATE REQUEST ===');
+            \Log::info('Course ID: ' . $courseId);
+            \Log::info('Auth User ID: ' . (auth()->id() ?? 'GUEST'));
+            \Log::info('Auth Check: ' . (auth()->check() ? 'AUTHENTICATED' : 'NOT AUTHENTICATED'));
+            
+            $course = Course::findOrFail($courseId);
+            
+            // Get all completed enrollments
+            $enrollments = DB::table('course_enrollments')
+                ->join('users', 'course_enrollments.user_id', '=', 'users.id')
+                ->where('course_enrollments.course_id', $courseId)
+                ->where('course_enrollments.status', 'completed')
+                ->select(
+                    'course_enrollments.*',
+                    'users.name as user_name',
+                    'users.email'
+                )
+                ->get();
+            
+            if ($enrollments->count() === 0) {
+                \Log::error('No completed users found for course ' . $courseId);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No completed users found for this course'
+                ], 404);
+            }
+            
+            // Check if template exists
+            if (!$course->certificate_template_path) {
+                \Log::error('No certificate template for course ' . $courseId);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No certificate template uploaded for this course'
+                ], 400);
+            }
+            
+            // Create temporary directory for PDFs
+            $tempDir = storage_path('app/temp/certificates_' . $courseId);
+            if (!file_exists($tempDir)) {
+                mkdir($tempDir, 0755, true);
+            }
+            
+            $generatedFiles = [];
+            
+            // ✅ Extract dates from course (once, for all certificates)
+            $startDate = $course->start_date ? \Carbon\Carbon::parse($course->start_date)->format('jS F Y') : 'N/A';
+            $endDate = $course->end_date ? \Carbon\Carbon::parse($course->end_date)->format('jS F Y') : 'N/A';
+            
+            // Load template image (once)
+            $templatePath = storage_path('app/public/' . $course->certificate_template_path);
+            // ✅ Use standard A4 dimensions (in points at 72 DPI)
+            $width = 842;   // A4 width
+            $height = 595;  // A4 height
+            
+            // Generate PDF for each user
+            foreach ($enrollments as $enrollment) {
+                // Generate unique certificate ID if not exists
+                if (!$enrollment->certificate_id) {
+                    $certId = 'CERT-' . date('Y') . '-' . str_pad($enrollment->id, 4, '0', STR_PAD_LEFT);
+                    DB::table('course_enrollments')
+                        ->where('id', $enrollment->id)
+                        ->update([
+                            'certificate_id' => $certId,
+                            'certificate_generated_at' => now()
+                        ]);
+                    $enrollment->certificate_id = $certId;
+                }
+                
+                // ✅ Parse enrollment data for student number
+                $enrollmentData = json_decode($enrollment->enrollment_data ?? '{}', true);
+                $studentNumber = $enrollmentData['student_number'] ?? $enrollmentData['phone'] ?? 'N/A';
+                
+                // Create PDF
+                $pdf = Pdf::loadView('admin.certificates.certificate', [
+                    'template_path' => $course->certificate_template_path,
+                    'student_name' => $enrollment->user_name,
+                    'student_number' => $studentNumber,
+                    'course_name' => $course->title,
+                    'completion_date' => $enrollment->completed_at ? \Carbon\Carbon::parse($enrollment->completed_at)->format('F d, Y') : \Carbon\Carbon::now()->format('F d, Y'),
+                    'certificate_id' => $enrollment->certificate_id,
+                    'instructor_name' => $course->instructor,
+                    'issue_date' => \Carbon\Carbon::now()->format('F d, Y'),
+                    'start_date' => $startDate,
+                    'end_date' => $endDate,
+                    'width' => $width,
+                    'height' => $height
+                ]);
+                
+                $pdf->setPaper([0, 0, $width, $height], 'portrait');
+                
+                // Save to temp directory
+                $filename = 'Certificate_' . str_replace(' ', '_', $enrollment->user_name) . '_' . $enrollment->certificate_id . '.pdf';
+                $filepath = $tempDir . '/' . $filename;
+                $pdf->save($filepath);
+                $generatedFiles[] = ['path' => $filepath, 'name' => $filename];
+            }
+            
+            // Create ZIP file
+            $zipFilename = 'Certificates_' . str_replace(' ', '_', $course->title) . '_' . date('Y-m-d') . '.zip';
+            $zipPath = $tempDir . '/../' . $zipFilename;
+            
+            $zip = new ZipArchive();
+            if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) === TRUE) {
+                foreach ($generatedFiles as $file) {
+                    $zip->addFile($file['path'], $file['name']);
+                }
+                $zip->close();
+            }
+            
+            // Clean up temp PDFs
             foreach ($generatedFiles as $file) {
-                $zip->addFile($file['path'], $file['name']);
+                if (file_exists($file['path'])) {
+                    unlink($file['path']);
+                }
             }
-            $zip->close();
+            
+            \Log::info('Bulk certificates generated successfully for course ' . $courseId);
+            
+            // Return ZIP download
+            return response()->download($zipPath, $zipFilename)->deleteFileAfterSend(true);
+            
+        } catch (\Exception $e) {
+            \Log::error('Bulk certificate generation error: ' . $e->getMessage() . ' at ' . $e->getFile() . ':' . $e->getLine());
+            return response()->json([
+                'success' => false,
+                'message' => 'Error generating certificates: ' . $e->getMessage()
+            ], 500);
         }
-        
-        // Clean up temp PDFs
-        foreach ($generatedFiles as $file) {
-            if (file_exists($file['path'])) {
-                unlink($file['path']);
-            }
-        }
-        
-        // Return ZIP download
-        return response()->download($zipPath, $zipFilename)->deleteFileAfterSend(true);
     }
 }

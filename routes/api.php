@@ -65,8 +65,8 @@ Route::prefix('admin')->group(function () {
         Route::delete('courses/{id}/certificate-template', [\App\Http\Controllers\Api\Admin\CourseController::class, 'removeCertificateTemplate']);
 
         // Certificate generation
-        Route::get('courses/{courseId}/certificates/{userId}', [\App\Http\Controllers\Api\Admin\CourseController::class, 'generateCertificate']);
         Route::get('courses/{courseId}/certificates/bulk', [\App\Http\Controllers\Api\Admin\CourseController::class, 'generateBulkCertificates']);
+        Route::get('courses/{courseId}/certificates/{userId}', [\App\Http\Controllers\Api\Admin\CourseController::class, 'generateCertificate']);
 
         // Duplicate course for new semester
         Route::post('courses/{id}/duplicate', [\App\Http\Controllers\Api\Admin\CourseController::class, 'duplicate']);

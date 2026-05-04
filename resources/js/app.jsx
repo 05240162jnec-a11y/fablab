@@ -32,6 +32,7 @@ import ProductionTeam from './Pages/Admin/ProductionTeam';
 import AdminMachines from './Pages/Admin/Machines';
 import AdminBookings from './Pages/Admin/Bookings';
 import AdminCourses from './Pages/Admin/Courses';
+import Certificates from './Pages/Admin/Certificates';
 import AdminCustomOrders from './Pages/Admin/CustomOrders';
 import AdminInventory from './Pages/Admin/Inventory';
 import AdminProjects from './Pages/Admin/Projects';
@@ -82,6 +83,7 @@ root.render(
             <Route path="/admin/machines" element={<AdminMachines />} />
             <Route path="/admin/bookings" element={<AdminBookings />} />
             <Route path="/admin/courses" element={<AdminCourses />} />
+            <Route path="/admin/certificates" element={<Certificates />} />
             <Route path="/admin/custom-orders" element={<AdminCustomOrders />} />
             <Route path="/admin/inventory" element={<AdminInventory />} />
             <Route path="/admin/projects" element={<AdminProjects />} />

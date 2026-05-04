@@ -350,7 +350,7 @@ export default function Courses() {
         }
     };
 
-    // ✅ NEW: Generate bulk certificates for all completed users
+    // ✅ UPDATED: Generate bulk certificates for all completed users - FIXED auth issue
     const handleGenerateBulkCertificates = async () => {
         if (!window.confirm(`Generate certificates for ALL completed users in "${selectedCourse.title}"?\n\nThis may take a moment for large classes.`)) {
             return;
@@ -361,17 +361,39 @@ export default function Courses() {
         try {
             const token = localStorage.getItem('admin_token');
 
-            // Use window.location to trigger ZIP download
-            window.location.href = `http://127.0.0.1:8000/api/admin/courses/${selectedCourse.id}/certificates/bulk?token=${token}`;
+            // ✅ Use axios with blob response to send Authorization header
+            const response = await axios.get(
+                `http://127.0.0.1:8000/api/admin/courses/${selectedCourse.id}/certificates/bulk`,
+                {
+                    headers: {
+                        'Accept': 'application/zip',
+                        'Authorization': `Bearer ${token}`,
+                    },
+                    responseType: 'blob'  // ✅ Important for ZIP download
+                }
+            );
 
-            // Show success message after a delay
-            setTimeout(() => {
-                alert(`✅ Certificates ZIP file is downloading!`);
-            }, 2000);
+            // Create download link
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `Certificates_${selectedCourse.title.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.zip`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(url);
+
+            alert(`✅ Certificates ZIP file is downloading!`);
 
         } catch (err) {
             console.error('Bulk generate error:', err);
-            alert('❌ Failed to generate certificates. Please try again.');
+            if (err.response?.status === 404) {
+                alert('❌ No completed users found for this course');
+            } else if (err.response?.status === 400) {
+                alert('❌ No certificate template uploaded for this course');
+            } else {
+                alert('❌ Failed to generate certificates. Please try again.');
+            }
         } finally {
             setGeneratingBulk(false);
         }
@@ -784,6 +806,17 @@ export default function Courses() {
                                 </svg>
                                 Create Course
                             </button>
+                            {/* Manage Certificates Button */}
+                            <Link
+                                to="/admin/certificates"
+                                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                            >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                                Manage Certificates
+                            </Link>
+
 
                             {/* Notifications */}
                             <button className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors">

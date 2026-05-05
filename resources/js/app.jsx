@@ -37,11 +37,13 @@ import AdminCustomOrders from './Pages/Admin/CustomOrders';
 import AdminInventory from './Pages/Admin/Inventory';
 import AdminProjects from './Pages/Admin/Projects';
 import AdminGallery from './Pages/Admin/Gallery';
-import AdminFAQ from './Pages/Admin/FAQ'; 
+import AdminFAQ from './Pages/Admin/FAQ';
 
-import UserDashboard from './Pages/User/Dashboard'; 
-import BookMachine from './Pages/User/BookMachine'; 
-import Courses from './Pages/User/Courses'; 
+// User Pages
+import UserDashboard from './Pages/User/Dashboard';
+import BookMachine from './Pages/User/BookMachine';
+import UserCourses from './Pages/User/Courses';
+import CustomOrders from './Pages/User/CustomOrders';
 
 // Create root element
 const root = createRoot(document.getElementById('app'));
@@ -74,11 +76,7 @@ root.render(
             {/* Admin Pages */}
             <Route path="/admin/login" element={<AdminLogin />} />
             <Route path="/admin/dashboard" element={<AdminDashboard />} />
-            {/* <Route path="/admin/users" element={<AdminUsers />} /> */}  ← Comment out until created
-            {/* Admin Pages */}
-            <Route path="/admin/login" element={<AdminLogin />} />
-            <Route path="/admin/dashboard" element={<AdminDashboard />} />
-            <Route path="/admin/users" element={<Users />} />  {/* ← ADD THIS */}
+            <Route path="/admin/users" element={<Users />} />
             <Route path="/admin/production-team" element={<ProductionTeam />} />
             <Route path="/admin/machines" element={<AdminMachines />} />
             <Route path="/admin/bookings" element={<AdminBookings />} />
@@ -87,14 +85,14 @@ root.render(
             <Route path="/admin/custom-orders" element={<AdminCustomOrders />} />
             <Route path="/admin/inventory" element={<AdminInventory />} />
             <Route path="/admin/projects" element={<AdminProjects />} />
-            <Route path="/admin/projects" element={<AdminProjects />} />
-            <Route path="/admin/gallery" element={<AdminGallery />} />  
-            <Route path="/admin/faq" element={<AdminFAQ />} /> 
+            <Route path="/admin/gallery" element={<AdminGallery />} />
+            <Route path="/admin/faq" element={<AdminFAQ />} />
 
             {/* User Pages */}
-            <Route path="/user/dashboard" element={<UserDashboard />} /> 
+            <Route path="/user/dashboard" element={<UserDashboard />} />
             <Route path="/user/book-machine" element={<BookMachine />} />
-            <Route path="/user/courses" element={<Courses />} />
+            <Route path="/user/courses" element={<UserCourses />} />
+            <Route path="/user/custom-orders" element={<CustomOrders />} />
         </Routes>
     </BrowserRouter>
 );

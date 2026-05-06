@@ -16,12 +16,6 @@ Route::prefix('admin')->group(function () {
     // ← Protected admin routes (require token)
     Route::middleware('auth:sanctum')->group(function () {
         
-        // Custom Orders
-        Route::apiResource('custom-orders', \App\Http\Controllers\Api\Admin\CustomOrderController::class)
-            ->only(['index', 'show', 'destroy']);
-        Route::post('custom-orders/{id}/approve', [\App\Http\Controllers\Api\Admin\CustomOrderController::class, 'approve']);
-        Route::post('custom-orders/{id}/reject', [\App\Http\Controllers\Api\Admin\CustomOrderController::class, 'reject']);
-        
         // Users
         Route::apiResource('users', \App\Http\Controllers\Api\Admin\UserController::class)
             ->only(['index', 'show', 'update', 'destroy']);
@@ -127,6 +121,11 @@ Route::middleware('auth:sanctum')->group(function () {
     // User Bookings
     Route::post('/user/bookings', [App\Http\Controllers\Api\UserBookingController::class, 'store']);
     Route::get('/user/my-bookings', [App\Http\Controllers\Api\UserBookingController::class, 'myBookings']);
+    
+    // ✅ Custom Orders - Real Controller Routes (FIXED: in user group, not admin!)
+    Route::get('/user/custom-orders', [\App\Http\Controllers\Api\User\CustomOrderController::class, 'index']);
+    Route::post('/user/custom-orders', [\App\Http\Controllers\Api\User\CustomOrderController::class, 'store']);
+    Route::get('/user/custom-orders/{id}', [\App\Http\Controllers\Api\User\CustomOrderController::class, 'show']);
     
 });
 

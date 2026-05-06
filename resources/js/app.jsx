@@ -43,7 +43,7 @@ import AdminFAQ from './Pages/Admin/FAQ';
 import UserDashboard from './Pages/User/Dashboard';
 import BookMachine from './Pages/User/BookMachine';
 import UserCourses from './Pages/User/Courses';
-import CustomOrders from './Pages/User/CustomOrders';
+import CustomOrders from './Pages/User/CustomOrders';  // ✅ ADDED THIS IMPORT
 
 // Create root element
 const root = createRoot(document.getElementById('app'));

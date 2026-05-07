@@ -55,6 +55,8 @@ class CustomOrderController extends Controller
                 'description' => 'required|string',
                 'quantity' => 'required|integer|min:1',
                 'material' => 'nullable|string|max:255',
+                'order_number' => 'ORD-' . strtoupper(\Illuminate\Support\Str::random(8)),
+
                 'design_image' => 'nullable|image|max:5120', // 5MB max
             ]);
 
@@ -73,7 +75,7 @@ class CustomOrderController extends Controller
                 'description' => $validated['description'],
                 'quantity' => $validated['quantity'],
                 'material' => $validated['material'] ?? null,
-                'design_image' => $designImagePath,
+                'image' => $imagePath,
                 'status' => 'pending',
             ]);
 

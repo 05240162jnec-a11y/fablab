@@ -623,7 +623,7 @@ export default function CustomOrders() {
                             {/* Design Image */}
                             {selectedOrder.design_image ? (
                                 <img
-                                    src={`http://127.0.0.1:8000/storage/${selectedOrder.design_image}`}
+                                    src={`http://127.0.0.1:8000/storage/${selectedOrder.image}`}
                                     alt={selectedOrder.title}
                                     className="w-full h-48 object-cover rounded-lg mb-4"
                                 />

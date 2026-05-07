@@ -38,6 +38,13 @@ Route::prefix('admin')->group(function () {
         Route::post('product-orders/{id}/approve', [\App\Http\Controllers\Api\Admin\ProductOrderController::class, 'approve']);
         Route::post('product-orders/{id}/reject', [\App\Http\Controllers\Api\Admin\ProductOrderController::class, 'reject']);
         Route::get('product-orders/{id}/screenshot', [\App\Http\Controllers\Api\Admin\ProductOrderController::class, 'screenshot']);
+
+        /// Products
+        Route::get('/products', [App\Http\Controllers\Api\Admin\ProductController::class, 'index']);
+        Route::post('/products', [App\Http\Controllers\Api\Admin\ProductController::class, 'store']);
+        Route::put('/products/{product}', [App\Http\Controllers\Api\Admin\ProductController::class, 'update']);
+        Route::put('/products/{product}/toggle-status', [App\Http\Controllers\Api\Admin\ProductController::class, 'toggleStatus']);
+        Route::delete('/products/{product}', [App\Http\Controllers\Api\Admin\ProductController::class, 'destroy']);
         
         // Courses
         Route::apiResource('courses', \App\Http\Controllers\Api\Admin\CourseController::class);
@@ -107,6 +114,9 @@ Route::middleware('auth:sanctum')->group(function () {
     // User Profile
     Route::get('/user/profile', [App\Http\Controllers\Api\UserController::class, 'profile']);
 
+    // ✅ User Products (Shop)
+    Route::get('/user/products', [App\Http\Controllers\Api\Admin\ProductController::class, 'index']);
+
     // User Machines
     Route::get('/user/machines', [App\Http\Controllers\Api\UserMachineController::class, 'index']);
     Route::get('/user/machines/{id}/booked-dates', [App\Http\Controllers\Api\UserMachineController::class, 'bookedDates']);
@@ -126,6 +136,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user/custom-orders', [\App\Http\Controllers\Api\User\CustomOrderController::class, 'index']);
     Route::post('/user/custom-orders', [\App\Http\Controllers\Api\User\CustomOrderController::class, 'store']);
     Route::get('/user/custom-orders/{id}', [\App\Http\Controllers\Api\User\CustomOrderController::class, 'show']);
+
+    // ✅ Product Orders (Shop)
+    Route::get('/user/product-orders', [\App\Http\Controllers\Api\User\ProductOrderController::class, 'index']);
+    Route::post('/user/product-orders', [\App\Http\Controllers\Api\User\ProductOrderController::class, 'store']);
+    Route::get('/user/product-orders/{id}', [\App\Http\Controllers\Api\User\ProductOrderController::class, 'show']);
     
 });
 

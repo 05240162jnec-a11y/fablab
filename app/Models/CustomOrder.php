@@ -20,11 +20,13 @@ class CustomOrder extends Model
         'description',
         'quantity',
         'material',
-        'design_image',
+        'image',
         'status',
         'estimated_price',
         'rejection_reason',
         'admin_notes',
+        'order_number',
+
         'completed_at',
     ];
 

@@ -38,12 +38,17 @@ import AdminInventory from './Pages/Admin/Inventory';
 import AdminProjects from './Pages/Admin/Projects';
 import AdminGallery from './Pages/Admin/Gallery';
 import AdminFAQ from './Pages/Admin/FAQ';
+import AdminProducts from './Pages/Admin/Products';
 
 // User Pages
 import UserDashboard from './Pages/User/Dashboard';
 import BookMachine from './Pages/User/BookMachine';
 import UserCourses from './Pages/User/Courses';
-import CustomOrders from './Pages/User/CustomOrders';  // ✅ ADDED THIS IMPORT
+import CustomOrders from './Pages/User/CustomOrders';  
+import ShopProducts from './Pages/User/ShopProducts';
+import MyOrders from './Pages/User/MyOrders';
+import MyBookings from './Pages/User/MyBookings';
+import MyEnrollments from './Pages/User/MyEnrollments';
 
 // Create root element
 const root = createRoot(document.getElementById('app'));
@@ -80,6 +85,7 @@ root.render(
             <Route path="/admin/production-team" element={<ProductionTeam />} />
             <Route path="/admin/machines" element={<AdminMachines />} />
             <Route path="/admin/bookings" element={<AdminBookings />} />
+            <Route path="/admin/products" element={<AdminProducts />} />
             <Route path="/admin/courses" element={<AdminCourses />} />
             <Route path="/admin/certificates" element={<Certificates />} />
             <Route path="/admin/custom-orders" element={<AdminCustomOrders />} />
@@ -87,12 +93,17 @@ root.render(
             <Route path="/admin/projects" element={<AdminProjects />} />
             <Route path="/admin/gallery" element={<AdminGallery />} />
             <Route path="/admin/faq" element={<AdminFAQ />} />
+            
 
             {/* User Pages */}
             <Route path="/user/dashboard" element={<UserDashboard />} />
             <Route path="/user/book-machine" element={<BookMachine />} />
             <Route path="/user/courses" element={<UserCourses />} />
             <Route path="/user/custom-orders" element={<CustomOrders />} />
+            <Route path="/user/shop-products" element={<ShopProducts />} />
+            <Route path="/user/my-orders" element={<MyOrders />} />
+            <Route path="/user/my-bookings" element={<MyBookings />} />
+            <Route path="/user/my-enrollments" element={<MyEnrollments />} />
         </Routes>
     </BrowserRouter>
 );

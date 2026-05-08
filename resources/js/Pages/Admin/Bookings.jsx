@@ -22,6 +22,11 @@ export default function Bookings() {
     // Modal States
     const [showScreenshotModal, setShowScreenshotModal] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState(null);
+    const [actionLoading, setActionLoading] = useState(false);
+
+    // Loading States
+    const [initialLoading, setInitialLoading] = useState(true);
+    const [actionMessage, setActionMessage] = useState(null);
 
     // Dropdown States
     const [showMachineDropdown, setShowMachineDropdown] = useState(false);
@@ -31,7 +36,6 @@ export default function Bookings() {
     // Backend State
     const [bookings, setBookings] = useState([]);
     const [productOrders, setProductOrders] = useState([]);
-    const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
     // Toggle submenu
@@ -45,10 +49,9 @@ export default function Bookings() {
     // Fetch data from API
     const fetchData = async () => {
         try {
-            setLoading(true);
+            setInitialLoading(true);
             const token = localStorage.getItem('admin_token');
 
-            // Fetch bookings
             const bookingsResponse = await axios.get('http://127.0.0.1:8000/api/admin/bookings', {
                 headers: {
                     'Accept': 'application/json',
@@ -62,7 +65,6 @@ export default function Bookings() {
                 }
             });
 
-            // Fetch product orders
             const ordersResponse = await axios.get('http://127.0.0.1:8000/api/admin/product-orders', {
                 headers: {
                     'Accept': 'application/json',
@@ -75,78 +77,91 @@ export default function Bookings() {
             });
 
             if (bookingsResponse.data.success && ordersResponse.data.success) {
-                setBookings(bookingsResponse.data.data);
-                setProductOrders(ordersResponse.data.data);
+                setBookings(bookingsResponse.data.data || []);
+                setProductOrders(ordersResponse.data.data || []);
                 setError(null);
             }
         } catch (err) {
             console.error('Fetch error:', err);
             setError('Failed to load data. Please try again.');
         } finally {
-            setLoading(false);
+            setInitialLoading(false);
         }
     };
 
-    // Fetch on mount and when filters change
     useEffect(() => {
         fetchData();
-    }, [activeTab, searchTerm, machineFilter, bookingStatusFilter, orderStatusFilter, dateFilter]);
+    }, [activeTab]);
 
-    // Filter bookings (client-side for better UX)
+    useEffect(() => {
+        if (actionMessage) {
+            const timer = setTimeout(() => setActionMessage(null), 3000);
+            return () => clearTimeout(timer);
+        }
+    }, [actionMessage]);
+
+    // CLIENT-SIDE: Filter bookings
     const filteredBookings = bookings.filter(booking => {
-        const matchesSearch = booking.machine?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            booking.user?.name.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesSearch = !searchTerm ||
+            ((booking.machine?.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                (booking.user?.name || '').toLowerCase().includes(searchTerm.toLowerCase()));
+
         const matchesMachine = machineFilter === 'all' ||
-            (machineFilter === '3d-printer' && booking.machine?.type.includes('3D')) ||
-            (machineFilter === 'laser-cutter' && booking.machine?.type.includes('Laser')) ||
-            (machineFilter === 'pcb-mill' && booking.machine?.type.includes('PCB')) ||
-            (machineFilter === 'cnc-router' && booking.machine?.type.includes('CNC')) ||
-            (machineFilter === 'vinyl-cutter' && booking.machine?.type.includes('Vinyl')) ||
-            (machineFilter === 'soldering' && booking.machine?.type.includes('Soldering'));
+            (machineFilter === '3d-printer' && booking.machine?.type?.includes('3D')) ||
+            (machineFilter === 'laser-cutter' && booking.machine?.type?.includes('Laser')) ||
+            (machineFilter === 'pcb-mill' && booking.machine?.type?.includes('PCB')) ||
+            (machineFilter === 'cnc-router' && booking.machine?.type?.includes('CNC')) ||
+            (machineFilter === 'vinyl-cutter' && booking.machine?.type?.includes('Vinyl')) ||
+            (machineFilter === 'soldering' && booking.machine?.type?.includes('Soldering'));
+
         const matchesStatus = bookingStatusFilter === 'all' || booking.status === bookingStatusFilter;
-        return matchesSearch && matchesMachine && matchesStatus;
+        const matchesDate = !dateFilter || booking.booking_date === dateFilter;
+
+        return matchesSearch && matchesMachine && matchesStatus && matchesDate;
     });
 
-    // Filter product orders (client-side for better UX)
+    // CLIENT-SIDE: Filter product orders
     const filteredOrders = productOrders.filter(order => {
-        const matchesSearch = order.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            order.user?.name.toLowerCase().includes(searchTerm.toLowerCase());
+        const productName = order.items?.[0]?.name || '';
+        const userName = order.user?.name || '';
+        const orderNumber = order.order_number || '';
+
+        const matchesSearch = !searchTerm ||
+            productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            orderNumber.toLowerCase().includes(searchTerm.toLowerCase());
+
         const matchesStatus = orderStatusFilter === 'all' || order.status === orderStatusFilter;
+
         return matchesSearch && matchesStatus;
     });
 
-    // Get status badge color for bookings
     const getBookingStatusBadgeClass = (status) => {
         switch (status) {
-            case 'upcoming':
-                return 'bg-orange-100 text-orange-700 border border-orange-200';
-            case 'completed':
-                return 'bg-green-100 text-green-700 border border-green-200';
-            case 'cancelled':
-                return 'bg-red-100 text-red-700 border border-red-200';
-            default:
-                return 'bg-gray-100 text-gray-700 border border-gray-200';
+            case 'upcoming': return 'bg-orange-100 text-orange-700 border border-orange-200';
+            case 'completed': return 'bg-green-100 text-green-700 border border-green-200';
+            case 'cancelled': return 'bg-red-100 text-red-700 border border-red-200';
+            default: return 'bg-gray-100 text-gray-700 border border-gray-200';
         }
     };
 
-    // Get status badge color for orders
     const getOrderStatusBadgeClass = (status) => {
         switch (status) {
-            case 'pending':
-                return 'bg-orange-100 text-orange-700 border border-orange-200';
-            case 'approved':
-                return 'bg-green-100 text-green-700 border border-green-200';
-            case 'rejected':
-                return 'bg-red-100 text-red-700 border border-red-200';
-            default:
-                return 'bg-gray-100 text-gray-700 border border-gray-200';
+            case 'pending': return 'bg-orange-100 text-orange-700 border border-orange-200';
+            case 'approved': return 'bg-green-100 text-green-700 border border-green-200';
+            case 'rejected': return 'bg-red-100 text-red-700 border border-red-200';
+            default: return 'bg-gray-100 text-gray-700 border border-gray-200';
         }
     };
 
-    // Capitalize first letter
-    const capitalize = (str) => str.charAt(0).toUpperCase() + str.slice(1);
+    const getDeliveryBadgeClass = (deliveryOption) => {
+        return deliveryOption === 'shipping'
+            ? 'bg-purple-100 text-purple-700 border border-purple-200'
+            : 'bg-blue-100 text-blue-700 border border-blue-200';
+    };
 
-    // Format time slot
+    const capitalize = (str) => str?.charAt(0).toUpperCase() + str?.slice(1) || '';
+
     const formatTimeSlot = (startTime, endTime) => {
         const formatTime = (time) => {
             const date = new Date(`2000-01-01T${time}`);
@@ -155,8 +170,8 @@ export default function Bookings() {
         return `${formatTime(startTime)} - ${formatTime(endTime)}`;
     };
 
-    // Format date
     const formatDate = (dateString) => {
+        if (!dateString) return 'N/A';
         return new Date(dateString).toLocaleDateString('en-US', {
             year: 'numeric',
             month: 'short',
@@ -164,7 +179,20 @@ export default function Bookings() {
         });
     };
 
-    // Open screenshot modal
+    const getTotalQuantity = (order) => {
+        if (!order.items || !Array.isArray(order.items)) return 0;
+        return order.items.reduce((sum, item) => sum + (parseInt(item.quantity) || 0), 0);
+    };
+
+    const getProductName = (order) => {
+        return order.items?.[0]?.name || 'Unknown Product';
+    };
+
+    const getScreenshotUrl = (order) => {
+        if (!order.payment_screenshot) return 'https://via.placeholder.com/400x300?text=No+Image';
+        return `http://127.0.0.1:8000/storage/${order.payment_screenshot}`;
+    };
+
     const handleViewScreenshot = async (order) => {
         try {
             const token = localStorage.getItem('admin_token');
@@ -185,8 +213,14 @@ export default function Bookings() {
         }
     };
 
-    // Approve order
     const handleApproveOrder = async (order) => {
+        if (actionLoading) return;
+
+        const confirmed = window.confirm(`Are you sure you want to approve order ${order.order_number}?`);
+        if (!confirmed) return;
+
+        setActionLoading(true);
+
         try {
             const token = localStorage.getItem('admin_token');
             await axios.post(`http://127.0.0.1:8000/api/admin/product-orders/${order.id}/approve`, {}, {
@@ -196,18 +230,31 @@ export default function Bookings() {
                 }
             });
 
-            fetchData(); // Refresh list
-            alert(`✅ Order ${order.order_number} approved!`);
+            setActionMessage(`✅ Order ${order.order_number} approved!`);
+            fetchData();
         } catch (err) {
             console.error('Approve error:', err);
-            alert('❌ Failed to approve order');
+            if (err.response?.data?.message?.includes('not pending')) {
+                setActionMessage(`✅ Order ${order.order_number} was already approved!`);
+                fetchData();
+            } else {
+                alert('❌ Failed to approve order');
+            }
+        } finally {
+            setActionLoading(false);
         }
     };
 
-    // Reject order
     const handleRejectOrder = async (order) => {
+        if (actionLoading) return;
+
         const reason = prompt('Enter rejection reason:');
         if (!reason) return;
+
+        const confirmed = window.confirm(`Are you sure you want to reject order ${order.order_number}?\n\nReason: ${reason}`);
+        if (!confirmed) return;
+
+        setActionLoading(true);
 
         try {
             const token = localStorage.getItem('admin_token');
@@ -220,15 +267,21 @@ export default function Bookings() {
                 }
             });
 
-            fetchData(); // Refresh list
-            alert(`✅ Order ${order.order_number} rejected. Reason: ${reason}`);
+            setActionMessage(`✅ Order ${order.order_number} rejected!`);
+            fetchData();
         } catch (err) {
             console.error('Reject error:', err);
-            alert('❌ Failed to reject order');
+            if (err.response?.data?.message?.includes('not pending')) {
+                setActionMessage(`✅ Order ${order.order_number} was already rejected!`);
+                fetchData();
+            } else {
+                alert('❌ Failed to reject order');
+            }
+        } finally {
+            setActionLoading(false);
         }
     };
 
-    // Update booking status
     const handleUpdateBookingStatus = async (bookingId, newStatus) => {
         try {
             const token = localStorage.getItem('admin_token');
@@ -241,15 +294,21 @@ export default function Bookings() {
                 }
             });
 
-            fetchData(); // Refresh list
-            alert(`✅ Booking status updated to ${newStatus}`);
+            setActionMessage(`✅ Booking status updated to ${newStatus}`);
+            fetchData();
         } catch (err) {
             console.error('Update status error:', err);
             alert('❌ Failed to update booking status');
         }
     };
 
-    // Close all modals
+    const handleSearchKeyDown = (e) => {
+        if (e.key === 'Enter') {
+            fetchData();
+            e.target.blur();
+        }
+    };
+
     const closeAllModals = () => {
         setShowScreenshotModal(false);
         setSelectedOrder(null);
@@ -257,12 +316,9 @@ export default function Bookings() {
 
     return (
         <div className="flex min-h-screen bg-gray-50">
-            {/* ✅ Sidebar - Using Reusable AdminSidebar Component */}
             <AdminSidebar expandedMenus={expandedMenus} toggleSubmenu={toggleSubmenu} />
 
-            {/* Main Content */}
             <div className="flex-1">
-                {/* Top Header */}
                 <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
                     <div className="flex items-center justify-between px-6 py-4">
                         <div>
@@ -270,9 +326,7 @@ export default function Bookings() {
                             <p className="text-sm text-gray-600">Manage machine bookings and product orders</p>
                         </div>
 
-                        {/* Right Side */}
                         <div className="flex items-center gap-4">
-                            {/* Notifications */}
                             <button className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors">
                                 <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
@@ -280,7 +334,6 @@ export default function Bookings() {
                                 <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
                             </button>
 
-                            {/* Admin Profile */}
                             <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-cyan-600 rounded-full flex items-center justify-center text-white font-bold text-sm">
                                     AD
@@ -290,9 +343,7 @@ export default function Bookings() {
                     </div>
                 </header>
 
-                {/* Booking Management Content */}
                 <main className="p-6">
-                    {/* Tabs */}
                     <div className="mb-6">
                         <div className="flex gap-2 border-b border-gray-200">
                             <button
@@ -316,29 +367,36 @@ export default function Bookings() {
                         </div>
                     </div>
 
-                    {/* Loading State */}
-                    {loading && (
+                    {actionMessage && (
+                        <div className="mb-6 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg flex items-center justify-between">
+                            <span>{actionMessage}</span>
+                            <button onClick={() => setActionMessage(null)} className="text-green-700 hover:text-green-900">
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+                    )}
+
+                    {initialLoading && (
                         <div className="flex items-center justify-center py-20">
                             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
                         </div>
                     )}
 
-                    {/* Error State */}
-                    {error && !loading && (
+                    {error && !initialLoading && (
                         <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg mb-6">
                             {error}
                         </div>
                     )}
 
-                    {/* Machine Bookings Tab */}
-                    {!loading && !error && activeTab === 'machine-bookings' && (
+                    {!initialLoading && !error && activeTab === 'machine-bookings' && (
                         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
                             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
                                 <div>
                                     <h3 className="text-lg font-bold text-gray-900">Machine Bookings ({filteredBookings.length})</h3>
                                 </div>
                                 <div className="flex flex-col sm:flex-row gap-3">
-                                    {/* Date Filter */}
                                     <input
                                         type="date"
                                         value={dateFilter}
@@ -346,7 +404,6 @@ export default function Bookings() {
                                         className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                                     />
 
-                                    {/* All Machines Dropdown */}
                                     <div className="relative">
                                         <button
                                             onClick={() => setShowMachineDropdown(!showMachineDropdown)}
@@ -369,83 +426,10 @@ export default function Bookings() {
                                             <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
                                                 <button
                                                     onClick={() => { setMachineFilter('all'); setShowMachineDropdown(false); }}
-                                                    className={`w-full px-4 py-2 text-left text-sm flex items-center justify-between ${machineFilter === 'all' ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-gray-50'
-                                                        }`}
+                                                    className={`w-full px-4 py-2 text-left text-sm flex items-center justify-between ${machineFilter === 'all' ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-gray-50'}`}
                                                 >
                                                     All Machines
                                                     {machineFilter === 'all' && (
-                                                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                                        </svg>
-                                                    )}
-                                                </button>
-                                                <button
-                                                    onClick={() => { setMachineFilter('3d-printer'); setShowMachineDropdown(false); }}
-                                                    className={`w-full px-4 py-2 text-left text-sm flex items-center justify-between ${machineFilter === '3d-printer' ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-gray-50'
-                                                        }`}
-                                                >
-                                                    3D Printer
-                                                    {machineFilter === '3d-printer' && (
-                                                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                                        </svg>
-                                                    )}
-                                                </button>
-                                                <button
-                                                    onClick={() => { setMachineFilter('laser-cutter'); setShowMachineDropdown(false); }}
-                                                    className={`w-full px-4 py-2 text-left text-sm flex items-center justify-between ${machineFilter === 'laser-cutter' ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-gray-50'
-                                                        }`}
-                                                >
-                                                    Laser Cutter
-                                                    {machineFilter === 'laser-cutter' && (
-                                                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                                        </svg>
-                                                    )}
-                                                </button>
-                                                <button
-                                                    onClick={() => { setMachineFilter('pcb-mill'); setShowMachineDropdown(false); }}
-                                                    className={`w-full px-4 py-2 text-left text-sm flex items-center justify-between ${machineFilter === 'pcb-mill' ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-gray-50'
-                                                        }`}
-                                                >
-                                                    PCB Mill
-                                                    {machineFilter === 'pcb-mill' && (
-                                                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                                        </svg>
-                                                    )}
-                                                </button>
-                                                <button
-                                                    onClick={() => { setMachineFilter('cnc-router'); setShowMachineDropdown(false); }}
-                                                    className={`w-full px-4 py-2 text-left text-sm flex items-center justify-between ${machineFilter === 'cnc-router' ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-gray-50'
-                                                        }`}
-                                                >
-                                                    CNC Router
-                                                    {machineFilter === 'cnc-router' && (
-                                                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                                        </svg>
-                                                    )}
-                                                </button>
-                                                <button
-                                                    onClick={() => { setMachineFilter('vinyl-cutter'); setShowMachineDropdown(false); }}
-                                                    className={`w-full px-4 py-2 text-left text-sm flex items-center justify-between ${machineFilter === 'vinyl-cutter' ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-gray-50'
-                                                        }`}
-                                                >
-                                                    Vinyl Cutter
-                                                    {machineFilter === 'vinyl-cutter' && (
-                                                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                                        </svg>
-                                                    )}
-                                                </button>
-                                                <button
-                                                    onClick={() => { setMachineFilter('soldering'); setShowMachineDropdown(false); }}
-                                                    className={`w-full px-4 py-2 text-left text-sm flex items-center justify-between ${machineFilter === 'soldering' ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-gray-50'
-                                                        }`}
-                                                >
-                                                    Soldering Station
-                                                    {machineFilter === 'soldering' && (
                                                         <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                                                             <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                                                         </svg>
@@ -455,7 +439,6 @@ export default function Bookings() {
                                         )}
                                     </div>
 
-                                    {/* All Status Dropdown */}
                                     <div className="relative">
                                         <button
                                             onClick={() => setShowBookingStatusDropdown(!showBookingStatusDropdown)}
@@ -473,47 +456,10 @@ export default function Bookings() {
                                             <div className="absolute right-0 mt-2 w-40 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
                                                 <button
                                                     onClick={() => { setBookingStatusFilter('all'); setShowBookingStatusDropdown(false); }}
-                                                    className={`w-full px-4 py-2 text-left text-sm flex items-center justify-between ${bookingStatusFilter === 'all' ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-gray-50'
-                                                        }`}
+                                                    className={`w-full px-4 py-2 text-left text-sm flex items-center justify-between ${bookingStatusFilter === 'all' ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-gray-50'}`}
                                                 >
                                                     All Status
                                                     {bookingStatusFilter === 'all' && (
-                                                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                                        </svg>
-                                                    )}
-                                                </button>
-                                                <button
-                                                    onClick={() => { setBookingStatusFilter('upcoming'); setShowBookingStatusDropdown(false); }}
-                                                    className={`w-full px-4 py-2 text-left text-sm flex items-center justify-between ${bookingStatusFilter === 'upcoming' ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-gray-50'
-                                                        }`}
-                                                >
-                                                    Upcoming
-                                                    {bookingStatusFilter === 'upcoming' && (
-                                                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                                        </svg>
-                                                    )}
-                                                </button>
-                                                <button
-                                                    onClick={() => { setBookingStatusFilter('completed'); setShowBookingStatusDropdown(false); }}
-                                                    className={`w-full px-4 py-2 text-left text-sm flex items-center justify-between ${bookingStatusFilter === 'completed' ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-gray-50'
-                                                        }`}
-                                                >
-                                                    Completed
-                                                    {bookingStatusFilter === 'completed' && (
-                                                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                                        </svg>
-                                                    )}
-                                                </button>
-                                                <button
-                                                    onClick={() => { setBookingStatusFilter('cancelled'); setShowBookingStatusDropdown(false); }}
-                                                    className={`w-full px-4 py-2 text-left text-sm flex items-center justify-between ${bookingStatusFilter === 'cancelled' ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-gray-50'
-                                                        }`}
-                                                >
-                                                    Cancelled
-                                                    {bookingStatusFilter === 'cancelled' && (
                                                         <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                                                             <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                                                         </svg>
@@ -525,7 +471,6 @@ export default function Bookings() {
                                 </div>
                             </div>
 
-                            {/* Machine Bookings Table */}
                             <div className="overflow-x-auto">
                                 <table className="w-full">
                                     <thead>
@@ -573,12 +518,11 @@ export default function Bookings() {
                         </div>
                     )}
 
-                    {/* Product Orders Tab */}
-                    {!loading && !error && activeTab === 'product-orders' && (
+                    {/* ✅ UPDATED: Product Orders Tab with Shipping Cost Display */}
+                    {!initialLoading && !error && activeTab === 'product-orders' && (
                         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
                             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
                                 <div className="flex flex-col sm:flex-row gap-3">
-                                    {/* All Status Dropdown */}
                                     <div className="relative">
                                         <button
                                             onClick={() => setShowOrderStatusDropdown(!showOrderStatusDropdown)}
@@ -596,8 +540,7 @@ export default function Bookings() {
                                             <div className="absolute right-0 mt-2 w-40 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
                                                 <button
                                                     onClick={() => { setOrderStatusFilter('all'); setShowOrderStatusDropdown(false); }}
-                                                    className={`w-full px-4 py-2 text-left text-sm flex items-center justify-between ${orderStatusFilter === 'all' ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-gray-50'
-                                                        }`}
+                                                    className={`w-full px-4 py-2 text-left text-sm flex items-center justify-between ${orderStatusFilter === 'all' ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-gray-50'}`}
                                                 >
                                                     All Status
                                                     {orderStatusFilter === 'all' && (
@@ -608,8 +551,7 @@ export default function Bookings() {
                                                 </button>
                                                 <button
                                                     onClick={() => { setOrderStatusFilter('pending'); setShowOrderStatusDropdown(false); }}
-                                                    className={`w-full px-4 py-2 text-left text-sm flex items-center justify-between ${orderStatusFilter === 'pending' ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-gray-50'
-                                                        }`}
+                                                    className={`w-full px-4 py-2 text-left text-sm flex items-center justify-between ${orderStatusFilter === 'pending' ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-gray-50'}`}
                                                 >
                                                     Pending
                                                     {orderStatusFilter === 'pending' && (
@@ -620,8 +562,7 @@ export default function Bookings() {
                                                 </button>
                                                 <button
                                                     onClick={() => { setOrderStatusFilter('approved'); setShowOrderStatusDropdown(false); }}
-                                                    className={`w-full px-4 py-2 text-left text-sm flex items-center justify-between ${orderStatusFilter === 'approved' ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-gray-50'
-                                                        }`}
+                                                    className={`w-full px-4 py-2 text-left text-sm flex items-center justify-between ${orderStatusFilter === 'approved' ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-gray-50'}`}
                                                 >
                                                     Approved
                                                     {orderStatusFilter === 'approved' && (
@@ -632,8 +573,7 @@ export default function Bookings() {
                                                 </button>
                                                 <button
                                                     onClick={() => { setOrderStatusFilter('rejected'); setShowOrderStatusDropdown(false); }}
-                                                    className={`w-full px-4 py-2 text-left text-sm flex items-center justify-between ${orderStatusFilter === 'rejected' ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-gray-50'
-                                                        }`}
+                                                    className={`w-full px-4 py-2 text-left text-sm flex items-center justify-between ${orderStatusFilter === 'rejected' ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-gray-50'}`}
                                                 >
                                                     Rejected
                                                     {orderStatusFilter === 'rejected' && (
@@ -646,100 +586,87 @@ export default function Bookings() {
                                         )}
                                     </div>
 
-                                    {/* Search */}
                                     <div className="relative">
                                         <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                                         </svg>
                                         <input
                                             type="text"
-                                            placeholder="Search by user..."
+                                            placeholder="Search by user, product, or order #..."
                                             value={searchTerm}
                                             onChange={(e) => setSearchTerm(e.target.value)}
+                                            onKeyDown={handleSearchKeyDown}
                                             className="pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:w-64"
                                         />
+                                        {searchTerm && (
+                                            <button
+                                                onClick={fetchData}
+                                                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-blue-600"
+                                                title="Refresh search from server"
+                                            >
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                                </svg>
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Product Orders Grid */}
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                 {filteredOrders.map((order) => (
                                     <div key={order.id} className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-md transition-shadow">
-                                        {/* Header */}
                                         <div className="flex items-start justify-between mb-4">
-                                            <div>
-                                                <p className="text-sm text-gray-500 mb-1">{order.order_number}</p>
-                                                <h3 className="text-lg font-bold text-gray-900">{order.name}</h3>
+                                            <div className="flex-1">
+                                                <h3 className="text-lg font-bold text-gray-900 mb-1">{getProductName(order)}</h3>
+                                                <p className="text-sm text-gray-500">{order.order_number}</p>
                                             </div>
                                             <span className={`inline-flex px-3 py-1 rounded-full text-xs font-medium ${getOrderStatusBadgeClass(order.status)}`}>
                                                 {capitalize(order.status)}
                                             </span>
                                         </div>
 
-                                        {/* Details */}
-                                        <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
-                                            <div>
-                                                <p className="text-gray-500 mb-1">User</p>
-                                                <p className="font-medium text-gray-900">{order.user?.name}</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-gray-500 mb-1">Quantity</p>
-                                                <p className="font-medium text-gray-900">{order.quantity}</p>
-                                            </div>
-                                            <div className="col-span-2">
-                                                <p className="text-gray-500 mb-1">Order Date</p>
-                                                <p className="font-medium text-gray-900">{formatDate(order.order_date)}</p>
-                                            </div>
+                                        <div className="mb-3">
+                                            <span className={`inline-flex px-2 py-1 rounded text-xs font-medium ${getDeliveryBadgeClass(order.delivery_option)}`}>
+                                                {order.delivery_option === 'shipping' ? '📦 Shipping' : '🏪 Pick Up'}
+                                            </span>
                                         </div>
 
-                                        {/* Image */}
                                         <div className="mb-4">
-                                            <img
-                                                src={order.image ? `http://127.0.0.1:8000/storage/${order.image}` : 'https://via.placeholder.com/400x300?text=No+Image'}
-                                                alt={order.name}
-                                                className="w-full h-48 object-cover rounded-lg cursor-pointer"
-                                                onClick={() => handleViewScreenshot(order)}
-                                            />
+                                            <p className="text-sm text-gray-500 mb-1">Total Amount</p>
+                                            <p className="text-2xl font-bold text-blue-600">Nu. {parseFloat(order.total_amount || 0).toFixed(2)}</p>
+                                            {/* ✅ NEW: Show shipping cost breakdown */}
+                                            {order.delivery_option === 'shipping' && order.shipping_cost > 0 && (
+                                                <p className="text-xs text-purple-600 mt-1">
+                                                    (Includes Nu. {parseFloat(order.shipping_cost || 0).toFixed(2)} shipping)
+                                                </p>
+                                            )}
                                         </div>
 
-                                        {/* View Screenshot Button */}
-                                        <button
-                                            onClick={() => handleViewScreenshot(order)}
-                                            className="w-full py-2 border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors mb-4"
-                                        >
-                                            View Screenshot
-                                        </button>
+                                        <div className="mb-3">
+                                            <img
+                                                src={getScreenshotUrl(order)}
+                                                alt={getProductName(order)}
+                                                className="w-full h-48 object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
+                                                onClick={() => handleViewScreenshot(order)}
+                                                onError={(e) => {
+                                                    e.target.src = 'https://via.placeholder.com/400x300?text=No+Image';
+                                                }}
+                                            />
+                                            <p className="text-xs text-gray-500 mt-2 text-center">Click to view full screenshot</p>
+                                        </div>
 
-                                        {/* Action Buttons */}
-                                        {order.status === 'pending' && (
-                                            <div className="flex gap-2">
-                                                <button
-                                                    onClick={() => handleApproveOrder(order)}
-                                                    className="flex-1 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
-                                                >
-                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-                                                    </svg>
-                                                    Approve
-                                                </button>
-                                                <button
-                                                    onClick={() => handleRejectOrder(order)}
-                                                    className="flex-1 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center gap-2"
-                                                >
-                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                                                    </svg>
-                                                    Reject
-                                                </button>
+                                        {order.delivery_option === 'shipping' && order.shipping_address && (
+                                            <div className="mb-3 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                                                <p className="text-xs text-purple-700 font-semibold mb-1">📦 Shipping Address:</p>
+                                                <p className="text-sm text-gray-700">{order.shipping_address}</p>
                                             </div>
                                         )}
 
-                                        {/* Rejection Reason */}
                                         {order.status === 'rejected' && order.rejection_reason && (
                                             <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
                                                 <p className="text-sm text-red-800">
-                                                    <span className="font-semibold">Rejection Reason:</span> {order.rejection_reason}
+                                                    <span className="font-semibold">Rejected:</span> {order.rejection_reason}
                                                 </p>
                                             </div>
                                         )}
@@ -761,40 +688,173 @@ export default function Bookings() {
                 </main>
             </div>
 
-            {/* ===== SCREENSHOT MODAL ===== */}
+            {/* ✅ UPDATED: SCREENSHOT MODAL with Shipping Cost Breakdown */}
             {showScreenshotModal && selectedOrder && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full">
-                        {/* Modal Header */}
-                        <div className="flex items-center justify-between p-6 border-b border-gray-100">
+                <div
+                    className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
+                    onClick={closeAllModals}
+                >
+                    <div
+                        className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white rounded-t-2xl z-10">
                             <div>
-                                <h3 className="text-xl font-bold text-gray-900">Transaction Screenshot</h3>
-                                <p className="text-sm text-gray-500 mt-1">{selectedOrder.order_number} - {selectedOrder.name}</p>
+                                <h3 className="text-xl font-bold text-gray-900">Payment Screenshot</h3>
+                                <p className="text-sm text-gray-500 mt-1">
+                                    {selectedOrder.order_number} • {selectedOrder.user?.name || 'Unknown User'}
+                                </p>
                             </div>
-                            <button onClick={closeAllModals} className="text-gray-400 hover:text-gray-600">
+                            <button
+                                onClick={closeAllModals}
+                                className="text-gray-400 hover:text-gray-600 p-2 hover:bg-gray-100 rounded-full transition-colors"
+                            >
                                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
                                 </svg>
                             </button>
                         </div>
 
-                        {/* Modal Content */}
-                        <div className="p-6">
+                        <div className="p-6 overflow-y-auto flex-1 bg-gray-50">
                             <img
                                 src={selectedOrder.image}
-                                alt={selectedOrder.name}
-                                className="w-full h-auto rounded-lg"
+                                alt={getProductName(selectedOrder)}
+                                className="w-full h-auto rounded-lg shadow-md"
                             />
+
+                            <div className="mt-6 grid grid-cols-2 gap-4">
+                                <div className="bg-white p-4 rounded-lg border border-gray-200">
+                                    <p className="text-sm text-gray-500 mb-1">Order Number</p>
+                                    <p className="font-semibold text-gray-900">{selectedOrder.order_number}</p>
+                                </div>
+                                <div className="bg-white p-4 rounded-lg border border-gray-200">
+                                    <p className="text-sm text-gray-500 mb-1">Delivery Option</p>
+                                    <p className="font-semibold text-gray-900 capitalize">{selectedOrder.delivery_option}</p>
+                                </div>
+                                <div className="bg-white p-4 rounded-lg border border-gray-200">
+                                    <p className="text-sm text-gray-500 mb-1">Order Date</p>
+                                    <p className="font-semibold text-gray-900">{formatDate(selectedOrder.created_at)}</p>
+                                </div>
+                                <div className="bg-white p-4 rounded-lg border border-gray-200">
+                                    <p className="text-sm text-gray-500 mb-1">User</p>
+                                    <p className="font-semibold text-gray-900">{selectedOrder.user?.name || 'Unknown'}</p>
+                                </div>
+                                <div className="bg-white p-4 rounded-lg border border-gray-200">
+                                    <p className="text-sm text-gray-500 mb-1">Quantity</p>
+                                    <p className="font-semibold text-gray-900">{getTotalQuantity(selectedOrder)}</p>
+                                </div>
+                                {/* ✅ UPDATED: Shipping Address - Always visible in modal if exists */}
+                                {selectedOrder.shipping_address && (
+                                    <div className="col-span-2 bg-white p-4 rounded-lg border border-purple-200 bg-purple-50">
+                                        <p className="text-sm text-purple-700 font-semibold mb-1">📦 Shipping Address</p>
+                                        <p className="text-gray-900">{selectedOrder.shipping_address}</p>
+                                    </div>
+                                )}
+                                {/* ✅ NEW: Payment Breakdown with Shipping Cost */}
+                                <div className="col-span-2 bg-white p-4 rounded-lg border border-blue-200 bg-blue-50">
+                                    <p className="text-sm text-blue-700 font-semibold mb-3">💰 Payment Breakdown</p>
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between text-sm">
+                                            <span className="text-gray-600">Products Total:</span>
+                                            <span className="font-medium">
+                                                Nu. {(parseFloat(selectedOrder.total_amount || 0) - parseFloat(selectedOrder.shipping_cost || 0)).toFixed(2)}
+                                            </span>
+                                        </div>
+                                        {selectedOrder.delivery_option === 'shipping' && selectedOrder.shipping_cost > 0 && (
+                                            <div className="flex justify-between text-sm">
+                                                <span className="text-gray-600">Shipping Cost (Fixed):</span>
+                                                <span className="font-medium text-purple-600">
+                                                    Nu. {parseFloat(selectedOrder.shipping_cost || 0).toFixed(2)}
+                                                </span>
+                                            </div>
+                                        )}
+                                        <div className="flex justify-between text-base pt-2 border-t border-blue-200">
+                                            <span className="font-semibold text-gray-900">Total Paid:</span>
+                                            <span className="font-bold text-blue-600">
+                                                Nu. {parseFloat(selectedOrder.total_amount || 0).toFixed(2)}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                                {/* Items List */}
+                                <div className="col-span-2 bg-white p-4 rounded-lg border border-gray-200">
+                                    <p className="text-sm text-gray-500 mb-2">Items Ordered</p>
+                                    <ul className="space-y-2">
+                                        {selectedOrder.items?.map((item, idx) => (
+                                            <li key={idx} className="flex justify-between text-sm">
+                                                <span className="text-gray-700">{item.name} × {item.quantity}</span>
+                                                <span className="font-medium">Nu. {parseFloat(item.price * item.quantity).toFixed(2)}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            </div>
                         </div>
 
-                        {/* Modal Footer */}
-                        <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-100">
-                            <button
-                                onClick={closeAllModals}
-                                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                            >
-                                Close
-                            </button>
+                        <div className="px-6 py-4 border-t border-gray-200 sticky bottom-0 bg-white rounded-b-2xl">
+                            {selectedOrder.status === 'pending' ? (
+                                <div className="flex gap-3">
+                                    <button
+                                        onClick={() => handleApproveOrder(selectedOrder)}
+                                        disabled={actionLoading}
+                                        className={`flex-1 py-3 rounded-lg transition-colors flex items-center justify-center gap-2 font-semibold ${actionLoading
+                                                ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                                                : 'bg-green-600 text-white hover:bg-green-700'
+                                            }`}
+                                    >
+                                        {actionLoading ? (
+                                            <>
+                                                <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                </svg>
+                                                Processing...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                                                </svg>
+                                                Approve Order
+                                            </>
+                                        )}
+                                    </button>
+                                    <button
+                                        onClick={() => handleRejectOrder(selectedOrder)}
+                                        disabled={actionLoading}
+                                        className={`flex-1 py-3 rounded-lg transition-colors flex items-center justify-center gap-2 font-semibold ${actionLoading
+                                                ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                                                : 'bg-red-600 text-white hover:bg-red-700'
+                                            }`}
+                                    >
+                                        {actionLoading ? (
+                                            <>
+                                                <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                </svg>
+                                                Processing...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                                </svg>
+                                                Reject Order
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="text-center">
+                                    <span className={`inline-flex px-4 py-2 rounded-full text-sm font-medium ${getOrderStatusBadgeClass(selectedOrder.status)}`}>
+                                        {capitalize(selectedOrder.status)}
+                                    </span>
+                                    {selectedOrder.status === 'rejected' && selectedOrder.rejection_reason && (
+                                        <p className="text-sm text-red-600 mt-2">Reason: {selectedOrder.rejection_reason}</p>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>

@@ -15,6 +15,7 @@ class ProductOrder extends Model
         'user_id',
         'items',
         'total_amount',
+        'shipping_cost',
         'delivery_option',
         'shipping_address',
         'payment_screenshot',
@@ -25,19 +26,14 @@ class ProductOrder extends Model
     protected $casts = [
         'items' => 'array',
         'total_amount' => 'decimal:2',
+        'shipping_cost' => 'decimal:2',
     ];
 
-    /**
-     * Get the user who placed the order.
-     */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
-    /**
-     * Generate unique order number.
-     */
     public static function generateOrderNumber(): string
     {
         $year = date('Y');
@@ -46,5 +42,27 @@ class ProductOrder extends Model
         $number = $lastOrder ? ((int) substr($lastOrder->order_number, -4) + 1) : 1;
         
         return 'ORD-' . $year . '-' . str_pad($number, 4, '0', STR_PAD_LEFT);
+    }
+
+    public function scopePending($query)
+    {
+        return $query->where('status', 'pending');
+    }
+
+    public function scopeApproved($query)
+    {
+        return $query->where('status', 'approved');
+    }
+
+    public function scopeRejected($query)
+    {
+        return $query->where('status', 'rejected');
+    }
+
+    public function getScreenshotUrlAttribute(): ?string
+    {
+        return $this->payment_screenshot 
+            ? asset('storage/' . $this->payment_screenshot) 
+            : null;
     }
 }

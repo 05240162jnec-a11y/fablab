@@ -34,6 +34,7 @@ export default function Products() {
         images: [],
     });
     const [previewImages, setPreviewImages] = useState([]);
+    const [otherImages, setOtherImages] = useState([]);
     const [formLoading, setFormLoading] = useState(false);
 
     // Toggle submenu
@@ -80,14 +81,53 @@ export default function Products() {
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
-    // Handle image selection for add/edit forms
-    const handleImageChange = (e) => {
-        const files = Array.from(e.target.files).slice(0, 4); // Max 4 images
-        setFormData(prev => ({ ...prev, images: files }));
+    // Handle thumbnail image selection
+    const handleThumbnailChange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            setFormData(prev => ({ ...prev, images: [file] }));
+            const preview = URL.createObjectURL(file);
+            setPreviewImages([preview]);
+        }
+    };
 
-        // Create preview URLs
-        const previews = files.map(file => URL.createObjectURL(file));
-        setPreviewImages(previews);
+    // Handle other images selection (up to 4)
+    const handleOtherImagesChange = (e) => {
+        const files = Array.from(e.target.files);
+        const remainingSlots = 4 - otherImages.length;
+        const filesToAdd = files.slice(0, remainingSlots);
+
+        if (filesToAdd.length > 0) {
+            const newOtherImages = [...otherImages, ...filesToAdd];
+            setFormData(prev => ({ ...prev, images: [...prev.images.slice(0, 1), ...newOtherImages] }));
+
+            const newPreviews = filesToAdd.map(file => URL.createObjectURL(file));
+            setOtherImages(prev => [...prev, ...newPreviews]);
+        }
+    };
+
+    // Remove other image
+    const removeOtherImage = (index) => {
+        const newOtherImages = otherImages.filter((_, i) => i !== index);
+        const newFormDataImages = [formData.images[0], ...formData.images.slice(index + 2)];
+
+        setOtherImages(newOtherImages);
+        setFormData(prev => ({ ...prev, images: newFormDataImages }));
+    };
+
+    // Handle image change for Edit modal
+    const handleImageChange = (e) => {
+        const files = Array.from(e.target.files);
+        const remainingSlots = 4 - previewImages.length;
+        const filesToAdd = files.slice(0, remainingSlots);
+
+        if (filesToAdd.length > 0) {
+            const newPreviewImages = [...previewImages, ...filesToAdd.map(file => URL.createObjectURL(file))];
+            const newFormDataImages = [...formData.images, ...filesToAdd];
+
+            setPreviewImages(newPreviewImages);
+            setFormData(prev => ({ ...prev, images: newFormDataImages }));
+        }
     };
 
     // Reset form
@@ -101,15 +141,25 @@ export default function Products() {
             images: [],
         });
         setPreviewImages([]);
+        setOtherImages([]);
     };
 
-    // Open product details modal
     const handleViewDetails = (product) => {
-        setSelectedProduct(product);
+        console.log('Original product images:', product.images);
+
+        // Create a copy with full image URLs
+        const productWithFullUrls = {
+            ...product,
+            images: product.images?.map(img => `http://127.0.0.1:8000/storage/${img}`) || []
+        };
+
+        console.log('Product with full URLs:', productWithFullUrls.images);
+
+        setSelectedProduct(productWithFullUrls);
         setShowDetailsModal(true);
     };
 
-    // Open edit modal with product data
+    // Open edit modal with product data - Convert paths to full URLs
     const handleEdit = (product) => {
         setSelectedProduct(product);
         setFormData({
@@ -120,10 +170,14 @@ export default function Products() {
             stock: product.stock,
             images: [],
         });
-        setPreviewImages(product.images?.length > 0
-            ? product.images.map(img => `http://127.0.0.1:8000/storage/${img}`)
-            : []
-        );
+
+        // Convert database paths to full URLs
+        if (product.images && product.images.length > 0) {
+            setPreviewImages(product.images.map(img => `http://127.0.0.1:8000/storage/${img}`));
+        } else {
+            setPreviewImages([]);
+        }
+
         setShowDetailsModal(false);
         setShowEditModal(true);
     };
@@ -148,11 +202,9 @@ export default function Products() {
             );
 
             if (response.data.success) {
-                // Update local state immediately for better UX
                 setProducts(products.map(p =>
                     p.id === productId ? { ...p, status: newStatus } : p
                 ));
-                // Also update selected product if details modal is open
                 if (selectedProduct?.id === productId) {
                     setSelectedProduct({ ...selectedProduct, status: newStatus });
                 }
@@ -208,7 +260,6 @@ export default function Products() {
             data.append('price', formData.price);
             data.append('stock', formData.stock);
 
-            // Append images if any
             if (formData.images && formData.images.length > 0) {
                 formData.images.forEach((image, index) => {
                     if (image instanceof File) {
@@ -232,7 +283,7 @@ export default function Products() {
             if (response.data.success) {
                 setShowAddModal(false);
                 resetForm();
-                fetchProducts(); // Refresh list
+                fetchProducts();
                 alert('✅ Product added successfully!');
             }
         } catch (err) {
@@ -257,9 +308,8 @@ export default function Products() {
             data.append('size', formData.size);
             data.append('price', formData.price);
             data.append('stock', formData.stock);
-            data.append('_method', 'PUT'); // Laravel method spoofing for PUT
+            data.append('_method', 'PUT');
 
-            // Append new images if any
             formData.images.forEach((image, index) => {
                 data.append(`images[${index}]`, image);
             });
@@ -280,7 +330,7 @@ export default function Products() {
                 setShowEditModal(false);
                 resetForm();
                 setSelectedProduct(null);
-                fetchProducts(); // Refresh list
+                fetchProducts();
                 alert('✅ Product updated successfully!');
             }
         } catch (err) {
@@ -317,14 +367,12 @@ export default function Products() {
 
     // Filter products
     const filteredProducts = products.filter(product => {
-        // Filter by status
         if (filterStatus !== 'all') {
             if (filterStatus === 'active' && product.status !== 'active') return false;
             if (filterStatus === 'inactive' && product.status !== 'inactive') return false;
             if (filterStatus === 'out_of_stock' && product.stock > 0) return false;
         }
 
-        // Filter by search query
         if (searchQuery) {
             const query = searchQuery.toLowerCase();
             return product.name.toLowerCase().includes(query) ||
@@ -344,12 +392,9 @@ export default function Products() {
 
     return (
         <div className="flex min-h-screen bg-gray-50">
-            {/* ✅ Sidebar - Using Reusable AdminSidebar Component */}
             <AdminSidebar expandedMenus={expandedMenus} toggleSubmenu={toggleSubmenu} />
 
-            {/* Main Content */}
             <div className="flex-1">
-                {/* Top Header */}
                 <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
                     <div className="flex items-center justify-between px-6 py-4">
                         <div>
@@ -371,9 +416,7 @@ export default function Products() {
                     </div>
                 </header>
 
-                {/* Products Content */}
                 <main className="p-6">
-                    {/* Loading State */}
                     {loading && (
                         <div className="text-center py-12">
                             <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent"></div>
@@ -381,7 +424,6 @@ export default function Products() {
                         </div>
                     )}
 
-                    {/* Error State */}
                     {error && !loading && (
                         <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg mb-6">
                             {error}
@@ -396,7 +438,6 @@ export default function Products() {
 
                     {!loading && !error && (
                         <>
-                            {/* Stats Cards */}
                             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
                                 <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
                                     <div className="flex items-center justify-between">
@@ -448,7 +489,6 @@ export default function Products() {
                                 </div>
                             </div>
 
-                            {/* Stock Alert Threshold Setting */}
                             <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 mb-6">
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-3">
@@ -473,9 +513,7 @@ export default function Products() {
                                 </div>
                             </div>
 
-                            {/* Search & Filter */}
                             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
-                                {/* Search */}
                                 <div className="relative flex-1 max-w-md">
                                     <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -489,7 +527,6 @@ export default function Products() {
                                     />
                                 </div>
 
-                                {/* Status Filter */}
                                 <div className="relative">
                                     <select
                                         value={filterStatus}
@@ -504,7 +541,6 @@ export default function Products() {
                                 </div>
                             </div>
 
-                            {/* Products Table */}
                             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                                 <div className="overflow-x-auto">
                                     <table className="w-full">
@@ -571,8 +607,8 @@ export default function Products() {
                                                         </td>
                                                         <td className="px-6 py-4">
                                                             <span className={`px-2 py-1 rounded-full text-xs font-medium ${product.stock === 0 ? 'bg-red-100 text-red-700' :
-                                                                    product.stock <= stockAlertThreshold ? 'bg-yellow-100 text-yellow-700' :
-                                                                        'bg-green-100 text-green-700'
+                                                                product.stock <= stockAlertThreshold ? 'bg-yellow-100 text-yellow-700' :
+                                                                    'bg-green-100 text-green-700'
                                                                 }`}>
                                                                 {product.stock}
                                                             </span>
@@ -606,13 +642,14 @@ export default function Products() {
 
             {/* Product Details Modal */}
             {showDetailsModal && selectedProduct && (
-                <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 sticky top-0 bg-white">
-                            <h2 className="text-xl font-bold text-gray-900">Product Details</h2>
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col">
+                        {/* Modal Header - Fixed */}
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 flex-shrink-0">
+                            <h2 className="text-2xl font-bold text-gray-900">Product Details</h2>
                             <button
                                 onClick={() => setShowDetailsModal(false)}
-                                className="text-gray-400 hover:text-gray-600"
+                                className="text-gray-400 hover:text-gray-600 p-2 hover:bg-gray-100 rounded-full transition-colors"
                             >
                                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
@@ -620,97 +657,124 @@ export default function Products() {
                             </button>
                         </div>
 
-                        <div className="p-6 space-y-6">
-                            <div className="flex items-start gap-4">
-                                <div className="w-24 h-24 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                                    {selectedProduct.images && selectedProduct.images.length > 0 ? (
-                                        <img
-                                            src={`http://127.0.0.1:8000/storage/${selectedProduct.images[0]}`}
-                                            alt={selectedProduct.name}
-                                            className="w-full h-full object-cover rounded-lg"
-                                        />
-                                    ) : (
-                                        <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                        </svg>
-                                    )}
-                                </div>
-                                <div className="flex-1">
-                                    <h3 className="text-xl font-bold text-gray-900">{selectedProduct.name}</h3>
-                                    <p className="text-2xl font-bold text-blue-600 mt-2">{formatCurrency(selectedProduct.price)}</p>
-                                    <span className={`inline-block mt-2 px-3 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(selectedProduct.status)}`}>
-                                        {selectedProduct.status.charAt(0).toUpperCase() + selectedProduct.status.slice(1)}
-                                    </span>
-                                </div>
-                            </div>
-
-                            <div>
-                                <h4 className="font-semibold text-gray-900 mb-2">Description</h4>
-                                <p className="text-gray-600">{selectedProduct.description}</p>
-                            </div>
-
-                            <div className="grid grid-cols-3 gap-4">
-                                <div className="p-3 bg-gray-50 rounded-lg">
-                                    <p className="text-sm text-gray-500">Size</p>
-                                    <p className="font-semibold text-gray-900">{selectedProduct.size}</p>
-                                </div>
-                                <div className="p-3 bg-gray-50 rounded-lg">
-                                    <p className="text-sm text-gray-500">Stock</p>
-                                    <p className="font-semibold text-gray-900">{selectedProduct.stock} units</p>
-                                </div>
-                                <div className="p-3 bg-gray-50 rounded-lg">
-                                    <p className="text-sm text-gray-500">Status</p>
-                                    <span className={`inline-block mt-1 px-2 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(selectedProduct.status)}`}>
-                                        {selectedProduct.status.charAt(0).toUpperCase() + selectedProduct.status.slice(1)}
-                                    </span>
-                                </div>
-                            </div>
-
-                            {selectedProduct.images && selectedProduct.images.length > 0 && (
+                        {/* Modal Body - Scrollable */}
+                        <div className="overflow-y-auto flex-1 p-6">
+                            {/* Two-Column Layout */}
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                {/* Left Column - Large Thumbnail */}
                                 <div>
-                                    <h4 className="font-semibold text-gray-900 mb-2">All Images ({selectedProduct.images.length})</h4>
-                                    <div className="grid grid-cols-4 gap-2">
-                                        {selectedProduct.images.map((img, index) => (
-                                            <div key={index} className="aspect-square bg-gray-100 rounded-lg overflow-hidden">
+                                    <label className="block text-sm font-semibold text-gray-700 mb-3">Thumbnail Image</label>
+                                    <div className="aspect-square bg-gray-100 rounded-xl border-2 border-dashed border-gray-300 overflow-hidden">
+                                        {selectedProduct.images && selectedProduct.images.length > 0 ? (
+                                            <img
+                                                src={selectedProduct.images[0]}
+                                                alt={selectedProduct.name}
+                                                className="w-full h-full object-cover"
+                                            />
+                                        ) : (
+                                            <div className="w-full h-full flex flex-col items-center justify-center">
+                                                <svg className="w-16 h-16 text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                </svg>
+                                                <p className="text-sm text-gray-500">No Image</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Right Column - Product Details */}
+                                <div className="space-y-4">
+                                    <div>
+                                        <h3 className="text-2xl font-bold text-gray-900">{selectedProduct.name}</h3>
+                                        <p className="text-3xl font-bold text-blue-600 mt-2">{formatCurrency(selectedProduct.price)}</p>
+                                        <span className={`inline-block mt-2 px-3 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(selectedProduct.status)}`}>
+                                            {selectedProduct.status.charAt(0).toUpperCase() + selectedProduct.status.slice(1)}
+                                        </span>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-2">Description</label>
+                                        <p className="text-gray-600 bg-gray-50 rounded-lg p-4">{selectedProduct.description || 'No description available'}</p>
+                                    </div>
+
+                                    <div className="grid grid-cols-3 gap-4">
+                                        <div className="p-4 bg-gray-50 rounded-lg">
+                                            <p className="text-sm text-gray-500 mb-1">Size</p>
+                                            <p className="font-semibold text-gray-900">{selectedProduct.size || 'N/A'}</p>
+                                        </div>
+                                        <div className="p-4 bg-gray-50 rounded-lg">
+                                            <p className="text-sm text-gray-500 mb-1">Stock</p>
+                                            <p className={`font-semibold ${selectedProduct.stock === 0 ? 'text-red-600' : selectedProduct.stock <= stockAlertThreshold ? 'text-yellow-600' : 'text-green-600'}`}>
+                                                {selectedProduct.stock} units
+                                            </p>
+                                        </div>
+                                        <div className="p-4 bg-gray-50 rounded-lg">
+                                            <p className="text-sm text-gray-500 mb-1">Status</p>
+                                            <span className={`inline-block mt-1 px-2 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(selectedProduct.status)}`}>
+                                                {selectedProduct.status.charAt(0).toUpperCase() + selectedProduct.status.slice(1)}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    <div className="p-4 bg-gray-50 rounded-lg">
+                                        <p className="text-sm text-gray-500 mb-1">Created On</p>
+                                        <p className="font-semibold text-gray-900">{formatDate(selectedProduct.created_at)}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Other Images Section - Images already have full URLs */}
+                            {selectedProduct.images && selectedProduct.images.length > 1 && (
+                                <div className="mt-6">
+                                    <label className="block text-sm font-semibold text-gray-700 mb-3">
+                                        Other Images ({selectedProduct.images.length - 1})
+                                    </label>
+                                    <div className="grid grid-cols-4 gap-4">
+                                        {selectedProduct.images.slice(1).map((img, index) => (
+                                            <div key={index} className="aspect-square bg-gray-100 rounded-lg overflow-hidden relative">
                                                 <img
-                                                    src={`http://127.0.0.1:8000/storage/${img}`}
-                                                    alt={`${selectedProduct.name} ${index + 1}`}
+                                                    src={img}
+                                                    alt={`${selectedProduct.name} ${index + 2}`}
                                                     className="w-full h-full object-cover"
                                                 />
+                                                <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-50 transition-opacity flex items-center justify-center">
+                                                    <span className="text-white text-xs font-medium opacity-0 hover:opacity-100">
+                                                        Image ({index + 2})
+                                                    </span>
+                                                </div>
                                             </div>
                                         ))}
                                     </div>
+                                    <p className="text-xs text-gray-500 mt-2">
+                                        Total {selectedProduct.images.length} image(s) including thumbnail
+                                    </p>
                                 </div>
                             )}
+                        </div>
 
-                            <div className="p-3 bg-gray-50 rounded-lg">
-                                <p className="text-sm text-gray-500">Created</p>
-                                <p className="font-semibold text-gray-900">{formatDate(selectedProduct.created_at)}</p>
-                            </div>
-
-                            <div className="flex gap-3">
-                                <button
-                                    onClick={() => {
-                                        setShowDetailsModal(false);
-                                        handleEdit(selectedProduct);
-                                    }}
-                                    className="flex-1 px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium flex items-center justify-center gap-2"
-                                >
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                    </svg>
-                                    Edit
-                                </button>
-                                <button
-                                    onClick={() => handleDelete(selectedProduct.id)}
-                                    className="flex-1 px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium flex items-center justify-center gap-2"
-                                >
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                    </svg>
-                                    Delete
-                                </button>
-                            </div>
+                        {/* Modal Footer - Fixed */}
+                        <div className="flex gap-3 px-6 py-4 border-t border-gray-200 flex-shrink-0">
+                            <button
+                                onClick={() => {
+                                    setShowDetailsModal(false);
+                                    handleEdit(selectedProduct);
+                                }}
+                                className="flex-1 px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-semibold flex items-center justify-center gap-2"
+                            >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                                Edit
+                            </button>
+                            <button
+                                onClick={() => handleDelete(selectedProduct.id)}
+                                className="flex-1 px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-semibold flex items-center justify-center gap-2"
+                            >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                                Delete
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -718,17 +782,21 @@ export default function Products() {
 
             {/* Edit Product Modal */}
             {showEditModal && selectedProduct && (
-                <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 sticky top-0 bg-white">
-                            <h2 className="text-xl font-bold text-gray-900">Edit Product</h2>
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+                        {/* Modal Header - Fixed */}
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 flex-shrink-0">
+                            <div>
+                                <h2 className="text-2xl font-bold text-gray-900">Edit Product</h2>
+                                <p className="text-sm text-gray-600 mt-1">Update the product listing details</p>
+                            </div>
                             <button
                                 onClick={() => {
                                     setShowEditModal(false);
                                     resetForm();
                                     setSelectedProduct(null);
                                 }}
-                                className="text-gray-400 hover:text-gray-600"
+                                className="text-gray-400 hover:text-gray-600 p-2 hover:bg-gray-100 rounded-full transition-colors"
                             >
                                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
@@ -736,150 +804,216 @@ export default function Products() {
                             </button>
                         </div>
 
-                        <form onSubmit={handleUpdateProduct} className="p-6 space-y-4">
-                            <p className="text-sm text-gray-600">Update the product listing details</p>
+                        {/* Modal Body - Scrollable */}
+                        <div className="overflow-y-auto flex-1 p-6">
+                            <form onSubmit={handleUpdateProduct}>
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                    {/* Left Column - Thumbnail Preview */}
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-3">Thumbnail Image</label>
+                                        <div className="aspect-square bg-gray-100 rounded-xl border-2 border-dashed border-gray-300 overflow-hidden">
+                                            {previewImages.length > 0 ? (
+                                                <img
+                                                    src={previewImages[0]}
+                                                    alt="Thumbnail Preview"
+                                                    className="w-full h-full object-cover"
+                                                />
+                                            ) : (
+                                                <div className="w-full h-full flex flex-col items-center justify-center">
+                                                    <svg className="w-16 h-16 text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                    </svg>
+                                                    <p className="text-sm text-gray-500">No Image</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
 
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Product Name *</label>
-                                <input
-                                    type="text"
-                                    name="name"
-                                    value={formData.name}
-                                    onChange={handleInputChange}
-                                    required
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                />
-                            </div>
+                                    {/* Right Column - Form Fields */}
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label className="block text-sm font-semibold text-gray-700 mb-2">Product Name *</label>
+                                            <input
+                                                type="text"
+                                                name="name"
+                                                value={formData.name}
+                                                onChange={handleInputChange}
+                                                required
+                                                placeholder="Enter product name"
+                                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                                            />
+                                        </div>
 
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Description *</label>
-                                <textarea
-                                    name="description"
-                                    value={formData.description}
-                                    onChange={handleInputChange}
-                                    required
-                                    rows="3"
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
-                                />
-                            </div>
+                                        <div>
+                                            <label className="block text-sm font-semibold text-gray-700 mb-2">Description *</label>
+                                            <textarea
+                                                name="description"
+                                                value={formData.description}
+                                                onChange={handleInputChange}
+                                                required
+                                                placeholder="Enter product description"
+                                                rows="3"
+                                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none transition-colors"
+                                            />
+                                        </div>
 
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Size *</label>
-                                    <input
-                                        type="text"
-                                        name="size"
-                                        value={formData.size}
-                                        onChange={handleInputChange}
-                                        required
-                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                    />
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-sm font-semibold text-gray-700 mb-2">Size *</label>
+                                                <input
+                                                    type="text"
+                                                    name="size"
+                                                    value={formData.size}
+                                                    onChange={handleInputChange}
+                                                    required
+                                                    placeholder="e.g., 8 inch, 4 x 3 inch"
+                                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-semibold text-gray-700 mb-2">Price (Nu.) *</label>
+                                                <input
+                                                    type="number"
+                                                    name="price"
+                                                    value={formData.price}
+                                                    onChange={handleInputChange}
+                                                    required
+                                                    placeholder="Enter price"
+                                                    min="0"
+                                                    step="0.01"
+                                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-sm font-semibold text-gray-700 mb-2">Stock Quantity *</label>
+                                            <input
+                                                type="number"
+                                                name="stock"
+                                                value={formData.stock}
+                                                onChange={handleInputChange}
+                                                required
+                                                placeholder="Enter stock quantity"
+                                                min="0"
+                                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                                            />
+                                        </div>
+                                    </div>
                                 </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Price (Nu.) *</label>
-                                    <input
-                                        type="number"
-                                        name="price"
-                                        value={formData.price}
-                                        onChange={handleInputChange}
-                                        required
-                                        min="0"
-                                        step="0.01"
-                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                    />
+
+                                {/* Product Images Section */}
+                                <div className="mt-6">
+                                    <label className="block text-sm font-semibold text-gray-700 mb-3">Product Images</label>
+                                    <div className="grid grid-cols-4 gap-4">
+                                        {previewImages.map((img, index) => (
+                                            <div key={index} className="aspect-square bg-gray-100 rounded-lg relative group overflow-hidden">
+                                                <img
+                                                    src={img}
+                                                    alt={`Preview ${index + 1}`}
+                                                    className="w-full h-full object-cover rounded-lg"
+                                                />
+                                                <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <span className="text-white text-xs font-medium">Image ({index + 1})</span>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const newPreviews = [...previewImages];
+                                                        newPreviews.splice(index, 1);
+                                                        setPreviewImages(newPreviews);
+
+                                                        const newFormDataImages = [...formData.images];
+                                                        newFormDataImages.splice(index, 1);
+                                                        setFormData(prev => ({ ...prev, images: newFormDataImages }));
+                                                    }}
+                                                    className="absolute top-2 right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                                                >
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                        ))}
+                                        {previewImages.length < 4 && (
+                                            <label className={`aspect-square rounded-lg border-2 border-dashed flex items-center justify-center cursor-pointer transition-colors ${previewImages.length >= 4
+                                                    ? 'border-gray-200 bg-gray-50 cursor-not-allowed'
+                                                    : 'border-gray-300 hover:border-blue-500 hover:bg-blue-50'
+                                                }`}>
+                                                <input
+                                                    type="file"
+                                                    accept="image/*"
+                                                    multiple
+                                                    onChange={handleImageChange}
+                                                    className="hidden"
+                                                    disabled={previewImages.length >= 4}
+                                                />
+                                                <div className="text-center p-4">
+                                                    <svg className="w-8 h-8 text-gray-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                                    </svg>
+                                                    <p className="text-xs text-gray-600 font-medium">Add</p>
+                                                    <p className="text-xs text-gray-500 mt-1">({previewImages.length + 1}/4)</p>
+                                                </div>
+                                            </label>
+                                        )}
+                                    </div>
+                                    <p className="text-xs text-gray-500 mt-2">Upload up to 4 product images. First image will be the thumbnail.</p>
                                 </div>
-                            </div>
 
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Stock Quantity *</label>
-                                <input
-                                    type="number"
-                                    name="stock"
-                                    value={formData.stock}
-                                    onChange={handleInputChange}
-                                    required
-                                    min="0"
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Product Images</label>
-                                <div className="grid grid-cols-4 gap-2">
-                                    {previewImages.map((img, index) => (
-                                        <div key={index} className="aspect-square bg-gray-100 rounded-lg relative group">
-                                            <img src={img} alt={`Preview ${index + 1}`} className="w-full h-full object-cover rounded-lg" />
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    const newPreviews = [...previewImages];
-                                                    newPreviews.splice(index, 1);
-                                                    setPreviewImages(newPreviews);
-                                                }}
-                                                className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                                            >
-                                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                {/* Modal Footer */}
+                                <div className="flex gap-3 mt-8 pt-6 border-t border-gray-200">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setShowEditModal(false);
+                                            resetForm();
+                                            setSelectedProduct(null);
+                                        }}
+                                        className="flex-1 px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-semibold"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        disabled={formLoading}
+                                        className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+                                    >
+                                        {formLoading ? (
+                                            <span className="flex items-center justify-center gap-2">
+                                                <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                                                 </svg>
-                                            </button>
-                                        </div>
-                                    ))}
-                                    <label className="aspect-square bg-gray-100 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center cursor-pointer hover:border-blue-500 transition-colors">
-                                        <input
-                                            type="file"
-                                            accept="image/*"
-                                            multiple
-                                            onChange={handleImageChange}
-                                            className="hidden"
-                                        />
-                                        <div className="text-center">
-                                            <svg className="w-8 h-8 text-gray-400 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                                            </svg>
-                                            <p className="text-xs text-gray-500">Add</p>
-                                        </div>
-                                    </label>
+                                                Saving...
+                                            </span>
+                                        ) : (
+                                            'Save Changes'
+                                        )}
+                                    </button>
                                 </div>
-                                <p className="text-xs text-gray-500 mt-1">Upload up to 4 product images. First image will be the thumbnail.</p>
-                            </div>
-
-                            <div className="flex gap-3 pt-4">
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setShowEditModal(false);
-                                        resetForm();
-                                        setSelectedProduct(null);
-                                    }}
-                                    className="flex-1 px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={formLoading}
-                                    className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50"
-                                >
-                                    {formLoading ? 'Saving...' : 'Save Changes'}
-                                </button>
-                            </div>
-                        </form>
+                            </form>
+                        </div>
                     </div>
                 </div>
             )}
 
             {/* Add New Product Modal */}
             {showAddModal && (
-                <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 sticky top-0 bg-white">
-                            <h2 className="text-xl font-bold text-gray-900">Add New Product</h2>
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+                        {/* Modal Header - Fixed */}
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 flex-shrink-0">
+                            <div>
+                                <h2 className="text-2xl font-bold text-gray-900">Add New Product</h2>
+                                <p className="text-sm text-gray-600 mt-1">Create a new product listing for the Fab Lab shop</p>
+                            </div>
                             <button
                                 onClick={() => {
                                     setShowAddModal(false);
                                     resetForm();
                                 }}
-                                className="text-gray-400 hover:text-gray-600"
+                                className="text-gray-400 hover:text-gray-600 p-2 hover:bg-gray-100 rounded-full transition-colors"
                             >
                                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
@@ -887,125 +1021,195 @@ export default function Products() {
                             </button>
                         </div>
 
-                        <form onSubmit={handleAddProduct} className="p-6 space-y-4">
-                            <p className="text-sm text-gray-600">Create a new product listing for the Fab Lab shop</p>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Product Name *</label>
-                                <input
-                                    type="text"
-                                    name="name"
-                                    value={formData.name}
-                                    onChange={handleInputChange}
-                                    required
-                                    placeholder="Enter product name"
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Description *</label>
-                                <textarea
-                                    name="description"
-                                    value={formData.description}
-                                    onChange={handleInputChange}
-                                    required
-                                    placeholder="Enter product description"
-                                    rows="3"
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
-                                />
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
+                        {/* Modal Body */}
+                        <form onSubmit={handleAddProduct} className="p-6">
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                {/* Left Column - Thumbnail Preview */}
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Size *</label>
-                                    <input
-                                        type="text"
-                                        name="size"
-                                        value={formData.size}
-                                        onChange={handleInputChange}
-                                        required
-                                        placeholder="e.g., 8 inch, 4 x 3 inch"
-                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Price (Nu.) *</label>
-                                    <input
-                                        type="number"
-                                        name="price"
-                                        value={formData.price}
-                                        onChange={handleInputChange}
-                                        required
-                                        placeholder="Enter price"
-                                        min="0"
-                                        step="0.01"
-                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                    />
-                                </div>
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Stock Quantity *</label>
-                                <input
-                                    type="number"
-                                    name="stock"
-                                    value={formData.stock}
-                                    onChange={handleInputChange}
-                                    required
-                                    placeholder="Enter stock quantity"
-                                    min="0"
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Product Images</label>
-                                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-500 transition-colors cursor-pointer">
-                                    <input
-                                        type="file"
-                                        accept="image/*"
-                                        multiple
-                                        onChange={handleImageChange}
-                                        className="hidden"
-                                        id="add-product-images"
-                                    />
-                                    <label htmlFor="add-product-images" className="cursor-pointer block">
-                                        <svg className="w-10 h-10 text-gray-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                                        </svg>
-                                        <p className="text-sm text-gray-600">Add Images</p>
-                                        <p className="text-xs text-gray-500 mt-1">Upload up to 4 images. First will be thumbnail.</p>
-                                    </label>
-                                    {previewImages.length > 0 && (
-                                        <div className="grid grid-cols-4 gap-2 mt-4">
-                                            {previewImages.map((img, index) => (
-                                                <div key={index} className="aspect-square bg-gray-100 rounded-lg overflow-hidden">
-                                                    <img src={img} alt={`Preview ${index + 1}`} className="w-full h-full object-cover" />
+                                    <label className="block text-sm font-semibold text-gray-700 mb-3">Thumbnail Image</label>
+                                    <div className="aspect-square bg-gray-100 rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center relative overflow-hidden group hover:border-blue-500 transition-colors">
+                                        {previewImages.length > 0 ? (
+                                            <>
+                                                <img
+                                                    src={previewImages[0]}
+                                                    alt="Thumbnail Preview"
+                                                    className="w-full h-full object-cover"
+                                                />
+                                                <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <span className="text-white text-sm font-medium">Large Thumbnail Image (1)</span>
                                                 </div>
-                                            ))}
+                                            </>
+                                        ) : (
+                                            <label className="cursor-pointer w-full h-full flex flex-col items-center justify-center p-6">
+                                                <input
+                                                    type="file"
+                                                    accept="image/*"
+                                                    onChange={handleThumbnailChange}
+                                                    className="hidden"
+                                                    id="add-thumbnail"
+                                                />
+                                                <svg className="w-16 h-16 text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                </svg>
+                                                <p className="text-sm text-gray-600 font-medium">Click to upload thumbnail</p>
+                                                <p className="text-xs text-gray-500 mt-1">First image will be thumbnail</p>
+                                            </label>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Right Column - Form Fields */}
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-2">Product Name *</label>
+                                        <input
+                                            type="text"
+                                            name="name"
+                                            value={formData.name}
+                                            onChange={handleInputChange}
+                                            required
+                                            placeholder="Enter product name"
+                                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-2">Description *</label>
+                                        <textarea
+                                            name="description"
+                                            value={formData.description}
+                                            onChange={handleInputChange}
+                                            required
+                                            placeholder="Enter product description"
+                                            rows="3"
+                                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none transition-colors"
+                                        />
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-semibold text-gray-700 mb-2">Size *</label>
+                                            <input
+                                                type="text"
+                                                name="size"
+                                                value={formData.size}
+                                                onChange={handleInputChange}
+                                                required
+                                                placeholder="e.g., 8 inch, 4 x 3 inch"
+                                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                                            />
                                         </div>
+                                        <div>
+                                            <label className="block text-sm font-semibold text-gray-700 mb-2">Price (Nu.) *</label>
+                                            <input
+                                                type="number"
+                                                name="price"
+                                                value={formData.price}
+                                                onChange={handleInputChange}
+                                                required
+                                                placeholder="Enter price"
+                                                min="0"
+                                                step="0.01"
+                                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-2">Stock Quantity *</label>
+                                        <input
+                                            type="number"
+                                            name="stock"
+                                            value={formData.stock}
+                                            onChange={handleInputChange}
+                                            required
+                                            placeholder="Enter stock quantity"
+                                            min="0"
+                                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Other Images Section - Separate from Thumbnail */}
+                            <div className="mt-6">
+                                <label className="block text-sm font-semibold text-gray-700 mb-3">Other Images</label>
+                                <div className="grid grid-cols-4 gap-4">
+                                    {otherImages.map((img, index) => (
+                                        <div key={index} className="aspect-square bg-gray-100 rounded-lg relative group overflow-hidden">
+                                            <img
+                                                src={img}
+                                                alt={`Other Image ${index + 1}`}
+                                                className="w-full h-full object-cover rounded-lg"
+                                            />
+                                            <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <span className="text-white text-xs font-medium">Image ({index + 1})</span>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => removeOtherImage(index)}
+                                                className="absolute top-2 right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                                            >
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                                </svg>
+                                            </button>
+                                        </div>
+                                    ))}
+                                    {otherImages.length < 4 && (
+                                        <label className={`aspect-square rounded-lg border-2 border-dashed flex items-center justify-center cursor-pointer transition-colors ${otherImages.length >= 4
+                                                ? 'border-gray-200 bg-gray-50 cursor-not-allowed'
+                                                : 'border-gray-300 hover:border-blue-500 hover:bg-blue-50'
+                                            }`}>
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                multiple
+                                                onChange={handleOtherImagesChange}
+                                                className="hidden"
+                                                disabled={otherImages.length >= 4}
+                                            />
+                                            <div className="text-center p-4">
+                                                <svg className="w-8 h-8 text-gray-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                                </svg>
+                                                <p className="text-xs text-gray-600 font-medium">Add Image</p>
+                                                <p className="text-xs text-gray-500 mt-1">({otherImages.length + 1}/4)</p>
+                                            </div>
+                                        </label>
                                     )}
                                 </div>
+                                <p className="text-xs text-gray-500 mt-2">Upload up to 4 additional images (excluding thumbnail).</p>
                             </div>
 
-                            <div className="flex gap-3 pt-4">
+                            {/* Modal Footer */}
+                            <div className="flex gap-3 mt-8 pt-6 border-t border-gray-200">
                                 <button
                                     type="button"
                                     onClick={() => {
                                         setShowAddModal(false);
                                         resetForm();
                                     }}
-                                    className="flex-1 px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                                    className="flex-1 px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-semibold"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     type="submit"
                                     disabled={formLoading}
-                                    className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50"
+                                    className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
                                 >
-                                    {formLoading ? 'Adding...' : 'Add Product'}
+                                    {formLoading ? (
+                                        <span className="flex items-center justify-center gap-2">
+                                            <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                            </svg>
+                                            Adding...
+                                        </span>
+                                    ) : (
+                                        'Add Product'
+                                    )}
                                 </button>
                             </div>
                         </form>

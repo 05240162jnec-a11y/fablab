@@ -19,11 +19,11 @@ class ProductOrderController extends Controller
     public function index(Request $request)
     {
         $user = Auth::user();
-        
+
         $orders = ProductOrder::where('user_id', $user->id)
             ->orderBy('created_at', 'desc')
             ->get();
-        
+
         return response()->json([
             'success' => true,
             'orders' => $orders
@@ -44,7 +44,7 @@ class ProductOrderController extends Controller
             'total_amount' => 'required|numeric|min:0',
             'delivery_option' => 'required|in:pickup,shipping',
             'shipping_address' => 'required_if:delivery_option,shipping|string',
-            'payment_screenshot' => 'required|image|mimes:jpeg,png,jpg,gif|max:5120', // Max 5MB
+            'payment_screenshot' => 'required|image|mimes:jpeg,png,jpg,gif|max:5120',
         ]);
 
         if ($validator->fails()) {
@@ -73,7 +73,7 @@ class ProductOrderController extends Controller
         }
 
         DB::beginTransaction();
-        
+
         try {
             // Handle payment screenshot upload
             $screenshotPath = null;
@@ -81,12 +81,16 @@ class ProductOrderController extends Controller
                 $screenshotPath = $request->file('payment_screenshot')->store('product_orders', 'public');
             }
 
+            // ✅ FIXED: Calculate shipping cost (Fixed Nu. 150 for shipping)
+            $shippingCost = $request->delivery_option === 'shipping' ? 150.00 : 0.00;
+
             // Create the order
             $order = ProductOrder::create([
                 'order_number' => ProductOrder::generateOrderNumber(),
                 'user_id' => Auth::id(),
                 'items' => $request->items,
                 'total_amount' => $request->total_amount,
+                'shipping_cost' => $shippingCost,
                 'delivery_option' => $request->delivery_option,
                 'shipping_address' => $request->delivery_option === 'shipping' ? $request->shipping_address : null,
                 'payment_screenshot' => $screenshotPath,
@@ -109,12 +113,12 @@ class ProductOrderController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
-            
+
             // Delete uploaded screenshot if exists
             if ($screenshotPath) {
                 Storage::disk('public')->delete($screenshotPath);
             }
-            
+
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to create order. Please try again.',
@@ -129,18 +133,18 @@ class ProductOrderController extends Controller
     public function show($id)
     {
         $user = Auth::user();
-        
+
         $order = ProductOrder::where('user_id', $user->id)
             ->where('id', $id)
             ->first();
-        
+
         if (!$order) {
             return response()->json([
                 'success' => false,
                 'message' => 'Order not found'
             ], 404);
         }
-        
+
         return response()->json([
             'success' => true,
             'order' => $order

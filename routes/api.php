@@ -31,6 +31,13 @@ Route::prefix('admin')->group(function () {
         Route::apiResource('bookings', \App\Http\Controllers\Api\Admin\BookingController::class)
             ->only(['index']);
         Route::post('bookings/{id}/update-status', [\App\Http\Controllers\Api\Admin\BookingController::class, 'updateStatus']);
+
+        // ✅ Product Orders (Admin Management)
+        Route::get('/product-orders', [App\Http\Controllers\Api\Admin\ProductOrderController::class, 'index']);
+        Route::get('/product-orders/{id}', [App\Http\Controllers\Api\Admin\ProductOrderController::class, 'show']);
+        Route::get('/product-orders/{id}/screenshot', [App\Http\Controllers\Api\Admin\ProductOrderController::class, 'screenshot']);
+        Route::post('/product-orders/{id}/approve', [App\Http\Controllers\Api\Admin\ProductOrderController::class, 'approve']);
+        Route::post('/product-orders/{id}/reject', [App\Http\Controllers\Api\Admin\ProductOrderController::class, 'reject']);
         
         // Product Orders
         Route::apiResource('product-orders', \App\Http\Controllers\Api\Admin\ProductOrderController::class)
@@ -111,6 +118,9 @@ Route::prefix('admin')->group(function () {
 // ==========================================
 Route::middleware('auth:sanctum')->group(function () {
     
+    // User Dashboard
+    Route::get('/user/dashboard', [App\Http\Controllers\Api\DashboardController::class, 'userDashboard']);
+
     // User Profile
     Route::get('/user/profile', [App\Http\Controllers\Api\UserController::class, 'profile']);
 

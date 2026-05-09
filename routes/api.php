@@ -32,16 +32,9 @@ Route::prefix('admin')->group(function () {
             ->only(['index']);
         Route::post('bookings/{id}/update-status', [\App\Http\Controllers\Api\Admin\BookingController::class, 'updateStatus']);
 
-        // ✅ Product Orders (Admin Management)
-        Route::get('/product-orders', [App\Http\Controllers\Api\Admin\ProductOrderController::class, 'index']);
-        Route::get('/product-orders/{id}', [App\Http\Controllers\Api\Admin\ProductOrderController::class, 'show']);
-        Route::get('/product-orders/{id}/screenshot', [App\Http\Controllers\Api\Admin\ProductOrderController::class, 'screenshot']);
-        Route::post('/product-orders/{id}/approve', [App\Http\Controllers\Api\Admin\ProductOrderController::class, 'approve']);
-        Route::post('/product-orders/{id}/reject', [App\Http\Controllers\Api\Admin\ProductOrderController::class, 'reject']);
-        
-        // Product Orders
+        // ✅ FIXED: Product Orders (Admin Management) - Clean routes, no duplicates
         Route::apiResource('product-orders', \App\Http\Controllers\Api\Admin\ProductOrderController::class)
-            ->only(['index']);
+            ->only(['index', 'show', 'destroy']);
         Route::post('product-orders/{id}/approve', [\App\Http\Controllers\Api\Admin\ProductOrderController::class, 'approve']);
         Route::post('product-orders/{id}/reject', [\App\Http\Controllers\Api\Admin\ProductOrderController::class, 'reject']);
         Route::get('product-orders/{id}/screenshot', [\App\Http\Controllers\Api\Admin\ProductOrderController::class, 'screenshot']);

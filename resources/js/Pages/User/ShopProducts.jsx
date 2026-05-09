@@ -532,7 +532,9 @@ export default function ShopProducts() {
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                {/* Image Gallery with Thumbnails */}
                                 <div>
+                                    {/* Main Carousel Image */}
                                     <div className="relative aspect-square bg-gray-100 rounded-lg overflow-hidden mb-4">
                                         {selectedProduct.images && selectedProduct.images.length > 0 ? (
                                             <>
@@ -575,8 +577,31 @@ export default function ShopProducts() {
                                             </div>
                                         )}
                                     </div>
+
+                                    {/* ✅ Thumbnail Navigation Strip */}
+                                    {selectedProduct.images && selectedProduct.images.length > 1 && (
+                                        <div className="flex gap-2 overflow-x-auto pb-2">
+                                            {selectedProduct.images.map((img, index) => (
+                                                <button
+                                                    key={index}
+                                                    onClick={() => goToImage(index)}
+                                                    className={`flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-all ${currentImageIndex === index
+                                                            ? 'border-blue-600 ring-2 ring-blue-600/20'
+                                                            : 'border-gray-200 hover:border-gray-300'
+                                                        }`}
+                                                >
+                                                    <img
+                                                        src={getProductImage(selectedProduct, index)}
+                                                        alt={`Thumbnail ${index + 1}`}
+                                                        className="w-full h-full object-cover"
+                                                    />
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
 
+                                {/* Product Details */}
                                 <div>
                                     <p className="text-gray-600 mb-4">{selectedProduct.description}</p>
 
@@ -632,6 +657,12 @@ export default function ShopProducts() {
                                             Buy Now
                                         </button>
                                     </div>
+
+                                    {selectedProduct.stock === 0 && (
+                                        <p className="text-xs text-gray-500 mt-2 text-center">
+                                            This product is currently out of stock. You can add to cart and checkout when it's available.
+                                        </p>
+                                    )}
                                 </div>
                             </div>
                         </div>

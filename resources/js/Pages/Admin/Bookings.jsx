@@ -22,7 +22,11 @@ export default function Bookings() {
     // Modal States
     const [showScreenshotModal, setShowScreenshotModal] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState(null);
-    const [actionLoading, setActionLoading] = useState(false);
+
+    // ✅ LOADING STATES - Separate for each action
+    const [approveLoading, setApproveLoading] = useState(false);
+    const [rejectLoading, setRejectLoading] = useState(false);
+    const [actionLoading, setActionLoading] = useState(false); // ✅ For delete operations
 
     // Loading States
     const [initialLoading, setInitialLoading] = useState(true);
@@ -154,12 +158,6 @@ export default function Bookings() {
         }
     };
 
-    const getDeliveryBadgeClass = (deliveryOption) => {
-        return deliveryOption === 'shipping'
-            ? 'bg-purple-100 text-purple-700 border border-purple-200'
-            : 'bg-blue-100 text-blue-700 border border-blue-200';
-    };
-
     const capitalize = (str) => str?.charAt(0).toUpperCase() + str?.slice(1) || '';
 
     const formatTimeSlot = (startTime, endTime) => {
@@ -214,12 +212,12 @@ export default function Bookings() {
     };
 
     const handleApproveOrder = async (order) => {
-        if (actionLoading) return;
+        if (approveLoading) return;
 
         const confirmed = window.confirm(`Are you sure you want to approve order ${order.order_number}?`);
         if (!confirmed) return;
 
-        setActionLoading(true);
+        setApproveLoading(true);
 
         try {
             const token = localStorage.getItem('admin_token');
@@ -232,21 +230,26 @@ export default function Bookings() {
 
             setActionMessage(`✅ Order ${order.order_number} approved!`);
             fetchData();
+            setShowScreenshotModal(false);
+            setSelectedOrder(null);
+
         } catch (err) {
             console.error('Approve error:', err);
             if (err.response?.data?.message?.includes('not pending')) {
                 setActionMessage(`✅ Order ${order.order_number} was already approved!`);
                 fetchData();
+                setShowScreenshotModal(false);
+                setSelectedOrder(null);
             } else {
                 alert('❌ Failed to approve order');
             }
         } finally {
-            setActionLoading(false);
+            setApproveLoading(false);
         }
     };
 
     const handleRejectOrder = async (order) => {
-        if (actionLoading) return;
+        if (rejectLoading) return;
 
         const reason = prompt('Enter rejection reason:');
         if (!reason) return;
@@ -254,7 +257,7 @@ export default function Bookings() {
         const confirmed = window.confirm(`Are you sure you want to reject order ${order.order_number}?\n\nReason: ${reason}`);
         if (!confirmed) return;
 
-        setActionLoading(true);
+        setRejectLoading(true);
 
         try {
             const token = localStorage.getItem('admin_token');
@@ -269,16 +272,49 @@ export default function Bookings() {
 
             setActionMessage(`✅ Order ${order.order_number} rejected!`);
             fetchData();
+            setShowScreenshotModal(false);
+            setSelectedOrder(null);
+
         } catch (err) {
             console.error('Reject error:', err);
             if (err.response?.data?.message?.includes('not pending')) {
                 setActionMessage(`✅ Order ${order.order_number} was already rejected!`);
                 fetchData();
+                setShowScreenshotModal(false);
+                setSelectedOrder(null);
             } else {
                 alert('❌ Failed to reject order');
             }
         } finally {
-            setActionLoading(false);
+            setRejectLoading(false);
+        }
+    };
+
+    const handleDeleteOrder = async (order) => {
+        if (actionLoading) return;  // ✅ Now works!
+
+        const confirmed = window.confirm(`Are you sure you want to delete order ${order.order_number}? This action cannot be undone.`);
+        if (!confirmed) return;
+
+        setActionLoading(true);  // ✅ Now works!
+
+        try {
+            const token = localStorage.getItem('admin_token');
+
+            await axios.delete(`http://127.0.0.1:8000/api/admin/product-orders/${order.id}`, {
+                headers: {
+                    'Accept': 'application/json',
+                    'Authorization': `Bearer ${token}`,
+                }
+            });
+
+            setActionMessage(`✅ Order ${order.order_number} deleted!`);
+            fetchData();
+        } catch (err) {
+            console.error('Delete error:', err);
+            alert('❌ Failed to delete order: ' + (err.response?.data?.message || err.message));
+        } finally {
+            setActionLoading(false);  // ✅ Now works!
         }
     };
 
@@ -518,7 +554,6 @@ export default function Bookings() {
                         </div>
                     )}
 
-                    {/* ✅ UPDATED: Product Orders Tab with Shipping Cost Display */}
                     {!initialLoading && !error && activeTab === 'product-orders' && (
                         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
                             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
@@ -615,7 +650,7 @@ export default function Bookings() {
 
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                 {filteredOrders.map((order) => (
-                                    <div key={order.id} className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-md transition-shadow">
+                                    <div key={order.id} className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-md transition-shadow flex flex-col">
                                         <div className="flex items-start justify-between mb-4">
                                             <div className="flex-1">
                                                 <h3 className="text-lg font-bold text-gray-900 mb-1">{getProductName(order)}</h3>
@@ -626,24 +661,12 @@ export default function Bookings() {
                                             </span>
                                         </div>
 
-                                        <div className="mb-3">
-                                            <span className={`inline-flex px-2 py-1 rounded text-xs font-medium ${getDeliveryBadgeClass(order.delivery_option)}`}>
-                                                {order.delivery_option === 'shipping' ? '📦 Shipping' : '🏪 Pick Up'}
-                                            </span>
-                                        </div>
-
                                         <div className="mb-4">
                                             <p className="text-sm text-gray-500 mb-1">Total Amount</p>
                                             <p className="text-2xl font-bold text-blue-600">Nu. {parseFloat(order.total_amount || 0).toFixed(2)}</p>
-                                            {/* ✅ NEW: Show shipping cost breakdown */}
-                                            {order.delivery_option === 'shipping' && order.shipping_cost > 0 && (
-                                                <p className="text-xs text-purple-600 mt-1">
-                                                    (Includes Nu. {parseFloat(order.shipping_cost || 0).toFixed(2)} shipping)
-                                                </p>
-                                            )}
                                         </div>
 
-                                        <div className="mb-3">
+                                        <div className="mb-4 flex-1">
                                             <img
                                                 src={getScreenshotUrl(order)}
                                                 alt={getProductName(order)}
@@ -653,23 +676,19 @@ export default function Bookings() {
                                                     e.target.src = 'https://via.placeholder.com/400x300?text=No+Image';
                                                 }}
                                             />
-                                            <p className="text-xs text-gray-500 mt-2 text-center">Click to view full screenshot</p>
+                                            <p className="text-xs text-gray-500 mt-2 text-center">Click to view details</p>
                                         </div>
 
-                                        {order.delivery_option === 'shipping' && order.shipping_address && (
-                                            <div className="mb-3 p-3 bg-purple-50 border border-purple-200 rounded-lg">
-                                                <p className="text-xs text-purple-700 font-semibold mb-1">📦 Shipping Address:</p>
-                                                <p className="text-sm text-gray-700">{order.shipping_address}</p>
-                                            </div>
-                                        )}
-
-                                        {order.status === 'rejected' && order.rejection_reason && (
-                                            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-                                                <p className="text-sm text-red-800">
-                                                    <span className="font-semibold">Rejected:</span> {order.rejection_reason}
-                                                </p>
-                                            </div>
-                                        )}
+                                        <button
+                                            onClick={() => handleDeleteOrder(order)}
+                                            disabled={actionLoading}
+                                            className="w-full py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm font-medium disabled:opacity-50"
+                                        >
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                            </svg>
+                                            Delete Order
+                                        </button>
                                     </div>
                                 ))}
                             </div>
@@ -688,7 +707,6 @@ export default function Bookings() {
                 </main>
             </div>
 
-            {/* ✅ UPDATED: SCREENSHOT MODAL with Shipping Cost Breakdown */}
             {showScreenshotModal && selectedOrder && (
                 <div
                     className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
@@ -743,14 +761,12 @@ export default function Bookings() {
                                     <p className="text-sm text-gray-500 mb-1">Quantity</p>
                                     <p className="font-semibold text-gray-900">{getTotalQuantity(selectedOrder)}</p>
                                 </div>
-                                {/* ✅ UPDATED: Shipping Address - Always visible in modal if exists */}
                                 {selectedOrder.shipping_address && (
                                     <div className="col-span-2 bg-white p-4 rounded-lg border border-purple-200 bg-purple-50">
                                         <p className="text-sm text-purple-700 font-semibold mb-1">📦 Shipping Address</p>
                                         <p className="text-gray-900">{selectedOrder.shipping_address}</p>
                                     </div>
                                 )}
-                                {/* ✅ NEW: Payment Breakdown with Shipping Cost */}
                                 <div className="col-span-2 bg-white p-4 rounded-lg border border-blue-200 bg-blue-50">
                                     <p className="text-sm text-blue-700 font-semibold mb-3">💰 Payment Breakdown</p>
                                     <div className="space-y-2">
@@ -776,7 +792,6 @@ export default function Bookings() {
                                         </div>
                                     </div>
                                 </div>
-                                {/* Items List */}
                                 <div className="col-span-2 bg-white p-4 rounded-lg border border-gray-200">
                                     <p className="text-sm text-gray-500 mb-2">Items Ordered</p>
                                     <ul className="space-y-2">
@@ -796,13 +811,13 @@ export default function Bookings() {
                                 <div className="flex gap-3">
                                     <button
                                         onClick={() => handleApproveOrder(selectedOrder)}
-                                        disabled={actionLoading}
-                                        className={`flex-1 py-3 rounded-lg transition-colors flex items-center justify-center gap-2 font-semibold ${actionLoading
-                                                ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
-                                                : 'bg-green-600 text-white hover:bg-green-700'
+                                        disabled={approveLoading}
+                                        className={`flex-1 py-3 rounded-lg transition-colors flex items-center justify-center gap-2 font-semibold ${approveLoading
+                                            ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                                            : 'bg-green-600 text-white hover:bg-green-700'
                                             }`}
                                     >
-                                        {actionLoading ? (
+                                        {approveLoading ? (
                                             <>
                                                 <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
                                                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -819,15 +834,16 @@ export default function Bookings() {
                                             </>
                                         )}
                                     </button>
+
                                     <button
                                         onClick={() => handleRejectOrder(selectedOrder)}
-                                        disabled={actionLoading}
-                                        className={`flex-1 py-3 rounded-lg transition-colors flex items-center justify-center gap-2 font-semibold ${actionLoading
-                                                ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
-                                                : 'bg-red-600 text-white hover:bg-red-700'
+                                        disabled={rejectLoading}
+                                        className={`flex-1 py-3 rounded-lg transition-colors flex items-center justify-center gap-2 font-semibold ${rejectLoading
+                                            ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                                            : 'bg-red-600 text-white hover:bg-red-700'
                                             }`}
                                     >
-                                        {actionLoading ? (
+                                        {rejectLoading ? (
                                             <>
                                                 <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
                                                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>

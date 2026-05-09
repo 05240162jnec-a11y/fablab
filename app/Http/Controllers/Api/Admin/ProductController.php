@@ -53,13 +53,13 @@ class ProductController extends Controller
             'status' => 'active',
         ]);
 
-        // Handle image uploads (max 4)
+        // ✅ Handle image uploads (max 5: 1 thumbnail + 4 others)
         if ($request->hasFile('images')) {
             $imagePaths = [];
             $files = is_array($request->images) ? $request->images : [$request->images];
             
             foreach ($files as $index => $image) {
-                if ($index >= 4) break;
+                if ($index >= 5) break;  // ✅ Changed from 4 to 5
                 if ($image && $image->isValid()) {
                     $path = $image->store('products', 'public');
                     $imagePaths[] = $path;
@@ -106,13 +106,13 @@ class ProductController extends Controller
             'stock' => $request->stock,
         ]);
 
-        // Handle new image uploads
+        // ✅ Handle new image uploads (max 5: 1 thumbnail + 4 others)
         if ($request->hasFile('images')) {
             $imagePaths = $product->images ?? [];
             $files = is_array($request->images) ? $request->images : [$request->images];
             
             foreach ($files as $index => $image) {
-                if (count($imagePaths) >= 4) break;
+                if (count($imagePaths) >= 5) break;  // ✅ Changed from 4 to 5
                 if ($image && $image->isValid()) {
                     $path = $image->store('products', 'public');
                     $imagePaths[] = $path;

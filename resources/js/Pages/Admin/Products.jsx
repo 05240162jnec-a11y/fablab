@@ -18,6 +18,10 @@ export default function Products() {
     const [showDetailsModal, setShowDetailsModal] = useState(false);
     const [showEditModal, setShowEditModal] = useState(false);
     const [showAddModal, setShowAddModal] = useState(false);
+    const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+    // ✅ NEW: Carousel State
+    const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
     // Filter & Search States
     const [searchQuery, setSearchQuery] = useState('');
@@ -75,10 +79,27 @@ export default function Products() {
         fetchProducts();
     }, []);
 
+    // ✅ NEW: Keyboard navigation for carousel
+    useEffect(() => {
+        const handleKeyPress = (e) => {
+            if (!showDetailsModal) return;
+
+            if (e.key === 'ArrowLeft') {
+                goToPreviousImage();
+            } else if (e.key === 'ArrowRight') {
+                goToNextImage();
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyPress);
+        return () => window.removeEventListener('keydown', handleKeyPress);
+    }, [showDetailsModal, currentImageIndex, selectedProduct]);
+
     // Handle form input changes
     const handleInputChange = (e) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
+        setHasUnsavedChanges(true);
     };
 
     // Handle thumbnail image selection
@@ -88,10 +109,11 @@ export default function Products() {
             setFormData(prev => ({ ...prev, images: [file] }));
             const preview = URL.createObjectURL(file);
             setPreviewImages([preview]);
+            setHasUnsavedChanges(true);
         }
     };
 
-    // Handle other images selection (up to 4)
+    // Handle other images selection (up to 4 additional images, excluding thumbnail)
     const handleOtherImagesChange = (e) => {
         const files = Array.from(e.target.files);
         const remainingSlots = 4 - otherImages.length;
@@ -99,20 +121,22 @@ export default function Products() {
 
         if (filesToAdd.length > 0) {
             const newOtherImages = [...otherImages, ...filesToAdd];
-            setFormData(prev => ({ ...prev, images: [...prev.images.slice(0, 1), ...newOtherImages] }));
+            setFormData(prev => ({ ...prev, images: [prev.images[0], ...newOtherImages] }));
 
             const newPreviews = filesToAdd.map(file => URL.createObjectURL(file));
             setOtherImages(prev => [...prev, ...newPreviews]);
+            setHasUnsavedChanges(true);
         }
     };
 
-    // Remove other image
+    // Remove other image (keep thumbnail intact)
     const removeOtherImage = (index) => {
         const newOtherImages = otherImages.filter((_, i) => i !== index);
-        const newFormDataImages = [formData.images[0], ...formData.images.slice(index + 2)];
+        const newFormDataImages = [formData.images[0], ...newOtherImages];
 
         setOtherImages(newOtherImages);
         setFormData(prev => ({ ...prev, images: newFormDataImages }));
+        setHasUnsavedChanges(true);
     };
 
     // Handle image change for Edit modal
@@ -127,6 +151,7 @@ export default function Products() {
 
             setPreviewImages(newPreviewImages);
             setFormData(prev => ({ ...prev, images: newFormDataImages }));
+            setHasUnsavedChanges(true);
         }
     };
 
@@ -142,24 +167,28 @@ export default function Products() {
         });
         setPreviewImages([]);
         setOtherImages([]);
+        setHasUnsavedChanges(false);
+        setCurrentImageIndex(0); // ✅ Reset carousel
     };
 
+    // Open product details modal
     const handleViewDetails = (product) => {
-        console.log('Original product images:', product.images);
-
-        // Create a copy with full image URLs
         const productWithFullUrls = {
             ...product,
-            images: product.images?.map(img => `http://127.0.0.1:8000/storage/${img}`) || []
+            images: product.images?.map(img => {
+                if (img.startsWith('http')) {
+                    return img;
+                }
+                return `http://127.0.0.1:8000/storage/${img}`;
+            }) || []
         };
 
-        console.log('Product with full URLs:', productWithFullUrls.images);
-
         setSelectedProduct(productWithFullUrls);
+        setCurrentImageIndex(0); // ✅ Reset to first image
         setShowDetailsModal(true);
     };
 
-    // Open edit modal with product data - Convert paths to full URLs
+    // Open edit modal with product data
     const handleEdit = (product) => {
         setSelectedProduct(product);
         setFormData({
@@ -171,15 +200,51 @@ export default function Products() {
             images: [],
         });
 
-        // Convert database paths to full URLs
         if (product.images && product.images.length > 0) {
-            setPreviewImages(product.images.map(img => `http://127.0.0.1:8000/storage/${img}`));
+            const fullUrls = product.images.map(img => {
+                if (img.startsWith('http')) {
+                    return img;
+                }
+                return `http://127.0.0.1:8000/storage/${img}`;
+            });
+            setPreviewImages(fullUrls);
         } else {
             setPreviewImages([]);
         }
 
         setShowDetailsModal(false);
         setShowEditModal(true);
+        setHasUnsavedChanges(false);
+    };
+
+    // ✅ NEW: Carousel Navigation Functions
+    const goToPreviousImage = () => {
+        if (selectedProduct?.images?.length > 0) {
+            setCurrentImageIndex((prev) => (prev === 0 ? selectedProduct.images.length - 1 : prev - 1));
+        }
+    };
+
+    const goToNextImage = () => {
+        if (selectedProduct?.images?.length > 0) {
+            setCurrentImageIndex((prev) => (prev === selectedProduct.images.length - 1 ? 0 : prev + 1));
+        }
+    };
+
+    const goToImage = (index) => {
+        setCurrentImageIndex(index);
+    };
+
+    // Check for unsaved changes before closing modal
+    const checkUnsavedChanges = (callback) => {
+        if (hasUnsavedChanges) {
+            const confirmed = window.confirm('You have unsaved changes. Are you sure you want to discard them and close?');
+            if (confirmed) {
+                resetForm();
+                callback();
+            }
+        } else {
+            callback();
+        }
     };
 
     // Toggle product status via API
@@ -640,11 +705,11 @@ export default function Products() {
                 </main>
             </div>
 
-            {/* Product Details Modal */}
+            {/* ✅ UPDATED: Product Details Modal WITH CAROUSEL */}
             {showDetailsModal && selectedProduct && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
                     <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col">
-                        {/* Modal Header - Fixed */}
+                        {/* Modal Header */}
                         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 flex-shrink-0">
                             <h2 className="text-2xl font-bold text-gray-900">Product Details</h2>
                             <button
@@ -657,32 +722,81 @@ export default function Products() {
                             </button>
                         </div>
 
-                        {/* Modal Body - Scrollable */}
+                        {/* Modal Body */}
                         <div className="overflow-y-auto flex-1 p-6">
-                            {/* Two-Column Layout */}
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                {/* Left Column - Large Thumbnail */}
+                                {/* Left Column - Image Carousel */}
                                 <div>
-                                    <label className="block text-sm font-semibold text-gray-700 mb-3">Thumbnail Image</label>
-                                    <div className="aspect-square bg-gray-100 rounded-xl border-2 border-dashed border-gray-300 overflow-hidden">
+                                    {/* Main Carousel Image */}
+                                    <div className="relative aspect-square bg-gray-100 rounded-xl overflow-hidden mb-4">
                                         {selectedProduct.images && selectedProduct.images.length > 0 ? (
-                                            <img
-                                                src={selectedProduct.images[0]}
-                                                alt={selectedProduct.name}
-                                                className="w-full h-full object-cover"
-                                            />
+                                            <>
+                                                <img
+                                                    src={selectedProduct.images[currentImageIndex]}
+                                                    alt={`${selectedProduct.name} - View ${currentImageIndex + 1}`}
+                                                    className="w-full h-full object-cover"
+                                                />
+
+                                                {/* Navigation Arrows */}
+                                                {selectedProduct.images.length > 1 && (
+                                                    <>
+                                                        <button
+                                                            onClick={goToPreviousImage}
+                                                            className="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-white/90 hover:bg-white rounded-full flex items-center justify-center shadow-lg transition-all hover:scale-110"
+                                                        >
+                                                            <svg className="w-6 h-6 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                                                            </svg>
+                                                        </button>
+                                                        <button
+                                                            onClick={goToNextImage}
+                                                            className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-white/90 hover:bg-white rounded-full flex items-center justify-center shadow-lg transition-all hover:scale-110"
+                                                        >
+                                                            <svg className="w-6 h-6 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                                                            </svg>
+                                                        </button>
+
+                                                        {/* Image Counter */}
+                                                        <div className="absolute top-4 right-4 bg-black/70 text-white px-3 py-1 rounded-full text-sm font-medium">
+                                                            {currentImageIndex + 1} / {selectedProduct.images.length}
+                                                        </div>
+                                                    </>
+                                                )}
+                                            </>
                                         ) : (
-                                            <div className="w-full h-full flex flex-col items-center justify-center">
-                                                <svg className="w-16 h-16 text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <div className="w-full h-full flex items-center justify-center">
+                                                <svg className="w-24 h-24 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                                                 </svg>
-                                                <p className="text-sm text-gray-500">No Image</p>
                                             </div>
                                         )}
                                     </div>
+
+                                    {/* Thumbnail Navigation */}
+                                    {selectedProduct.images && selectedProduct.images.length > 1 && (
+                                        <div className="flex gap-2 overflow-x-auto pb-2">
+                                            {selectedProduct.images.map((img, index) => (
+                                                <button
+                                                    key={index}
+                                                    onClick={() => goToImage(index)}
+                                                    className={`flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-all ${currentImageIndex === index
+                                                            ? 'border-blue-600 ring-2 ring-blue-600/20'
+                                                            : 'border-gray-200 hover:border-gray-300'
+                                                        }`}
+                                                >
+                                                    <img
+                                                        src={img}
+                                                        alt={`Thumbnail ${index + 1}`}
+                                                        className="w-full h-full object-cover"
+                                                    />
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
 
-                                {/* Right Column - Product Details */}
+                                {/* Right Column - Details */}
                                 <div className="space-y-4">
                                     <div>
                                         <h3 className="text-2xl font-bold text-gray-900">{selectedProduct.name}</h3>
@@ -693,23 +807,23 @@ export default function Products() {
                                     </div>
 
                                     <div>
-                                        <label className="block text-sm font-semibold text-gray-700 mb-2">Description</label>
+                                        <div className="text-sm font-semibold text-gray-700 mb-2">Description</div>
                                         <p className="text-gray-600 bg-gray-50 rounded-lg p-4">{selectedProduct.description || 'No description available'}</p>
                                     </div>
 
                                     <div className="grid grid-cols-3 gap-4">
                                         <div className="p-4 bg-gray-50 rounded-lg">
-                                            <p className="text-sm text-gray-500 mb-1">Size</p>
-                                            <p className="font-semibold text-gray-900">{selectedProduct.size || 'N/A'}</p>
+                                            <div className="text-sm text-gray-500 mb-1">Size</div>
+                                            <div className="font-semibold text-gray-900">{selectedProduct.size || 'N/A'}</div>
                                         </div>
                                         <div className="p-4 bg-gray-50 rounded-lg">
-                                            <p className="text-sm text-gray-500 mb-1">Stock</p>
-                                            <p className={`font-semibold ${selectedProduct.stock === 0 ? 'text-red-600' : selectedProduct.stock <= stockAlertThreshold ? 'text-yellow-600' : 'text-green-600'}`}>
+                                            <div className="text-sm text-gray-500 mb-1">Stock</div>
+                                            <div className={`font-semibold ${selectedProduct.stock === 0 ? 'text-red-600' : selectedProduct.stock <= stockAlertThreshold ? 'text-yellow-600' : 'text-green-600'}`}>
                                                 {selectedProduct.stock} units
-                                            </p>
+                                            </div>
                                         </div>
                                         <div className="p-4 bg-gray-50 rounded-lg">
-                                            <p className="text-sm text-gray-500 mb-1">Status</p>
+                                            <div className="text-sm text-gray-500 mb-1">Status</div>
                                             <span className={`inline-block mt-1 px-2 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(selectedProduct.status)}`}>
                                                 {selectedProduct.status.charAt(0).toUpperCase() + selectedProduct.status.slice(1)}
                                             </span>
@@ -717,42 +831,14 @@ export default function Products() {
                                     </div>
 
                                     <div className="p-4 bg-gray-50 rounded-lg">
-                                        <p className="text-sm text-gray-500 mb-1">Created On</p>
-                                        <p className="font-semibold text-gray-900">{formatDate(selectedProduct.created_at)}</p>
+                                        <div className="text-sm text-gray-500 mb-1">Created On</div>
+                                        <div className="font-semibold text-gray-900">{formatDate(selectedProduct.created_at)}</div>
                                     </div>
                                 </div>
                             </div>
-
-                            {/* Other Images Section - Images already have full URLs */}
-                            {selectedProduct.images && selectedProduct.images.length > 1 && (
-                                <div className="mt-6">
-                                    <label className="block text-sm font-semibold text-gray-700 mb-3">
-                                        Other Images ({selectedProduct.images.length - 1})
-                                    </label>
-                                    <div className="grid grid-cols-4 gap-4">
-                                        {selectedProduct.images.slice(1).map((img, index) => (
-                                            <div key={index} className="aspect-square bg-gray-100 rounded-lg overflow-hidden relative">
-                                                <img
-                                                    src={img}
-                                                    alt={`${selectedProduct.name} ${index + 2}`}
-                                                    className="w-full h-full object-cover"
-                                                />
-                                                <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-50 transition-opacity flex items-center justify-center">
-                                                    <span className="text-white text-xs font-medium opacity-0 hover:opacity-100">
-                                                        Image ({index + 2})
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                    <p className="text-xs text-gray-500 mt-2">
-                                        Total {selectedProduct.images.length} image(s) including thumbnail
-                                    </p>
-                                </div>
-                            )}
                         </div>
 
-                        {/* Modal Footer - Fixed */}
+                        {/* Modal Footer */}
                         <div className="flex gap-3 px-6 py-4 border-t border-gray-200 flex-shrink-0">
                             <button
                                 onClick={() => {
@@ -784,18 +870,18 @@ export default function Products() {
             {showEditModal && selectedProduct && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
                     <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
-                        {/* Modal Header - Fixed */}
+                        {/* Modal Header */}
                         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 flex-shrink-0">
                             <div>
                                 <h2 className="text-2xl font-bold text-gray-900">Edit Product</h2>
                                 <p className="text-sm text-gray-600 mt-1">Update the product listing details</p>
                             </div>
                             <button
-                                onClick={() => {
+                                onClick={() => checkUnsavedChanges(() => {
                                     setShowEditModal(false);
                                     resetForm();
                                     setSelectedProduct(null);
-                                }}
+                                })}
                                 className="text-gray-400 hover:text-gray-600 p-2 hover:bg-gray-100 rounded-full transition-colors"
                             >
                                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -804,13 +890,13 @@ export default function Products() {
                             </button>
                         </div>
 
-                        {/* Modal Body - Scrollable */}
+                        {/* Modal Body */}
                         <div className="overflow-y-auto flex-1 p-6">
                             <form onSubmit={handleUpdateProduct}>
                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                                     {/* Left Column - Thumbnail Preview */}
                                     <div>
-                                        <label className="block text-sm font-semibold text-gray-700 mb-3">Thumbnail Image</label>
+                                        <div className="text-sm font-semibold text-gray-700 mb-3">Thumbnail Image</div>
                                         <div className="aspect-square bg-gray-100 rounded-xl border-2 border-dashed border-gray-300 overflow-hidden">
                                             {previewImages.length > 0 ? (
                                                 <img
@@ -819,7 +905,7 @@ export default function Products() {
                                                     className="w-full h-full object-cover"
                                                 />
                                             ) : (
-                                                <div className="w-full h-full flex flex-col items-center justify-center">
+                                                <div className="w-full h-full flex items-center justify-center">
                                                     <svg className="w-16 h-16 text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                                                     </svg>
@@ -904,7 +990,7 @@ export default function Products() {
 
                                 {/* Product Images Section */}
                                 <div className="mt-6">
-                                    <label className="block text-sm font-semibold text-gray-700 mb-3">Product Images</label>
+                                    <div className="text-sm font-semibold text-gray-700 mb-3">Product Images</div>
                                     <div className="grid grid-cols-4 gap-4">
                                         {previewImages.map((img, index) => (
                                             <div key={index} className="aspect-square bg-gray-100 rounded-lg relative group overflow-hidden">
@@ -926,6 +1012,7 @@ export default function Products() {
                                                         const newFormDataImages = [...formData.images];
                                                         newFormDataImages.splice(index, 1);
                                                         setFormData(prev => ({ ...prev, images: newFormDataImages }));
+                                                        setHasUnsavedChanges(true);
                                                     }}
                                                     className="absolute top-2 right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                                                 >
@@ -965,11 +1052,11 @@ export default function Products() {
                                 <div className="flex gap-3 mt-8 pt-6 border-t border-gray-200">
                                     <button
                                         type="button"
-                                        onClick={() => {
+                                        onClick={() => checkUnsavedChanges(() => {
                                             setShowEditModal(false);
                                             resetForm();
                                             setSelectedProduct(null);
-                                        }}
+                                        })}
                                         className="flex-1 px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-semibold"
                                     >
                                         Cancel
@@ -1002,17 +1089,17 @@ export default function Products() {
             {showAddModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
                     <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-                        {/* Modal Header - Fixed */}
+                        {/* Modal Header */}
                         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 flex-shrink-0">
                             <div>
                                 <h2 className="text-2xl font-bold text-gray-900">Add New Product</h2>
                                 <p className="text-sm text-gray-600 mt-1">Create a new product listing for the Fab Lab shop</p>
                             </div>
                             <button
-                                onClick={() => {
+                                onClick={() => checkUnsavedChanges(() => {
                                     setShowAddModal(false);
                                     resetForm();
-                                }}
+                                })}
                                 className="text-gray-400 hover:text-gray-600 p-2 hover:bg-gray-100 rounded-full transition-colors"
                             >
                                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1026,7 +1113,7 @@ export default function Products() {
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                                 {/* Left Column - Thumbnail Preview */}
                                 <div>
-                                    <label className="block text-sm font-semibold text-gray-700 mb-3">Thumbnail Image</label>
+                                    <div className="text-sm font-semibold text-gray-700 mb-3">Thumbnail Image</div>
                                     <div className="aspect-square bg-gray-100 rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center relative overflow-hidden group hover:border-blue-500 transition-colors">
                                         {previewImages.length > 0 ? (
                                             <>
@@ -1131,9 +1218,9 @@ export default function Products() {
                                 </div>
                             </div>
 
-                            {/* Other Images Section - Separate from Thumbnail */}
+                            {/* Other Images Section */}
                             <div className="mt-6">
-                                <label className="block text-sm font-semibold text-gray-700 mb-3">Other Images</label>
+                                <div className="text-sm font-semibold text-gray-700 mb-3">Other Images</div>
                                 <div className="grid grid-cols-4 gap-4">
                                     {otherImages.map((img, index) => (
                                         <div key={index} className="aspect-square bg-gray-100 rounded-lg relative group overflow-hidden">
@@ -1186,10 +1273,10 @@ export default function Products() {
                             <div className="flex gap-3 mt-8 pt-6 border-t border-gray-200">
                                 <button
                                     type="button"
-                                    onClick={() => {
+                                    onClick={() => checkUnsavedChanges(() => {
                                         setShowAddModal(false);
                                         resetForm();
-                                    }}
+                                    })}
                                     className="flex-1 px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-semibold"
                                 >
                                     Cancel

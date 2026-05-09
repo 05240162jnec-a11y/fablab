@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Link } from 'react-router-dom';
 import UserSidebar from './UserSidebar';
 
 export default function ShopProducts() {
@@ -19,18 +18,32 @@ export default function ShopProducts() {
     const [showDetailsModal, setShowDetailsModal] = useState(false);
     const [quantity, setQuantity] = useState(1);
 
+    // Carousel State
+    const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
     // Cart States
     const [cart, setCart] = useState([]);
     const [showCartDrawer, setShowCartDrawer] = useState(false);
     const [showDeliveryModal, setShowDeliveryModal] = useState(false);
     const [showPaymentModal, setShowPaymentModal] = useState(false);
 
+    // ✅ NEW: Cart Selection States
+    const [selectedCartItems, setSelectedCartItems] = useState([]); // Array of product IDs
+    const [isSelectAll, setIsSelectAll] = useState(false);
+
+    // Notification State
+    const [showNotification, setShowNotification] = useState(false);
+
     // Delivery & Payment States
     const [deliveryOption, setDeliveryOption] = useState('pickup');
     const [shippingAddress, setShippingAddress] = useState('');
     const [paymentScreenshot, setPaymentScreenshot] = useState(null);
+    const [screenshotPreview, setScreenshotPreview] = useState(null);
     const [submitting, setSubmitting] = useState(false);
     const [directCheckoutProduct, setDirectCheckoutProduct] = useState(null);
+
+    // Track products already in cart (for badge count)
+    const [cartProductIds, setCartProductIds] = useState([]);
 
     // Toggle submenu
     const toggleSubmenu = (menu) => {
@@ -43,14 +56,40 @@ export default function ShopProducts() {
     // Fetch products on mount
     useEffect(() => {
         fetchProducts();
-        // Load cart from localStorage
         const savedCart = localStorage.getItem('cart');
         if (savedCart) {
-            setCart(JSON.parse(savedCart));
+            const parsedCart = JSON.parse(savedCart);
+            setCart(parsedCart);
+            setCartProductIds(parsedCart.map(item => item.id));
         }
     }, []);
 
-    // ✅ UPDATED: Fetch products from API
+    // Update "Select All" checkbox when cart or selection changes
+    useEffect(() => {
+        if (cart.length > 0 && selectedCartItems.length === cart.length) {
+            setIsSelectAll(true);
+        } else {
+            setIsSelectAll(false);
+        }
+    }, [selectedCartItems, cart]);
+
+    // Keyboard navigation for carousel
+    useEffect(() => {
+        const handleKeyPress = (e) => {
+            if (!showDetailsModal) return;
+
+            if (e.key === 'ArrowLeft') {
+                goToPreviousImage();
+            } else if (e.key === 'ArrowRight') {
+                goToNextImage();
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyPress);
+        return () => window.removeEventListener('keydown', handleKeyPress);
+    }, [showDetailsModal, currentImageIndex, selectedProduct]);
+
+    // Fetch products from API
     const fetchProducts = async () => {
         try {
             setLoading(true);
@@ -64,43 +103,18 @@ export default function ShopProducts() {
             });
 
             if (response.data.success) {
-                // Filter to only show active products with stock
-                const activeProducts = response.data.products.filter(p =>
-                    p.status === 'active' && p.stock > 0
-                );
-                setProducts(activeProducts);
+                setProducts(response.data.products);
             }
         } catch (error) {
             console.error('Error fetching products:', error);
-            // Keep sample data as fallback for development
             setProducts([
                 {
                     id: 1,
                     name: 'Jangchub Chorten',
-                    description: 'Beautifully crafted 3D printed Jangchub Chorten (Stupa of Enlightenment). A traditional Bhutanese Buddhist monument representing the enlightened mind of Buddha.',
+                    description: 'Beautifully crafted 3D printed Jangchub Chorten (Stupa of Enlightenment).',
                     price: 1000,
                     size: '8 inch',
                     stock: 8,
-                    images: [],
-                    category: '3D Printed'
-                },
-                {
-                    id: 2,
-                    name: 'Druk Thunder Dragon',
-                    description: 'Intricate 3D printed Druk (Thunder Dragon) - the national symbol of Bhutan. Perfect for display on desk or shelf.',
-                    price: 850,
-                    size: '6 inch',
-                    stock: 5,
-                    images: [],
-                    category: '3D Printed'
-                },
-                {
-                    id: 3,
-                    name: 'Takin Figurine',
-                    description: '3D printed Takin, Bhutan\'s national animal. A unique conversation starter and collectible item.',
-                    price: 600,
-                    size: '4 inch',
-                    stock: 12,
                     images: [],
                     category: '3D Printed'
                 },
@@ -110,11 +124,29 @@ export default function ShopProducts() {
         }
     };
 
-    // Open product details modal (click on product card)
+    // Open product details modal
     const handleViewDetails = (product) => {
         setSelectedProduct(product);
         setQuantity(1);
+        setCurrentImageIndex(0);
         setShowDetailsModal(true);
+    };
+
+    // Carousel Navigation Functions
+    const goToPreviousImage = () => {
+        if (selectedProduct?.images?.length > 1) {
+            setCurrentImageIndex((prev) => (prev === 0 ? selectedProduct.images.length - 1 : prev - 1));
+        }
+    };
+
+    const goToNextImage = () => {
+        if (selectedProduct?.images?.length > 1) {
+            setCurrentImageIndex((prev) => (prev === selectedProduct.images.length - 1 ? 0 : prev + 1));
+        }
+    };
+
+    const goToImage = (index) => {
+        setCurrentImageIndex(index);
     };
 
     // Add to cart
@@ -133,19 +165,52 @@ export default function ShopProducts() {
             const newCart = [...cart, { ...product, quantity: qty }];
             setCart(newCart);
             localStorage.setItem('cart', JSON.stringify(newCart));
+            setCartProductIds(prev => [...prev, product.id]);
         }
 
-        setShowDetailsModal(false);
-        setShowCartDrawer(true);
+        setShowNotification(true);
+        setTimeout(() => {
+            setShowNotification(false);
+        }, 3000);
     };
 
-    // Buy Now - Direct to checkout
+    // Buy Now - Direct to checkout (selects this single product)
     const buyNow = (product, qty = 1) => {
         setDirectCheckoutProduct({ ...product, quantity: qty });
         setShowDetailsModal(false);
         setDeliveryOption('pickup');
         setShippingAddress('');
+        setSelectedCartItems([]); // Clear selection for direct buy
         setShowDeliveryModal(true);
+    };
+
+    // ✅ Toggle item selection
+    const toggleItemSelection = (productId) => {
+        if (selectedCartItems.includes(productId)) {
+            setSelectedCartItems(selectedCartItems.filter(id => id !== productId));
+        } else {
+            setSelectedCartItems([...selectedCartItems, productId]);
+        }
+    };
+
+    // ✅ Toggle Select All
+    const toggleSelectAll = () => {
+        if (isSelectAll) {
+            setSelectedCartItems([]);
+        } else {
+            setSelectedCartItems(cart.map(item => item.id));
+        }
+    };
+
+    // ✅ Delete selected items
+    const deleteSelectedItems = () => {
+        if (selectedCartItems.length === 0) return;
+
+        const newCart = cart.filter(item => !selectedCartItems.includes(item.id));
+        setCart(newCart);
+        localStorage.setItem('cart', JSON.stringify(newCart));
+        setSelectedCartItems([]);
+        setCartProductIds(prev => prev.filter(id => !selectedCartItems.includes(id)));
     };
 
     // Remove from cart
@@ -153,6 +218,8 @@ export default function ShopProducts() {
         const newCart = cart.filter(item => item.id !== productId);
         setCart(newCart);
         localStorage.setItem('cart', JSON.stringify(newCart));
+        setCartProductIds(prev => prev.filter(id => id !== productId));
+        setSelectedCartItems(prev => prev.filter(id => id !== productId));
     };
 
     // Update cart quantity
@@ -166,19 +233,44 @@ export default function ShopProducts() {
         localStorage.setItem('cart', JSON.stringify(newCart));
     };
 
-    // Calculate total
-    const cartTotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    const cartItemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+    // ✅ Calculate totals for SELECTED items only
+    const selectedItems = cart.filter(item => selectedCartItems.includes(item.id));
+    const selectedItemsTotal = selectedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const selectedItemsCount = selectedItems.reduce((sum, item) => sum + item.quantity, 0);
 
-    // Proceed to checkout from cart
+    // Badge count (unique products in cart)
+    const cartItemCount = cartProductIds.length;
+
+    // Shipping calculation
+    const shippingCost = deliveryOption === 'shipping' ? 150 : 0;
+    const totalWithShipping = selectedItemsTotal + shippingCost;
+
+    // Proceed to checkout
     const handleCheckout = () => {
+        if (selectedCartItems.length === 0) {
+            alert('Please select at least one item to checkout');
+            return;
+        }
         setShowCartDrawer(false);
         setDeliveryOption('pickup');
         setShippingAddress('');
         setShowDeliveryModal(true);
     };
 
-    // ✅ FIXED: Submit order to real API - Send items as form fields, not JSON string
+    // Handle payment screenshot upload
+    const handleScreenshotUpload = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            setPaymentScreenshot(file);
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setScreenshotPreview(reader.result);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    // Submit order
     const handleSubmitOrder = async () => {
         if (!paymentScreenshot) {
             alert('❌ Please upload payment screenshot');
@@ -196,33 +288,33 @@ export default function ShopProducts() {
             const formData = new FormData();
             const userToken = localStorage.getItem('auth_token');
 
-            // Prepare items array
-            const items = directCheckoutProduct
+            // Determine which items to submit (selected items or direct checkout product)
+            const itemsToSubmit = directCheckoutProduct
                 ? [{
                     id: directCheckoutProduct.id,
                     name: directCheckoutProduct.name,
                     price: directCheckoutProduct.price,
                     quantity: directCheckoutProduct.quantity
                 }]
-                : cart.map(item => ({
+                : selectedItems.map(item => ({
                     id: item.id,
                     name: item.name,
                     price: item.price,
                     quantity: item.quantity
                 }));
 
-            // ✅ FIXED: Send items as individual form fields (Laravel expects array format)
-            items.forEach((item, index) => {
+            itemsToSubmit.forEach((item, index) => {
                 formData.append(`items[${index}][id]`, item.id);
                 formData.append(`items[${index}][name]`, item.name);
                 formData.append(`items[${index}][price]`, item.price);
                 formData.append(`items[${index}][quantity]`, item.quantity);
             });
 
-            formData.append('total_amount', directCheckoutProduct
-                ? directCheckoutProduct.price * directCheckoutProduct.quantity
-                : cartTotal
-            );
+            const finalTotal = directCheckoutProduct
+                ? (directCheckoutProduct.price * directCheckoutProduct.quantity) + (deliveryOption === 'shipping' ? 150 : 0)
+                : totalWithShipping;
+
+            formData.append('total_amount', finalTotal);
             formData.append('delivery_option', deliveryOption);
 
             if (deliveryOption === 'shipping') {
@@ -248,22 +340,28 @@ export default function ShopProducts() {
             if (response.data.success) {
                 alert('✅ Order submitted successfully! We will review your payment and confirm shortly.');
 
-                // Clear cart and reset
-                setCart([]);
-                localStorage.removeItem('cart');
+                // Remove purchased items from cart
+                const purchasedIds = directCheckoutProduct
+                    ? [directCheckoutProduct.id]
+                    : selectedCartItems;
+
+                const remainingCart = cart.filter(item => !purchasedIds.includes(item.id));
+                setCart(remainingCart);
+                localStorage.setItem('cart', JSON.stringify(remainingCart));
+                setCartProductIds(prev => prev.filter(id => !purchasedIds.includes(id)));
+
+                setSelectedCartItems([]);
                 setDirectCheckoutProduct(null);
                 setPaymentScreenshot(null);
+                setScreenshotPreview(null);
                 setShowPaymentModal(false);
                 setShowDeliveryModal(false);
 
-                // Refresh products to update stock
                 fetchProducts();
             }
         } catch (error) {
             console.error('Order submission error:', error);
-
             if (error.response?.data?.errors) {
-                // Show validation errors
                 const errors = Object.values(error.response.data.errors).flat().join('\n');
                 alert('❌ Validation failed:\n' + errors);
             } else if (error.response?.data?.message) {
@@ -281,15 +379,21 @@ export default function ShopProducts() {
         return `Nu. ${amount.toLocaleString()}`;
     };
 
-    // ✅ UPDATED: Get product image URL
-    const getProductImage = (product) => {
-        if (product.images && product.images.length > 0) {
-            return `http://127.0.0.1:8000/storage/${product.images[0]}`;
+    // Get product image URL
+    const getProductImage = (product, index = 0) => {
+        if (product.images && product.images.length > 0 && product.images[index]) {
+            return `http://127.0.0.1:8000/storage/${product.images[index]}`;
         }
         if (product.image) {
             return `http://127.0.0.1:8000/storage/${product.image}`;
         }
         return null;
+    };
+
+    // View product details from cart
+    const viewProductFromCart = (product) => {
+        setShowCartDrawer(false);
+        handleViewDetails(product);
     };
 
     return (
@@ -307,7 +411,7 @@ export default function ShopProducts() {
                             <p className="text-sm text-gray-600 mt-1">Browse and order products made at the JNEC Fab Lab</p>
                         </div>
 
-                        {/* Cart Button */}
+                        {/* Cart Button with Badge */}
                         <button
                             onClick={() => setShowCartDrawer(true)}
                             className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors relative"
@@ -317,13 +421,28 @@ export default function ShopProducts() {
                             </svg>
                             Cart
                             {cartItemCount > 0 && (
-                                <span className="absolute -top-1 -right-1 bg-blue-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                                <span className="absolute -top-2 -right-2 bg-blue-600 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center shadow-lg">
                                     {cartItemCount}
                                 </span>
                             )}
                         </button>
                     </div>
                 </header>
+
+                {/* Notification Toast */}
+                {showNotification && (
+                    <div className="fixed top-20 right-6 z-50 animate-slide-in-right">
+                        <div className="bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-3">
+                            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                            </svg>
+                            <div>
+                                <p className="font-semibold">Added to cart</p>
+                                <p className="text-sm text-green-100">Product has been added to cart</p>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {/* Products Grid */}
                 <main className="p-6">
@@ -340,7 +459,6 @@ export default function ShopProducts() {
                                     onClick={() => handleViewDetails(product)}
                                     className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-lg transition-shadow overflow-hidden cursor-pointer"
                                 >
-                                    {/* Product Image */}
                                     <div className="h-48 bg-gray-100 flex items-center justify-center relative">
                                         {getProductImage(product) ? (
                                             <img
@@ -362,27 +480,15 @@ export default function ShopProducts() {
                                             </svg>
                                         )}
 
-                                        {/* Wishlist Button */}
-                                        <button
-                                            onClick={(e) => e.stopPropagation()}
-                                            className="absolute top-2 right-2 p-2 bg-white rounded-full shadow hover:bg-gray-50"
-                                        >
-                                            <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                                            </svg>
-                                        </button>
-
-                                        {/* Out of Stock Badge */}
                                         {product.stock === 0 && (
-                                            <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-                                                <span className="bg-white text-gray-800 px-3 py-1 rounded-full text-sm font-medium">
+                                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                                <span className="bg-red-600 text-white px-4 py-2 rounded-full text-sm font-semibold shadow-lg">
                                                     Out of Stock
                                                 </span>
                                             </div>
                                         )}
                                     </div>
 
-                                    {/* Product Info */}
                                     <div className="p-4">
                                         <h3 className="font-semibold text-gray-900 mb-1">{product.name}</h3>
                                         <p className="text-sm text-gray-500 mb-3">{product.size}</p>
@@ -390,24 +496,15 @@ export default function ShopProducts() {
                                         <div className="flex items-center justify-between">
                                             <span className="text-lg font-bold text-blue-600">{formatCurrency(product.price)}</span>
 
-                                            {product.stock > 0 ? (
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        addToCart(product);
-                                                    }}
-                                                    className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
-                                                >
-                                                    Add to Cart
-                                                </button>
-                                            ) : (
-                                                <button
-                                                    disabled
-                                                    className="px-3 py-1.5 bg-gray-200 text-gray-500 text-sm rounded-lg cursor-not-allowed"
-                                                >
-                                                    Out of Stock
-                                                </button>
-                                            )}
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    addToCart(product);
+                                                }}
+                                                className="px-3 py-1.5 text-sm rounded-lg transition-colors bg-blue-600 text-white hover:bg-blue-700"
+                                            >
+                                                Add to Cart
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
@@ -419,7 +516,7 @@ export default function ShopProducts() {
 
             {/* Product Details Modal */}
             {showDetailsModal && selectedProduct && (
-                <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
                     <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
                         <div className="p-6">
                             <div className="flex justify-between items-start mb-6">
@@ -435,40 +532,62 @@ export default function ShopProducts() {
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                {/* Image Gallery */}
                                 <div>
-                                    <div className="aspect-square bg-gray-100 rounded-lg flex items-center justify-center mb-4">
-                                        {getProductImage(selectedProduct) ? (
-                                            <img
-                                                src={getProductImage(selectedProduct)}
-                                                alt={selectedProduct.name}
-                                                className="w-full h-full object-cover rounded-lg"
-                                                onError={(e) => {
-                                                    e.target.onerror = null;
-                                                    e.target.parentElement.innerHTML = `
-                                                        <svg class="w-24 h-24 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                                                        </svg>
-                                                    `;
-                                                }}
-                                            />
+                                    <div className="relative aspect-square bg-gray-100 rounded-lg overflow-hidden mb-4">
+                                        {selectedProduct.images && selectedProduct.images.length > 0 ? (
+                                            <>
+                                                <img
+                                                    src={getProductImage(selectedProduct, currentImageIndex) || getProductImage(selectedProduct)}
+                                                    alt={`${selectedProduct.name} - View ${currentImageIndex + 1}`}
+                                                    className="w-full h-full object-cover"
+                                                />
+
+                                                {selectedProduct.images.length > 1 && (
+                                                    <>
+                                                        <button
+                                                            onClick={goToPreviousImage}
+                                                            className="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-white/90 hover:bg-white rounded-full flex items-center justify-center shadow-lg transition-all hover:scale-110"
+                                                        >
+                                                            <svg className="w-6 h-6 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                                                            </svg>
+                                                        </button>
+                                                        <button
+                                                            onClick={goToNextImage}
+                                                            className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-white/90 hover:bg-white rounded-full flex items-center justify-center shadow-lg transition-all hover:scale-110"
+                                                        >
+                                                            <svg className="w-6 h-6 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                                                            </svg>
+                                                        </button>
+
+                                                        <div className="absolute top-4 right-4 bg-black/70 text-white px-3 py-1 rounded-full text-sm font-medium">
+                                                            {currentImageIndex + 1} / {selectedProduct.images.length}
+                                                        </div>
+                                                    </>
+                                                )}
+                                            </>
                                         ) : (
-                                            <svg className="w-24 h-24 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                            </svg>
+                                            <div className="w-full h-full flex items-center justify-center">
+                                                <svg className="w-24 h-24 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                </svg>
+                                            </div>
                                         )}
                                     </div>
                                 </div>
 
-                                {/* Product Details */}
                                 <div>
                                     <p className="text-gray-600 mb-4">{selectedProduct.description}</p>
 
                                     <div className="mb-6">
                                         <div className="flex items-center gap-4 mb-4">
                                             <span className="text-3xl font-bold text-blue-600">{formatCurrency(selectedProduct.price)}</span>
-                                            <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
-                                                {selectedProduct.stock} available
+                                            <span className={`text-sm px-3 py-1 rounded-full ${selectedProduct.stock > 0
+                                                    ? 'text-green-700 bg-green-100'
+                                                    : 'text-red-700 bg-red-100'
+                                                }`}>
+                                                {selectedProduct.stock > 0 ? `${selectedProduct.stock} available` : 'Out of Stock'}
                                             </span>
                                         </div>
 
@@ -479,7 +598,6 @@ export default function ShopProducts() {
 
                                     <hr className="my-6" />
 
-                                    {/* Quantity Selector */}
                                     <div className="mb-6">
                                         <label className="block text-sm font-medium text-gray-700 mb-2">Quantity:</label>
                                         <div className="flex items-center gap-3">
@@ -491,7 +609,7 @@ export default function ShopProducts() {
                                             </button>
                                             <span className="w-12 text-center font-medium">{quantity}</span>
                                             <button
-                                                onClick={() => setQuantity(Math.min(selectedProduct.stock, quantity + 1))}
+                                                onClick={() => setQuantity(Math.min(selectedProduct.stock || 999, quantity + 1))}
                                                 className="w-10 h-10 rounded-lg border border-gray-300 flex items-center justify-center hover:bg-gray-50"
                                             >
                                                 +
@@ -499,19 +617,17 @@ export default function ShopProducts() {
                                         </div>
                                     </div>
 
-                                    {/* Action Buttons */}
                                     <div className="flex gap-3">
                                         <button
                                             onClick={() => addToCart(selectedProduct, quantity)}
-                                            disabled={selectedProduct.stock === 0}
-                                            className="flex-1 px-6 py-3 border-2 border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 transition-colors disabled:border-gray-300 disabled:text-gray-400 disabled:hover:bg-transparent"
+                                            className="flex-1 px-6 py-3 border-2 border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 transition-colors"
                                         >
                                             Add to Cart
                                         </button>
                                         <button
                                             onClick={() => buyNow(selectedProduct, quantity)}
                                             disabled={selectedProduct.stock === 0}
-                                            className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-300"
+                                            className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
                                         >
                                             Buy Now
                                         </button>
@@ -523,14 +639,14 @@ export default function ShopProducts() {
                 </div>
             )}
 
-            {/* Cart Drawer - Slides from Right */}
+            {/* ✅ UPDATED: Cart Drawer with Checkboxes */}
             {showCartDrawer && (
                 <>
                     <div
-                        className="fixed inset-0 bg-gray-900 bg-opacity-50 z-40"
+                        className="fixed inset-0 bg-black/50 z-40"
                         onClick={() => setShowCartDrawer(false)}
                     ></div>
-                    <div className="fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-in-out">
+                    <div className="fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-in-out animate-slide-in-right">
                         <div className="flex flex-col h-full">
                             {/* Header */}
                             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
@@ -550,6 +666,34 @@ export default function ShopProducts() {
                                 </button>
                             </div>
 
+                            {/* ✅ Selection Toolbar */}
+                            {cart.length > 0 && (
+                                <div className="px-6 py-3 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={isSelectAll}
+                                            onChange={toggleSelectAll}
+                                            className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                                        />
+                                        <span className="text-sm font-medium text-gray-700">
+                                            Select All ({cart.length})
+                                        </span>
+                                    </label>
+                                    {selectedCartItems.length > 0 && (
+                                        <button
+                                            onClick={deleteSelectedItems}
+                                            className="text-red-600 hover:text-red-700 text-sm font-medium flex items-center gap-1"
+                                        >
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                            </svg>
+                                            Delete ({selectedCartItems.length})
+                                        </button>
+                                    )}
+                                </div>
+                            )}
+
                             {/* Cart Items */}
                             <div className="flex-1 overflow-y-auto p-6">
                                 {cart.length === 0 ? (
@@ -568,22 +712,28 @@ export default function ShopProducts() {
                                 ) : (
                                     <div className="space-y-4">
                                         {cart.map((item) => (
-                                            <div key={item.id} className="flex items-start gap-4 p-4 bg-gray-50 rounded-lg">
-                                                {/* Product Image */}
-                                                <div className="w-16 h-16 bg-gray-200 rounded-lg flex items-center justify-center flex-shrink-0">
+                                            <div key={item.id} className={`flex items-start gap-4 p-4 rounded-lg border transition-all ${selectedCartItems.includes(item.id)
+                                                    ? 'bg-blue-50 border-blue-200'
+                                                    : 'bg-gray-50 border-gray-200'
+                                                }`}>
+                                                {/* ✅ Checkbox */}
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedCartItems.includes(item.id)}
+                                                    onChange={() => toggleItemSelection(item.id)}
+                                                    className="mt-1 w-5 h-5 text-blue-600 rounded focus:ring-blue-500 cursor-pointer"
+                                                />
+
+                                                {/* Clickable Product Image */}
+                                                <div
+                                                    onClick={() => viewProductFromCart(item)}
+                                                    className="w-20 h-20 bg-gray-200 rounded-lg flex items-center justify-center flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity overflow-hidden"
+                                                >
                                                     {getProductImage(item) ? (
                                                         <img
                                                             src={getProductImage(item)}
                                                             alt={item.name}
-                                                            className="w-full h-full object-cover rounded-lg"
-                                                            onError={(e) => {
-                                                                e.target.onerror = null;
-                                                                e.target.parentElement.innerHTML = `
-                                                                    <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                                                                    </svg>
-                                                                `;
-                                                            }}
+                                                            className="w-full h-full object-cover"
                                                         />
                                                     ) : (
                                                         <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -596,14 +746,19 @@ export default function ShopProducts() {
                                                 <div className="flex-1">
                                                     <div className="flex justify-between items-start">
                                                         <div>
-                                                            <h3 className="font-semibold text-gray-900">{item.name}</h3>
+                                                            <h3
+                                                                onClick={() => viewProductFromCart(item)}
+                                                                className="font-semibold text-gray-900 cursor-pointer hover:text-blue-600 transition-colors"
+                                                            >
+                                                                {item.name}
+                                                            </h3>
                                                             <p className="text-xs text-gray-500">{item.size}</p>
                                                         </div>
                                                         <button
                                                             onClick={() => removeFromCart(item.id)}
                                                             className="text-gray-400 hover:text-red-600 transition-colors"
                                                         >
-                                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
                                                             </svg>
                                                         </button>
@@ -627,6 +782,12 @@ export default function ShopProducts() {
                                                             +
                                                         </button>
                                                     </div>
+
+                                                    {item.stock === 0 && (
+                                                        <p className="text-xs text-red-600 mt-1 font-medium">
+                                                            ⚠ Currently out of stock
+                                                        </p>
+                                                    )}
                                                 </div>
                                             </div>
                                         ))}
@@ -638,12 +799,17 @@ export default function ShopProducts() {
                             {cart.length > 0 && (
                                 <div className="border-t border-gray-200 p-6 bg-white">
                                     <div className="flex justify-between items-center mb-4">
-                                        <span className="text-lg font-semibold text-gray-700">Total</span>
-                                        <span className="text-2xl font-bold text-blue-600">{formatCurrency(cartTotal)}</span>
+                                        <span className="text-lg font-semibold text-gray-700">
+                                            Selected ({selectedCartItems.length})
+                                        </span>
+                                        <span className="text-2xl font-bold text-blue-600">
+                                            {formatCurrency(selectedItemsTotal)}
+                                        </span>
                                     </div>
                                     <button
                                         onClick={handleCheckout}
-                                        className="w-full py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
+                                        disabled={selectedCartItems.length === 0}
+                                        className="w-full py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold disabled:bg-gray-300 disabled:cursor-not-allowed"
                                     >
                                         Proceed to Checkout
                                     </button>
@@ -654,247 +820,393 @@ export default function ShopProducts() {
                 </>
             )}
 
-            {/* Delivery Options Modal */}
+            {/* ✅ UPDATED: Delivery Options Modal with Order Summary */}
             {showDeliveryModal && (
-                <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full">
-                        <div className="p-6">
-                            <div className="flex justify-between items-center mb-6">
-                                <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
-                                    Delivery Option
-                                </h2>
-                                <button
-                                    onClick={() => {
-                                        setShowDeliveryModal(false);
-                                        if (directCheckoutProduct) {
-                                            setShowDetailsModal(true);
-                                        } else {
-                                            setShowCartDrawer(true);
-                                        }
-                                    }}
-                                    className="text-gray-400 hover:text-gray-600"
-                                >
-                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                                    </svg>
-                                </button>
-                            </div>
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col">
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 flex-shrink-0">
+                            <h2 className="text-2xl font-bold text-gray-900">Checkout</h2>
+                            <button
+                                onClick={() => {
+                                    setShowDeliveryModal(false);
+                                    if (directCheckoutProduct) {
+                                        setShowDetailsModal(true);
+                                    } else {
+                                        setShowCartDrawer(true);
+                                    }
+                                }}
+                                className="text-gray-400 hover:text-gray-600 p-2 hover:bg-gray-100 rounded-full transition-colors"
+                            >
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
 
-                            {/* Progress Indicator */}
-                            <div className="flex items-center justify-center mb-8">
-                                <div className="flex items-center">
-                                    <div className="w-3 h-3 bg-blue-600 rounded-full"></div>
-                                    <div className="w-24 h-1 bg-blue-600"></div>
-                                    <div className="w-3 h-3 bg-blue-600 rounded-full"></div>
-                                    <div className="w-24 h-1 bg-gray-300"></div>
-                                    <div className="w-3 h-3 bg-gray-300 rounded-full"></div>
+                        <div className="flex-1 overflow-y-auto p-6">
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                {/* Left: Delivery Options */}
+                                <div className="lg:col-span-2 space-y-6">
+                                    {/* Progress Indicator */}
+                                    <div className="flex items-center justify-center mb-8">
+                                        <div className="flex items-center">
+                                            <div className="w-3 h-3 bg-blue-600 rounded-full"></div>
+                                            <div className="w-24 h-1 bg-blue-600"></div>
+                                            <div className="w-3 h-3 bg-blue-600 rounded-full"></div>
+                                            <div className="w-24 h-1 bg-gray-300"></div>
+                                            <div className="w-3 h-3 bg-gray-300 rounded-full"></div>
+                                        </div>
+                                    </div>
+
+                                    <h3 className="text-lg font-semibold text-gray-900">Delivery Option</h3>
+
+                                    <div className="space-y-4">
+                                        <label className={`flex items-start p-4 border-2 rounded-lg cursor-pointer transition-colors ${deliveryOption === 'pickup' ? 'border-blue-600 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                                            <input
+                                                type="radio"
+                                                name="delivery"
+                                                value="pickup"
+                                                checked={deliveryOption === 'pickup'}
+                                                onChange={(e) => setDeliveryOption(e.target.value)}
+                                                className="mt-1 w-4 h-4 text-blue-600"
+                                            />
+                                            <div className="ml-3 flex-1">
+                                                <div className="flex items-center gap-2">
+                                                    <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                    </svg>
+                                                    <span className="font-semibold text-gray-900">Self Pick Up</span>
+                                                </div>
+                                                <p className="text-sm text-gray-600 mt-1">Pick up your order from JNEC Fab Lab during working hours (9 AM - 5 PM)</p>
+                                            </div>
+                                        </label>
+
+                                        <label className={`flex items-start p-4 border-2 rounded-lg cursor-pointer transition-colors ${deliveryOption === 'shipping' ? 'border-blue-600 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                                            <input
+                                                type="radio"
+                                                name="delivery"
+                                                value="shipping"
+                                                checked={deliveryOption === 'shipping'}
+                                                onChange={(e) => setDeliveryOption(e.target.value)}
+                                                className="mt-1 w-4 h-4 text-blue-600"
+                                            />
+                                            <div className="ml-3 flex-1">
+                                                <div className="flex items-center gap-2">
+                                                    <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                    </svg>
+                                                    <span className="font-semibold text-gray-900">Ship to Address</span>
+                                                </div>
+                                                <p className="text-sm text-gray-600 mt-1">
+                                                    We will ship your order to your provided address
+                                                </p>
+                                                {deliveryOption === 'shipping' && (
+                                                    <p className="text-sm font-semibold text-purple-600 mt-2">
+                                                        Shipping Cost (Fixed): {formatCurrency(150)}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </label>
+                                    </div>
+
+                                    {deliveryOption === 'shipping' && (
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                Shipping Address *
+                                            </label>
+                                            <textarea
+                                                value={shippingAddress}
+                                                onChange={(e) => setShippingAddress(e.target.value)}
+                                                placeholder="Enter your full shipping address"
+                                                rows="3"
+                                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* ✅ Right: Order Summary */}
+                                <div className="lg:col-span-1">
+                                    <div className="bg-gray-50 rounded-xl p-6 sticky top-0">
+                                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Order Summary</h3>
+
+                                        <div className="space-y-3 mb-4 max-h-60 overflow-y-auto">
+                                            {(directCheckoutProduct ? [directCheckoutProduct] : selectedItems).map((item) => (
+                                                <div key={item.id} className="flex items-center gap-3">
+                                                    <div className="w-12 h-12 bg-gray-200 rounded-lg overflow-hidden flex-shrink-0">
+                                                        {getProductImage(item) ? (
+                                                            <img src={getProductImage(item)} alt={item.name} className="w-full h-full object-cover" />
+                                                        ) : (
+                                                            <div className="w-full h-full flex items-center justify-center text-gray-400">
+                                                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                                </svg>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-sm font-medium text-gray-900 truncate">{item.name}</p>
+                                                        <p className="text-xs text-gray-500">Qty: {item.quantity}</p>
+                                                    </div>
+                                                    <p className="text-sm font-semibold text-gray-900">{formatCurrency(item.price * item.quantity)}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+
+                                        <div className="border-t border-gray-200 pt-4 space-y-2">
+                                            <div className="flex justify-between text-sm">
+                                                <span className="text-gray-600">Items Total:</span>
+                                                <span className="font-medium text-gray-900">
+                                                    {directCheckoutProduct
+                                                        ? formatCurrency(directCheckoutProduct.price * directCheckoutProduct.quantity)
+                                                        : formatCurrency(selectedItemsTotal)
+                                                    }
+                                                </span>
+                                            </div>
+
+                                            {deliveryOption === 'shipping' && (
+                                                <div className="flex justify-between text-sm">
+                                                    <span className="text-gray-600">Shipping Cost:</span>
+                                                    <span className="font-medium text-purple-600">{formatCurrency(150)}</span>
+                                                </div>
+                                            )}
+
+                                            <div className="border-t border-gray-200 pt-2 flex justify-between">
+                                                <span className="text-base font-semibold text-gray-900">Total:</span>
+                                                <span className="text-lg font-bold text-blue-600">
+                                                    {directCheckoutProduct
+                                                        ? formatCurrency((directCheckoutProduct.price * directCheckoutProduct.quantity) + (deliveryOption === 'shipping' ? 150 : 0))
+                                                        : formatCurrency(totalWithShipping)
+                                                    }
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
+                        </div>
 
-                            {/* Delivery Options */}
-                            <div className="space-y-4 mb-6">
-                                <label className={`flex items-start p-4 border-2 rounded-lg cursor-pointer transition-colors ${deliveryOption === 'pickup' ? 'border-blue-600 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}>
-                                    <input
-                                        type="radio"
-                                        name="delivery"
-                                        value="pickup"
-                                        checked={deliveryOption === 'pickup'}
-                                        onChange={(e) => setDeliveryOption(e.target.value)}
-                                        className="mt-1 w-4 h-4 text-blue-600"
-                                    />
-                                    <div className="ml-3 flex-1">
-                                        <div className="flex items-center gap-2">
-                                            <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                                            </svg>
-                                            <span className="font-semibold text-gray-900">Self Pick Up</span>
-                                        </div>
-                                        <p className="text-sm text-gray-600 mt-1">Pick up your order from JNEC Fab Lab during working hours (9 AM - 5 PM)</p>
-                                    </div>
-                                </label>
-
-                                <label className={`flex items-start p-4 border-2 rounded-lg cursor-pointer transition-colors ${deliveryOption === 'shipping' ? 'border-blue-600 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}>
-                                    <input
-                                        type="radio"
-                                        name="delivery"
-                                        value="shipping"
-                                        checked={deliveryOption === 'shipping'}
-                                        onChange={(e) => setDeliveryOption(e.target.value)}
-                                        className="mt-1 w-4 h-4 text-blue-600"
-                                    />
-                                    <div className="ml-3 flex-1">
-                                        <div className="flex items-center gap-2">
-                                            <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                            </svg>
-                                            <span className="font-semibold text-gray-900">Ship to Address</span>
-                                        </div>
-                                        <p className="text-sm text-gray-600 mt-1">We will ship your order to your provided address (additional charges may apply)</p>
-                                    </div>
-                                </label>
-                            </div>
-
-                            {/* Shipping Address Field */}
-                            {deliveryOption === 'shipping' && (
-                                <div className="mb-6">
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Shipping Address *
-                                    </label>
-                                    <textarea
-                                        value={shippingAddress}
-                                        onChange={(e) => setShippingAddress(e.target.value)}
-                                        placeholder="Enter your full shipping address"
-                                        rows="3"
-                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
-                                    />
-                                </div>
-                            )}
-
-                            {/* Buttons */}
-                            <div className="flex gap-3">
-                                <button
-                                    onClick={() => {
-                                        setShowDeliveryModal(false);
-                                        if (directCheckoutProduct) {
-                                            setShowDetailsModal(true);
-                                        } else {
-                                            setShowCartDrawer(true);
-                                        }
-                                    }}
-                                    className="flex-1 px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                                >
-                                    Back
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        if (deliveryOption === 'shipping' && !shippingAddress.trim()) {
-                                            alert('❌ Please enter shipping address');
-                                            return;
-                                        }
-                                        setShowDeliveryModal(false);
-                                        setShowPaymentModal(true);
-                                    }}
-                                    className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
-                                >
-                                    Continue to Payment
-                                </button>
-                            </div>
+                        {/* Footer */}
+                        <div className="flex gap-3 px-6 py-4 border-t border-gray-200 flex-shrink-0">
+                            <button
+                                onClick={() => {
+                                    setShowDeliveryModal(false);
+                                    if (directCheckoutProduct) {
+                                        setShowDetailsModal(true);
+                                    } else {
+                                        setShowCartDrawer(true);
+                                    }
+                                }}
+                                className="flex-1 px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-semibold"
+                            >
+                                Back
+                            </button>
+                            <button
+                                onClick={() => {
+                                    if (deliveryOption === 'shipping' && !shippingAddress.trim()) {
+                                        alert('❌ Please enter shipping address');
+                                        return;
+                                    }
+                                    setShowDeliveryModal(false);
+                                    setShowPaymentModal(true);
+                                }}
+                                className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
+                            >
+                                Continue to Payment
+                            </button>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* Payment Modal */}
+            {/* ✅ UPDATED: Payment Modal with Order Summary */}
             {showPaymentModal && (
-                <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full">
-                        <div className="p-6">
-                            <div className="flex justify-between items-center mb-6">
-                                <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                                    </svg>
-                                    Payment
-                                </h2>
-                                <button
-                                    onClick={() => setShowPaymentModal(false)}
-                                    className="text-gray-400 hover:text-gray-600"
-                                >
-                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                                    </svg>
-                                </button>
-                            </div>
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col">
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 flex-shrink-0">
+                            <h2 className="text-2xl font-bold text-gray-900">Payment</h2>
+                            <button
+                                onClick={() => setShowPaymentModal(false)}
+                                className="text-gray-400 hover:text-gray-600 p-2 hover:bg-gray-100 rounded-full transition-colors"
+                            >
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
 
-                            {/* Progress Indicator */}
-                            <div className="flex items-center justify-center mb-8">
-                                <div className="flex items-center">
-                                    <div className="w-3 h-3 bg-blue-600 rounded-full"></div>
-                                    <div className="w-24 h-1 bg-blue-600"></div>
-                                    <div className="w-3 h-3 bg-blue-600 rounded-full"></div>
-                                    <div className="w-24 h-1 bg-blue-600"></div>
-                                    <div className="w-3 h-3 bg-blue-600 rounded-full"></div>
+                        <div className="flex-1 overflow-y-auto p-6">
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                {/* Left: Payment Details */}
+                                <div className="lg:col-span-2 space-y-6">
+                                    {/* Progress Indicator */}
+                                    <div className="flex items-center justify-center mb-8">
+                                        <div className="flex items-center">
+                                            <div className="w-3 h-3 bg-blue-600 rounded-full"></div>
+                                            <div className="w-24 h-1 bg-blue-600"></div>
+                                            <div className="w-3 h-3 bg-blue-600 rounded-full"></div>
+                                            <div className="w-24 h-1 bg-blue-600"></div>
+                                            <div className="w-3 h-3 bg-blue-600 rounded-full"></div>
+                                        </div>
+                                    </div>
+
+                                    {/* Bank Details */}
+                                    <div className="bg-gray-50 rounded-lg p-6">
+                                        <h3 className="font-semibold text-gray-900 mb-4">Bank Transfer Details</h3>
+                                        <div className="space-y-3">
+                                            <div className="flex justify-between">
+                                                <span className="text-gray-600">Bank Name:</span>
+                                                <span className="font-semibold text-gray-900">BOB Bank</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span className="text-gray-600">Account Name:</span>
+                                                <span className="font-semibold text-gray-900">JNEC Fab Lab</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span className="text-gray-600">Account Number:</span>
+                                                <span className="font-semibold text-gray-900">200123456789</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Screenshot Upload */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                            Upload Payment Screenshot *
+                                        </label>
+                                        <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-blue-500 transition-colors relative min-h-[250px]">
+                                            {!screenshotPreview ? (
+                                                <>
+                                                    <input
+                                                        type="file"
+                                                        accept="image/*"
+                                                        onChange={handleScreenshotUpload}
+                                                        className="hidden"
+                                                        id="payment-screenshot"
+                                                    />
+                                                    <label htmlFor="payment-screenshot" className="cursor-pointer block">
+                                                        <svg className="w-10 h-10 text-gray-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                                        </svg>
+                                                        <p className="text-sm text-gray-600">Click to upload screenshot</p>
+                                                        <p className="text-xs text-gray-400 mt-1">PNG, JPG up to 5MB</p>
+                                                    </label>
+                                                </>
+                                            ) : (
+                                                <div className="relative">
+                                                    <img
+                                                        src={screenshotPreview}
+                                                        alt="Payment Screenshot Preview"
+                                                        className="w-full h-auto object-contain mx-auto rounded-lg"
+                                                        style={{ maxHeight: '400px' }}
+                                                    />
+                                                    <button
+                                                        onClick={() => {
+                                                            setPaymentScreenshot(null);
+                                                            setScreenshotPreview(null);
+                                                        }}
+                                                        className="absolute top-2 right-2 w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors shadow-lg"
+                                                    >
+                                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                                        </svg>
+                                                    </button>
+                                                    <p className="text-xs text-gray-500 mt-2">PNG, JPG up to 5MB</p>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {paymentScreenshot && (
+                                            <p className="text-sm text-green-600 mt-2 flex items-center gap-1">
+                                                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                                </svg>
+                                                {paymentScreenshot.name}
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* ✅ Right: Order Summary */}
+                                <div className="lg:col-span-1">
+                                    <div className="bg-gray-50 rounded-xl p-6 sticky top-0">
+                                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Order Summary</h3>
+
+                                        <div className="space-y-3 mb-4 max-h-60 overflow-y-auto">
+                                            {(directCheckoutProduct ? [directCheckoutProduct] : selectedItems).map((item) => (
+                                                <div key={item.id} className="flex items-center gap-3">
+                                                    <div className="w-12 h-12 bg-gray-200 rounded-lg overflow-hidden flex-shrink-0">
+                                                        {getProductImage(item) ? (
+                                                            <img src={getProductImage(item)} alt={item.name} className="w-full h-full object-cover" />
+                                                        ) : (
+                                                            <div className="w-full h-full flex items-center justify-center text-gray-400">
+                                                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                                </svg>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-sm font-medium text-gray-900 truncate">{item.name}</p>
+                                                        <p className="text-xs text-gray-500">Qty: {item.quantity}</p>
+                                                    </div>
+                                                    <p className="text-sm font-semibold text-gray-900">{formatCurrency(item.price * item.quantity)}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+
+                                        <div className="border-t border-gray-200 pt-4 space-y-2">
+                                            <div className="flex justify-between text-sm">
+                                                <span className="text-gray-600">Items Total:</span>
+                                                <span className="font-medium text-gray-900">
+                                                    {directCheckoutProduct
+                                                        ? formatCurrency(directCheckoutProduct.price * directCheckoutProduct.quantity)
+                                                        : formatCurrency(selectedItemsTotal)
+                                                    }
+                                                </span>
+                                            </div>
+
+                                            {deliveryOption === 'shipping' && (
+                                                <div className="flex justify-between text-sm">
+                                                    <span className="text-gray-600">Shipping Cost:</span>
+                                                    <span className="font-medium text-purple-600">{formatCurrency(150)}</span>
+                                                </div>
+                                            )}
+
+                                            <div className="border-t border-gray-200 pt-2 flex justify-between">
+                                                <span className="text-base font-semibold text-gray-900">Total:</span>
+                                                <span className="text-lg font-bold text-blue-600">
+                                                    {directCheckoutProduct
+                                                        ? formatCurrency((directCheckoutProduct.price * directCheckoutProduct.quantity) + (deliveryOption === 'shipping' ? 150 : 0))
+                                                        : formatCurrency(totalWithShipping)
+                                                    }
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
+                        </div>
 
-                            {/* Bank Details */}
-                            <div className="bg-gray-50 rounded-lg p-6 mb-6">
-                                <h3 className="font-semibold text-gray-900 mb-4">Bank Transfer Details</h3>
-                                <div className="space-y-3">
-                                    <div className="flex justify-between">
-                                        <span className="text-gray-600">Bank Name:</span>
-                                        <span className="font-semibold text-gray-900">BOB Bank</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span className="text-gray-600">Account Name:</span>
-                                        <span className="font-semibold text-gray-900">JNEC Fab Lab</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span className="text-gray-600">Account Number:</span>
-                                        <span className="font-semibold text-gray-900">200123456789</span>
-                                    </div>
-                                    <hr className="my-3" />
-                                    <div className="flex justify-between">
-                                        <span className="text-gray-600">Amount to Pay:</span>
-                                        <span className="text-xl font-bold text-blue-600">
-                                            {directCheckoutProduct
-                                                ? formatCurrency(directCheckoutProduct.price * directCheckoutProduct.quantity)
-                                                : formatCurrency(cartTotal)
-                                            }
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Payment Screenshot Upload */}
-                            <div className="mb-6">
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Upload Payment Screenshot *
-                                </label>
-                                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-500 transition-colors">
-                                    <input
-                                        type="file"
-                                        accept="image/*"
-                                        onChange={(e) => setPaymentScreenshot(e.target.files[0])}
-                                        className="hidden"
-                                        id="payment-screenshot"
-                                    />
-                                    <label htmlFor="payment-screenshot" className="cursor-pointer">
-                                        <svg className="w-10 h-10 text-gray-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                                        </svg>
-                                        <p className="text-sm text-gray-600">Click to upload screenshot</p>
-                                        <p className="text-xs text-gray-400 mt-1">PNG, JPG up to 5MB</p>
-                                    </label>
-                                    {paymentScreenshot && (
-                                        <p className="text-sm text-green-600 mt-2">✅ {paymentScreenshot.name}</p>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Buttons */}
-                            <div className="flex gap-3">
-                                <button
-                                    onClick={() => {
-                                        setShowPaymentModal(false);
-                                        setShowDeliveryModal(true);
-                                    }}
-                                    className="flex-1 px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                                >
-                                    Back
-                                </button>
-                                <button
-                                    onClick={handleSubmitOrder}
-                                    disabled={submitting || !paymentScreenshot}
-                                    className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold disabled:bg-gray-300 disabled:cursor-not-allowed"
-                                >
-                                    {submitting ? 'Submitting...' : 'Submit Order'}
-                                </button>
-                            </div>
+                        {/* Footer */}
+                        <div className="flex gap-3 px-6 py-4 border-t border-gray-200 flex-shrink-0">
+                            <button
+                                onClick={() => {
+                                    setShowPaymentModal(false);
+                                    setShowDeliveryModal(true);
+                                }}
+                                className="flex-1 px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-semibold"
+                            >
+                                Back
+                            </button>
+                            <button
+                                onClick={handleSubmitOrder}
+                                disabled={submitting || !paymentScreenshot}
+                                className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold disabled:bg-gray-300 disabled:cursor-not-allowed"
+                            >
+                                {submitting ? 'Submitting...' : 'Submit Order'}
+                            </button>
                         </div>
                     </div>
                 </div>

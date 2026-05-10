@@ -14,21 +14,56 @@ use Illuminate\Support\Facades\DB;
 class ProductOrderController extends Controller
 {
     /**
-     * Display user's product orders.
-     */
-    public function index(Request $request)
-    {
-        $user = Auth::user();
+ * Display user's product orders.
+ */
+public function index(Request $request)
+{
+    $user = Auth::user();
 
-        $orders = ProductOrder::where('user_id', $user->id)
-            ->orderBy('created_at', 'desc')
-            ->get();
+    $orders = ProductOrder::where('user_id', $user->id)
+        ->orderBy('created_at', 'desc')
+        ->get();
 
-        return response()->json([
-            'success' => true,
-            'orders' => $orders
-        ]);
-    }
+    // ✅ Enrich items with product images - SAFER VERSION
+    $orders = $orders->map(function($order) {
+        $itemsWithImages = [];
+        
+        foreach ($order->items as $item) {
+            $product = Product::find($item['id']);
+            
+            // ✅ Safely get images
+            $productImage = null;
+            $productImages = [];
+            
+            if ($product) {
+                // Check if images is an array or JSON string
+                if (is_string($product->images)) {
+                    $imagesArray = json_decode($product->images, true) ?? [];
+                } else if (is_array($product->images)) {
+                    $imagesArray = $product->images;
+                } else {
+                    $imagesArray = [];
+                }
+                
+                $productImage = !empty($imagesArray) ? $imagesArray[0] : null;
+                $productImages = $imagesArray;
+            }
+            
+            $itemsWithImages[] = array_merge($item, [
+                'image' => $productImage,
+                'images' => $productImages,
+            ]);
+        }
+        
+        $order->items = $itemsWithImages;
+        return $order;
+    });
+
+    return response()->json([
+        'success' => true,
+        'orders' => $orders
+    ]);
+}
 
     /**
      * Store a new product order.
@@ -81,7 +116,7 @@ class ProductOrderController extends Controller
                 $screenshotPath = $request->file('payment_screenshot')->store('product_orders', 'public');
             }
 
-            // ✅ FIXED: Calculate shipping cost (Fixed Nu. 150 for shipping)
+            // Calculate shipping cost (Fixed Nu. 150 for shipping)
             $shippingCost = $request->delivery_option === 'shipping' ? 150.00 : 0.00;
 
             // Create the order
@@ -145,9 +180,55 @@ class ProductOrderController extends Controller
             ], 404);
         }
 
+        // ✅ Also enrich items with images for single order view
+        $itemsWithImages = [];
+        foreach ($order->items as $item) {
+            $product = Product::find($item['id']);
+            
+            $itemsWithImages[] = array_merge($item, [
+                'image' => $product?->images?->first() ?? null,
+                'images' => $product?->images ?? [],
+            ]);
+        }
+        $order->items = $itemsWithImages;
+
         return response()->json([
             'success' => true,
             'order' => $order
+        ]);
+    }
+
+    /**
+     * Get payment screenshot URL.
+     */
+    public function screenshot($id)
+    {
+        $user = Auth::user();
+        
+        $order = ProductOrder::where('user_id', $user->id)
+            ->where('id', $id)
+            ->first();
+
+        if (!$order) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Order not found'
+            ], 404);
+        }
+
+        if (!$order->payment_screenshot) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No screenshot uploaded'
+            ], 404);
+        }
+
+        // ✅ Return full URL for direct access
+        $imageUrl = url('storage/' . $order->payment_screenshot);
+
+        return response()->json([
+            'success' => true,
+            'image_url' => $imageUrl
         ]);
     }
 }

@@ -45,6 +45,13 @@ Route::prefix('admin')->group(function () {
         Route::put('/products/{product}', [App\Http\Controllers\Api\Admin\ProductController::class, 'update']);
         Route::put('/products/{product}/toggle-status', [App\Http\Controllers\Api\Admin\ProductController::class, 'toggleStatus']);
         Route::delete('/products/{product}', [App\Http\Controllers\Api\Admin\ProductController::class, 'destroy']);
+
+        // ✅ Custom Orders (Admin Management)
+        Route::get('/custom-orders', [\App\Http\Controllers\Api\Admin\CustomOrderController::class, 'index']);
+        Route::get('/custom-orders/{id}', [\App\Http\Controllers\Api\Admin\CustomOrderController::class, 'show']);
+        Route::get('/custom-orders/production-team', [\App\Http\Controllers\Api\Admin\CustomOrderController::class, 'getProductionTeam']);
+        Route::post('/custom-orders/{id}/assign', [\App\Http\Controllers\Api\Admin\CustomOrderController::class, 'assign']);
+        Route::post('/custom-orders/{id}/update-status', [\App\Http\Controllers\Api\Admin\CustomOrderController::class, 'updateStatus']);
         
         // Courses
         Route::apiResource('courses', \App\Http\Controllers\Api\Admin\CourseController::class);
@@ -135,15 +142,19 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/user/bookings', [App\Http\Controllers\Api\UserBookingController::class, 'store']);
     Route::get('/user/my-bookings', [App\Http\Controllers\Api\UserBookingController::class, 'myBookings']);
     
-    // ✅ Custom Orders - Real Controller Routes (FIXED: in user group, not admin!)
+    // ✅ Custom Orders (User)
     Route::get('/user/custom-orders', [\App\Http\Controllers\Api\User\CustomOrderController::class, 'index']);
     Route::post('/user/custom-orders', [\App\Http\Controllers\Api\User\CustomOrderController::class, 'store']);
     Route::get('/user/custom-orders/{id}', [\App\Http\Controllers\Api\User\CustomOrderController::class, 'show']);
 
-    // ✅ Product Orders (Shop)
+    // ✅ Product Orders (Shop) - FIXED
     Route::get('/user/product-orders', [\App\Http\Controllers\Api\User\ProductOrderController::class, 'index']);
     Route::post('/user/product-orders', [\App\Http\Controllers\Api\User\ProductOrderController::class, 'store']);
     Route::get('/user/product-orders/{id}', [\App\Http\Controllers\Api\User\ProductOrderController::class, 'show']);
+    
+    // ✅ FIXED: Use full namespace for cancel and screenshot
+    Route::post('/user/product-orders/{id}/cancel', [\App\Http\Controllers\Api\User\ProductOrderController::class, 'cancel']);
+    Route::get('/user/product-orders/{id}/screenshot', [\App\Http\Controllers\Api\User\ProductOrderController::class, 'screenshot']);
     
 });
 

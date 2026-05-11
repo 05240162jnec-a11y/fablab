@@ -193,47 +193,6 @@ export default function MyOrders() {
         }
     };
 
-    // ✅ Handle Reorder - Add items to cart
-    const handleReorder = async (order) => {
-        try {
-            // Get current cart from localStorage
-            const currentCart = JSON.parse(localStorage.getItem('cart') || '[]');
-
-            // Add items from this order to cart
-            const newItems = order.items.map(item => ({
-                id: item.id,
-                name: item.name,
-                price: parseFloat(item.price),
-                quantity: parseInt(item.quantity),
-                image: item.image || null,
-                size: item.size || null,
-            }));
-
-            // Merge with existing cart (avoid duplicates by id)
-            const updatedCart = [...currentCart];
-            newItems.forEach(newItem => {
-                const existingIndex = updatedCart.findIndex(cartItem => cartItem.id === newItem.id);
-                if (existingIndex >= 0) {
-                    // Update quantity if already in cart
-                    updatedCart[existingIndex].quantity += newItem.quantity;
-                } else {
-                    // Add new item
-                    updatedCart.push(newItem);
-                }
-            });
-
-            // Save updated cart
-            localStorage.setItem('cart', JSON.stringify(updatedCart));
-
-            // Show success message
-            alert(`✅ ${newItems.length} item(s) added to cart!`);
-
-        } catch (err) {
-            console.error('Reorder error:', err);
-            alert('❌ Failed to add items to cart');
-        }
-    };
-
     // ✅ Handle Cancel Order - Only for pending orders
     const handleCancelOrder = async (order) => {
         // Confirm cancellation
@@ -659,17 +618,6 @@ export default function MyOrders() {
 
                             {/* Action Buttons */}
                             <div className="text-center mt-6 flex gap-3 justify-center">
-                                {/* Reorder Button - Show for all orders */}
-                                <button
-                                    onClick={() => handleReorder(selectedOrder)}
-                                    className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold flex items-center gap-2"
-                                >
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                    </svg>
-                                    Reorder
-                                </button>
-
                                 {/* Cancel Button - Only for pending orders */}
                                 {selectedOrder.status === 'pending' && (
                                     <button

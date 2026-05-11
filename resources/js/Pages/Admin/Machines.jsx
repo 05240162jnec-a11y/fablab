@@ -21,10 +21,8 @@ export default function Machines() {
     // Form States
     const [formData, setFormData] = useState({
         name: '',
-        type: '',
         status: 'available',
         description: '',
-        specifications: '',
         image: null
     });
     const [previewImage, setPreviewImage] = useState(null);
@@ -95,10 +93,8 @@ export default function Machines() {
     const resetForm = () => {
         setFormData({
             name: '',
-            type: '',
             status: 'available',
             description: '',
-            specifications: '',
             image: null
         });
         setPreviewImage(null);
@@ -113,10 +109,10 @@ export default function Machines() {
             const token = localStorage.getItem('admin_token');
             const data = new FormData();
             data.append('name', formData.name);
-            data.append('type', formData.type);
+            data.append('type', 'General'); // ✅ Send default value
             data.append('status', formData.status);
             data.append('description', formData.description);
-            data.append('specifications', formData.specifications);
+            data.append('specifications', ''); // ✅ Send empty string
             if (formData.image) {
                 data.append('image', formData.image);
             }
@@ -137,7 +133,8 @@ export default function Machines() {
             }
         } catch (err) {
             console.error('Add machine error:', err);
-            alert('Failed to add machine');
+            console.error('Response:', err.response?.data); // ✅ Log detailed error
+            alert('Failed to add machine: ' + (err.response?.data?.message || err.message));
         } finally {
             setLoading(false);
         }
@@ -148,10 +145,8 @@ export default function Machines() {
         setSelectedMachine(machine);
         setFormData({
             name: machine.name,
-            type: machine.type,
             status: machine.status,
             description: machine.description || '',
-            specifications: machine.specifications || '',
             image: null
         });
         setPreviewImage(machine.image ? `http://127.0.0.1:8000/storage/${machine.image}` : null);
@@ -168,10 +163,10 @@ export default function Machines() {
             const token = localStorage.getItem('admin_token');
             const data = new FormData();
             data.append('name', formData.name);
-            data.append('type', formData.type);
+            data.append('type', 'General'); // ✅ Send default value
             data.append('status', formData.status);
             data.append('description', formData.description);
-            data.append('specifications', formData.specifications);
+            data.append('specifications', ''); // ✅ Send empty string
             if (formData.image) {
                 data.append('image', formData.image);
             }
@@ -194,7 +189,8 @@ export default function Machines() {
             }
         } catch (err) {
             console.error('Update machine error:', err);
-            alert('Failed to update machine');
+            console.error('Response:', err.response?.data); // ✅ Log detailed error
+            alert('Failed to update machine: ' + (err.response?.data?.message || err.message));
         } finally {
             setLoading(false);
         }
@@ -249,17 +245,14 @@ export default function Machines() {
             });
 
             if (response.data.success) {
-                // Update local state immediately
                 setMachines(prevMachines =>
                     prevMachines.map(m =>
                         m.id === machine.id ? { ...m, status: newStatus } : m
                     )
                 );
-                // Update selected machine if view modal is open
                 if (selectedMachine && selectedMachine.id === machine.id) {
                     setSelectedMachine({ ...selectedMachine, status: newStatus });
                 }
-                // Update stats
                 fetchMachines();
             }
         } catch (err) {
@@ -292,10 +285,8 @@ export default function Machines() {
 
     return (
         <div className="flex min-h-screen bg-gray-50">
-            {/* ✅ Sidebar - Using Reusable AdminSidebar Component */}
             <AdminSidebar expandedMenus={expandedMenus} toggleSubmenu={toggleSubmenu} />
 
-            {/* Main Content */}
             <div className="flex-1">
                 <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
                     <div className="flex items-center justify-between px-6 py-4">
@@ -414,7 +405,6 @@ export default function Machines() {
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             {machines.map((machine) => (
                                 <div key={machine.id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
-                                    {/* Machine Image */}
                                     <div className="w-full h-56 bg-gray-100 overflow-hidden">
                                         {machine.image ? (
                                             <img
@@ -431,11 +421,9 @@ export default function Machines() {
                                         )}
                                     </div>
 
-                                    {/* Card Content */}
                                     <div className="p-5">
                                         <div className="mb-3">
                                             <h3 className="text-lg font-bold text-gray-900">{machine.name}</h3>
-                                            <p className="text-sm text-gray-500 mt-1">{machine.type}</p>
                                         </div>
 
                                         <div className="mb-4">
@@ -444,7 +432,6 @@ export default function Machines() {
                                             </span>
                                         </div>
 
-                                        {/* View Details Button */}
                                         <button
                                             onClick={() => handleViewClick(machine)}
                                             className="w-full py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
@@ -491,30 +478,48 @@ export default function Machines() {
                                 <input type="text" name="name" value={formData.name} onChange={handleInputChange} required className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Machine Type *</label>
-                                <input type="text" name="type" value={formData.type} onChange={handleInputChange} required placeholder="e.g., 3D Printer, Laser Cutter, CNC" className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
-                                <select name="status" value={formData.status} onChange={handleInputChange} className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                    <option value="available">Available</option>
-                                    <option value="in_use">In Use</option>
-                                    <option value="maintenance">Maintenance</option>
-                                </select>
-                            </div>
-                            <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
                                 <textarea name="description" value={formData.description} onChange={handleInputChange} rows="3" className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
                             </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Specifications</label>
-                                <textarea name="specifications" value={formData.specifications} onChange={handleInputChange} rows="3" placeholder="Technical specifications, capabilities, etc." className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
-                            </div>
+
+                            {/* Machine Image Upload - Perfect Fit Preview */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">Machine Image</label>
-                                <input type="file" accept="image/*" onChange={handleImageChange} className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                                {previewImage && <img src={previewImage} alt="Preview" className="mt-2 w-32 h-32 object-cover rounded-lg" />}
+                                <div className="border-2 border-dashed border-gray-300 rounded-lg overflow-hidden">
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={handleImageChange}
+                                        className="hidden"
+                                        id="add-machine-image"
+                                    />
+                                    <label htmlFor="add-machine-image" className="cursor-pointer block">
+                                        {previewImage ? (
+                                            <div className="relative">
+                                                <div className="w-full h-64">
+                                                    <img
+                                                        src={previewImage}
+                                                        alt="Preview"
+                                                        className="w-full h-full object-cover"
+                                                    />
+                                                </div>
+                                                <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white px-4 py-2">
+                                                    <p className="text-sm font-medium">Click to change image</p>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="p-8 text-center">
+                                                <svg className="w-12 h-12 text-gray-400 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                </svg>
+                                                <p className="text-sm text-gray-600 font-medium">Click to upload image</p>
+                                                <p className="text-xs text-gray-400 mt-1">PNG, JPG up to 5MB</p>
+                                            </div>
+                                        )}
+                                    </label>
+                                </div>
                             </div>
+
                             <div className="flex justify-end gap-3 pt-4">
                                 <button type="button" onClick={() => { setShowAddModal(false); resetForm(); }} className="px-4 py-2 border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50">Cancel</button>
                                 <button type="submit" disabled={loading} className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
@@ -543,15 +548,10 @@ export default function Machines() {
                                 <img src={`http://127.0.0.1:8000/storage/${selectedMachine.image}`} alt={selectedMachine.name} className="w-full h-64 object-cover rounded-lg" />
                             )}
 
-                            {/* Machine Details Grid */}
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <p className="text-sm text-gray-500">Machine Name</p>
                                     <p className="font-semibold text-gray-900">{selectedMachine.name}</p>
-                                </div>
-                                <div>
-                                    <p className="text-sm text-gray-500">Machine Type</p>
-                                    <p className="font-semibold text-gray-900">{selectedMachine.type}</p>
                                 </div>
                                 <div>
                                     <p className="text-sm text-gray-500">Status</p>
@@ -572,14 +572,6 @@ export default function Machines() {
                                 </div>
                             )}
 
-                            {selectedMachine.specifications && (
-                                <div>
-                                    <p className="text-sm text-gray-500 mb-1">Specifications</p>
-                                    <p className="text-gray-700 whitespace-pre-wrap">{selectedMachine.specifications}</p>
-                                </div>
-                            )}
-
-                            {/* Maintenance Toggle - Inside View Modal */}
                             <div className="pt-4 border-t border-gray-100">
                                 <div className="flex items-center justify-between">
                                     <div>
@@ -600,7 +592,6 @@ export default function Machines() {
                             </div>
                         </div>
 
-                        {/* Edit and Delete Buttons */}
                         <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-100">
                             <button
                                 onClick={() => handleEditClick(selectedMachine)}
@@ -636,10 +627,8 @@ export default function Machines() {
                                 <label className="block text-sm font-medium text-gray-700 mb-2">Machine Name *</label>
                                 <input type="text" name="name" value={formData.name} onChange={handleInputChange} required className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
                             </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Machine Type *</label>
-                                <input type="text" name="type" value={formData.type} onChange={handleInputChange} required className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                            </div>
+
+                            {/* Status Dropdown - Only in Edit */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
                                 <select name="status" value={formData.status} onChange={handleInputChange} className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
@@ -648,50 +637,47 @@ export default function Machines() {
                                     <option value="maintenance">Maintenance</option>
                                 </select>
                             </div>
+
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
                                 <textarea name="description" value={formData.description} onChange={handleInputChange} rows="3" className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
                             </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Specifications</label>
-                                <textarea name="specifications" value={formData.specifications} onChange={handleInputChange} rows="3" className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
-                            </div>
+
+                            {/* Machine Image Upload - Perfect Fit Preview */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">Machine Image</label>
-                                <input type="file" accept="image/*" onChange={handleImageChange} className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                                {previewImage && <img src={previewImage} alt="Preview" className="mt-2 w-32 h-32 object-cover rounded-lg" />}
-                            </div>
-
-                            {/* Machine Details Section - As shown in your uploaded image */}
-                            <div className="pt-4 mt-4 border-t border-gray-200">
-                                <h4 className="text-md font-semibold text-gray-900 mb-4">Machine Details</h4>
-                                <div className="bg-gray-50 rounded-lg p-4 space-y-3">
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-sm text-gray-500">Machine Name</span>
-                                        <span className="text-sm font-medium text-gray-900">{formData.name || '—'}</span>
-                                    </div>
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-sm text-gray-500">Machine Type</span>
-                                        <span className="text-sm font-medium text-gray-900">{formData.type || '—'}</span>
-                                    </div>
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-sm text-gray-500">Status</span>
-                                        <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(formData.status)}`}>
-                                            {formatStatus(formData.status)}
-                                        </span>
-                                    </div>
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-sm text-gray-500">Added On</span>
-                                        <span className="text-sm font-medium text-gray-900">
-                                            {selectedMachine.created_at ? new Date(selectedMachine.created_at).toLocaleDateString() : '—'}
-                                        </span>
-                                    </div>
-                                    {formData.description && (
-                                        <div className="flex justify-between items-start">
-                                            <span className="text-sm text-gray-500">Description</span>
-                                            <span className="text-sm font-medium text-gray-900 text-right max-w-[60%]">{formData.description}</span>
-                                        </div>
-                                    )}
+                                <div className="border-2 border-dashed border-gray-300 rounded-lg overflow-hidden">
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={handleImageChange}
+                                        className="hidden"
+                                        id="edit-machine-image"
+                                    />
+                                    <label htmlFor="edit-machine-image" className="cursor-pointer block">
+                                        {previewImage ? (
+                                            <div className="relative">
+                                                <div className="w-full h-64">
+                                                    <img
+                                                        src={previewImage}
+                                                        alt="Preview"
+                                                        className="w-full h-full object-cover"
+                                                    />
+                                                </div>
+                                                <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white px-4 py-2">
+                                                    <p className="text-sm font-medium">Click to change image</p>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="p-8 text-center">
+                                                <svg className="w-12 h-12 text-gray-400 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                </svg>
+                                                <p className="text-sm text-gray-600 font-medium">Click to upload image</p>
+                                                <p className="text-xs text-gray-400 mt-1">PNG, JPG up to 5MB</p>
+                                            </div>
+                                        )}
+                                    </label>
                                 </div>
                             </div>
 

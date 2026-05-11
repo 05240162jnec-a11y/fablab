@@ -24,14 +24,16 @@ export default function CustomOrders() {
     // Filter State
     const [filter, setFilter] = useState('all'); // all, pending, in_progress, completed, rejected
 
-    // Form State
+    // Form State - ✅ Material removed
     const [formState, setFormState] = useState({
         title: '',
         description: '',
         quantity: '1',
-        material: '',
         design_image: null,
     });
+
+    // Image Preview State
+    const [imagePreview, setImagePreview] = useState(null);
 
     // Form Loading State
     const [submitting, setSubmitting] = useState(false);
@@ -88,15 +90,15 @@ export default function CustomOrders() {
         fetchOrders();
     }, []);
 
-    // Open Create Modal
+    // Open Create Modal - ✅ Material removed from reset
     const handleCreateOrder = () => {
         setFormState({
             title: '',
             description: '',
             quantity: '1',
-            material: '',
             design_image: null,
         });
+        setImagePreview(null);
         setShowCreateModal(true);
     };
 
@@ -106,7 +108,7 @@ export default function CustomOrders() {
         setShowViewModal(true);
     };
 
-    // Close all modals
+    // Close all modals - ✅ Material removed from reset
     const closeAllModals = () => {
         setShowCreateModal(false);
         setShowViewModal(false);
@@ -116,15 +118,27 @@ export default function CustomOrders() {
             title: '',
             description: '',
             quantity: '1',
-            material: '',
             design_image: null,
         });
+
+        // ✅ Clean up preview URL
+        if (imagePreview) {
+            URL.revokeObjectURL(imagePreview);
+            setImagePreview(null);
+        }
     };
 
-    // Submit New Order
+    // Submit New Order - ✅ Image required validation added
     const handleSubmitOrder = async (e) => {
         e.preventDefault();
         setSubmitting(true);
+
+        // ✅ Validate design image is uploaded
+        if (!formState.design_image) {
+            alert('❌ Please upload a design image');
+            setSubmitting(false);
+            return;
+        }
 
         try {
             const token = localStorage.getItem('auth_token');
@@ -132,7 +146,7 @@ export default function CustomOrders() {
             formData.append('title', formState.title);
             formData.append('description', formState.description);
             formData.append('quantity', formState.quantity);
-            formData.append('material', formState.material);
+            // ✅ Material removed
             if (formState.design_image) {
                 formData.append('design_image', formState.design_image);
             }
@@ -441,13 +455,10 @@ export default function CustomOrders() {
                                             {/* Description */}
                                             <p className="text-sm text-gray-600 mb-4 line-clamp-2">{order.description}</p>
 
-                                            {/* Details */}
+                                            {/* Details - ✅ Material removed */}
                                             <div className="flex items-center justify-between mb-4">
                                                 <div className="text-sm text-gray-600">
                                                     <span className="font-medium">Qty:</span> {order.quantity}
-                                                </div>
-                                                <div className="text-sm text-gray-600">
-                                                    <span className="font-medium">{order.material}</span>
                                                 </div>
                                             </div>
 
@@ -471,26 +482,27 @@ export default function CustomOrders() {
                 </main>
             </div>
 
-            {/* ===== CREATE ORDER MODAL ===== */}
+            {/* ===== CREATE ORDER MODAL - ✅ SCROLLABLE & FIXED SIZE ===== */}
             {showCreateModal && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full">
-                        {/* Modal Header */}
-                        <div className="flex items-center justify-between p-6 border-b border-gray-100">
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col">
+                        {/* Modal Header - Fixed */}
+                        <div className="flex items-center justify-between p-6 border-b border-gray-100 flex-shrink-0">
                             <div>
                                 <h3 className="text-xl font-bold text-gray-900">Request Custom Order</h3>
-                                <p className="text-sm text-gray-500 mt-1">Fill in the details of your custom fabrication request. Upload a design image if available.</p>
+                                <p className="text-sm text-gray-500 mt-1">Fill in the details of your custom fabrication request. Upload a design image to proceed.</p>
                             </div>
-                            <button onClick={closeAllModals} className="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100">
+                            <button onClick={closeAllModals} className="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100 flex-shrink-0">
                                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
                                 </svg>
                             </button>
                         </div>
 
-                        {/* Modal Body */}
-                        <form onSubmit={handleSubmitOrder}>
-                            <div className="p-6 space-y-4">
+                        {/* ✅ Form wraps entire scrollable content + footer */}
+                        <form onSubmit={handleSubmitOrder} className="flex flex-col flex-1 overflow-hidden">
+                            {/* Modal Body - Scrollable */}
+                            <div className="overflow-y-auto flex-1 p-6 space-y-4">
                                 {/* Project Title */}
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-2">Project Title *</label>
@@ -517,64 +529,81 @@ export default function CustomOrders() {
                                     ></textarea>
                                 </div>
 
-                                {/* Quantity & Material */}
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">Quantity *</label>
-                                        <input
-                                            type="number"
-                                            min="1"
-                                            value={formState.quantity}
-                                            onChange={(e) => setFormState({ ...formState, quantity: e.target.value })}
-                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                            required
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">Preferred Material</label>
-                                        <select
-                                            value={formState.material}
-                                            onChange={(e) => setFormState({ ...formState, material: e.target.value })}
-                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
-                                        >
-                                            <option value="">Select material</option>
-                                            <option value="Wood">Wood</option>
-                                            <option value="Acrylic">Acrylic</option>
-                                            <option value="PLA Filament">PLA Filament (3D Print)</option>
-                                            <option value="PCB Board">PCB Board</option>
-                                            <option value="Metal">Metal</option>
-                                            <option value="Other">Other</option>
-                                        </select>
-                                    </div>
+                                {/* Quantity */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Quantity *</label>
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        value={formState.quantity}
+                                        onChange={(e) => setFormState({ ...formState, quantity: e.target.value })}
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        required
+                                    />
                                 </div>
 
-                                {/* Design Image Upload */}
+                                {/* Design Image Upload - ✅ NOW REQUIRED with PERFECT FIT */}
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Design Image (Optional)</label>
-                                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-500 transition-colors">
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Design Image <span className="text-red-500">*</span>
+                                    </label>
+                                    <div className="border-2 border-dashed border-gray-300 rounded-lg overflow-hidden">
                                         <input
                                             type="file"
                                             accept="image/*"
-                                            onChange={(e) => setFormState({ ...formState, design_image: e.target.files[0] })}
+                                            onChange={(e) => {
+                                                const file = e.target.files[0];
+                                                setFormState({ ...formState, design_image: file });
+
+                                                // ✅ Create preview URL
+                                                if (file) {
+                                                    const previewUrl = URL.createObjectURL(file);
+                                                    setImagePreview(previewUrl);
+                                                }
+                                            }}
                                             className="hidden"
                                             id="design-image-upload"
+                                            required
                                         />
-                                        <label htmlFor="design-image-upload" className="cursor-pointer">
-                                            <svg className="w-10 h-10 text-gray-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                                            </svg>
-                                            <p className="text-sm text-gray-600">Click to upload design image</p>
-                                            <p className="text-xs text-gray-400 mt-1">PNG, JPG up to 5MB</p>
+                                        <label htmlFor="design-image-upload" className="cursor-pointer block">
+                                            {/* ✅ Show preview if image selected */}
+                                            {imagePreview ? (
+                                                <div className="relative">
+                                                    {/* ✅ Image fills entire dash boundary */}
+                                                    <div className="w-full h-64">
+                                                        <img
+                                                            src={imagePreview}
+                                                            alt="Preview"
+                                                            className="w-full h-full object-cover"
+                                                        />
+                                                    </div>
+                                                    {/* ✅ Overlay with file info */}
+                                                    <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white px-4 py-2">
+                                                        <p className="text-sm font-medium truncate">✅ {formState.design_image?.name}</p>
+                                                        <p className="text-xs text-gray-300">Click to change image</p>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                /* ✅ Show upload prompt if no image */
+                                                <div className="p-8 text-center">
+                                                    <svg className="w-12 h-12 text-gray-400 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                    </svg>
+                                                    <p className="text-sm text-gray-600 font-medium">Click to upload design image <span className="text-red-500">*</span></p>
+                                                    <p className="text-xs text-gray-400 mt-1">PNG, JPG up to 5MB</p>
+                                                </div>
+                                            )}
                                         </label>
-                                        {formState.design_image && (
-                                            <p className="text-sm text-green-600 mt-2">✅ {formState.design_image.name}</p>
-                                        )}
                                     </div>
+                                    {/* Validation message */}
+                                    {!formState.design_image && submitting && (
+                                        <p className="text-xs text-red-500 mt-1">Design image is required</p>
+                                    )}
                                 </div>
                             </div>
 
-                            {/* Modal Footer */}
-                            <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-100">
+                            {/* Modal Footer - Fixed with Submit Button INSIDE form */}
+                            <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-100 flex-shrink-0">
                                 <button
                                     type="button"
                                     onClick={closeAllModals}
@@ -620,13 +649,15 @@ export default function CustomOrders() {
 
                         {/* Modal Body */}
                         <div className="p-6">
-                            {/* Design Image */}
+                            {/* Design Image - ✅ Perfect fit */}
                             {selectedOrder.design_image ? (
-                                <img
-                                    src={`http://127.0.0.1:8000/storage/${selectedOrder.image}`}
-                                    alt={selectedOrder.title}
-                                    className="w-full h-48 object-cover rounded-lg mb-4"
-                                />
+                                <div className="w-full h-48 bg-gray-100 rounded-lg mb-4 overflow-hidden">
+                                    <img
+                                        src={`http://127.0.0.1:8000/storage/${selectedOrder.image || selectedOrder.design_image}`}
+                                        alt={selectedOrder.title}
+                                        className="w-full h-full object-cover"
+                                    />
+                                </div>
                             ) : (
                                 <div className="w-full h-48 bg-gray-100 rounded-lg mb-4 flex items-center justify-center">
                                     <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -641,21 +672,17 @@ export default function CustomOrders() {
                                 <p className="text-gray-600 text-sm">{selectedOrder.description}</p>
                             </div>
 
-                            {/* Details Grid */}
+                            {/* Details Grid - ✅ Material removed */}
                             <div className="grid grid-cols-2 gap-4 mb-4">
                                 <div>
                                     <p className="text-xs text-gray-500 mb-1">Quantity</p>
                                     <p className="font-semibold text-gray-900">{selectedOrder.quantity}</p>
                                 </div>
                                 <div>
-                                    <p className="text-xs text-gray-500 mb-1">Material</p>
-                                    <p className="font-semibold text-gray-900">{selectedOrder.material}</p>
-                                </div>
-                                <div>
                                     <p className="text-xs text-gray-500 mb-1">Submitted On</p>
                                     <p className="font-semibold text-gray-900">{formatDate(selectedOrder.created_at)}</p>
                                 </div>
-                                <div>
+                                <div className="col-span-2">
                                     <p className="text-xs text-gray-500 mb-1">Estimated Price</p>
                                     <p className="font-bold text-blue-600">
                                         {selectedOrder.estimated_price ? formatCurrency(selectedOrder.estimated_price) : 'Pending'}

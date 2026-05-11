@@ -14,56 +14,56 @@ use Illuminate\Support\Facades\DB;
 class ProductOrderController extends Controller
 {
     /**
- * Display user's product orders.
- */
-public function index(Request $request)
-{
-    $user = Auth::user();
+     * Display user's product orders.
+     */
+    public function index(Request $request)
+    {
+        $user = Auth::user();
 
-    $orders = ProductOrder::where('user_id', $user->id)
-        ->orderBy('created_at', 'desc')
-        ->get();
+        $orders = ProductOrder::where('user_id', $user->id)
+            ->orderBy('created_at', 'desc')
+            ->get();
 
-    // ✅ Enrich items with product images - SAFER VERSION
-    $orders = $orders->map(function($order) {
-        $itemsWithImages = [];
-        
-        foreach ($order->items as $item) {
-            $product = Product::find($item['id']);
+        // Enrich items with product images
+        $orders = $orders->map(function($order) {
+            $itemsWithImages = [];
             
-            // ✅ Safely get images
-            $productImage = null;
-            $productImages = [];
-            
-            if ($product) {
-                // Check if images is an array or JSON string
-                if (is_string($product->images)) {
-                    $imagesArray = json_decode($product->images, true) ?? [];
-                } else if (is_array($product->images)) {
-                    $imagesArray = $product->images;
-                } else {
-                    $imagesArray = [];
+            foreach ($order->items as $item) {
+                $product = Product::find($item['id']);
+                
+                // Safely get images
+                $productImage = null;
+                $productImages = [];
+                
+                if ($product) {
+                    // Check if images is an array or JSON string
+                    if (is_string($product->images)) {
+                        $imagesArray = json_decode($product->images, true) ?? [];
+                    } else if (is_array($product->images)) {
+                        $imagesArray = $product->images;
+                    } else {
+                        $imagesArray = [];
+                    }
+                    
+                    $productImage = !empty($imagesArray) ? $imagesArray[0] : null;
+                    $productImages = $imagesArray;
                 }
                 
-                $productImage = !empty($imagesArray) ? $imagesArray[0] : null;
-                $productImages = $imagesArray;
+                $itemsWithImages[] = array_merge($item, [
+                    'image' => $productImage,
+                    'images' => $productImages,
+                ]);
             }
             
-            $itemsWithImages[] = array_merge($item, [
-                'image' => $productImage,
-                'images' => $productImages,
-            ]);
-        }
-        
-        $order->items = $itemsWithImages;
-        return $order;
-    });
+            $order->items = $itemsWithImages;
+            return $order;
+        });
 
-    return response()->json([
-        'success' => true,
-        'orders' => $orders
-    ]);
-}
+        return response()->json([
+            'success' => true,
+            'orders' => $orders
+        ]);
+    }
 
     /**
      * Store a new product order.
@@ -180,14 +180,31 @@ public function index(Request $request)
             ], 404);
         }
 
-        // ✅ Also enrich items with images for single order view
+        // Also enrich items with images for single order view
         $itemsWithImages = [];
         foreach ($order->items as $item) {
             $product = Product::find($item['id']);
             
+            // Safely get images
+            $productImage = null;
+            $productImages = [];
+            
+            if ($product) {
+                if (is_string($product->images)) {
+                    $imagesArray = json_decode($product->images, true) ?? [];
+                } else if (is_array($product->images)) {
+                    $imagesArray = $product->images;
+                } else {
+                    $imagesArray = [];
+                }
+                
+                $productImage = !empty($imagesArray) ? $imagesArray[0] : null;
+                $productImages = $imagesArray;
+            }
+            
             $itemsWithImages[] = array_merge($item, [
-                'image' => $product?->images?->first() ?? null,
-                'images' => $product?->images ?? [],
+                'image' => $productImage,
+                'images' => $productImages,
             ]);
         }
         $order->items = $itemsWithImages;
@@ -196,6 +213,64 @@ public function index(Request $request)
             'success' => true,
             'order' => $order
         ]);
+    }
+
+    /**
+     * Cancel a pending order.
+     */
+    public function cancel($id)
+    {
+        $user = Auth::user();
+
+        $order = ProductOrder::where('user_id', $user->id)
+            ->where('id', $id)
+            ->first();
+
+        if (!$order) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Order not found'
+            ], 404);
+        }
+
+        // Only pending orders can be cancelled
+        if ($order->status !== 'pending') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Only pending orders can be cancelled'
+            ], 400);
+        }
+
+        DB::beginTransaction();
+
+        try {
+            // Restore product stock
+            foreach ($order->items as $item) {
+                $product = Product::find($item['id']);
+                if ($product) {
+                    $product->increment('stock', $item['quantity']);
+                }
+            }
+
+            // Update order status
+            $order->update(['status' => 'cancelled']);
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Order cancelled successfully',
+                'order' => $order
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to cancel order: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     /**
@@ -223,7 +298,7 @@ public function index(Request $request)
             ], 404);
         }
 
-        // ✅ Return full URL for direct access
+        // Return full URL for direct access
         $imageUrl = url('storage/' . $order->payment_screenshot);
 
         return response()->json([

@@ -19,7 +19,7 @@ export default function BookMachine() {
     const [showBookingModal, setShowBookingModal] = useState(false);
     const [loading, setLoading] = useState(true);
 
-    // Booking States (training check now comes from API)
+    // Booking States
     const [bookedDates, setBookedDates] = useState([]);
     const [bookingData, setBookingData] = useState({
         machine_id: '',
@@ -54,40 +54,11 @@ export default function BookMachine() {
                 },
             });
 
-            setMachines(response.data.machines);
+            console.log('Machines response:', response.data); // Debug log
+            setMachines(response.data.machines || []);
         } catch (error) {
             console.error('Error fetching machines:', error);
-            // Sample data for testing (fallback)
-            setMachines([
-                {
-                    id: 1,
-                    name: 'Ultimaker S5',
-                    category: '3D Printing',
-                    type: '3D Printer',
-                    status: 'available',
-                    description: 'Professional grade FDM 3D printer with dual extrusion',
-                    location: 'Lab A - Station 1',
-                    specs: 'Build volume: 330 x 240 x 300mm',
-                    added_on: '2026-04-20',
-                    required_courses: [1],
-                    required_course_names: ['Introduction to 3D Printing'],
-                    has_required_training: true,
-                },
-                {
-                    id: 2,
-                    name: 'Prusa MK4',
-                    category: '3D Printing',
-                    type: '3D Printer',
-                    status: 'available',
-                    description: 'Reliable FDM printer, great for beginners',
-                    location: 'Lab B - Station 3',
-                    specs: 'Build volume: 250 x 210 x 220mm',
-                    added_on: '2026-04-21',
-                    required_courses: [1],
-                    required_course_names: ['Introduction to 3D Printing'],
-                    has_required_training: false,
-                },
-            ]);
+            setMachines([]);
         } finally {
             setLoading(false);
         }
@@ -159,7 +130,7 @@ export default function BookMachine() {
         return true;
     };
 
-    // Submit booking
+    // Submit booking - ✅ FIXED: Send all required fields
     const handleBookingSubmit = async (e) => {
         e.preventDefault();
         setBookingSubmitting(true);
@@ -182,9 +153,19 @@ export default function BookMachine() {
         try {
             const authToken = localStorage.getItem('auth_token');
 
+            // ✅ FIXED: Send booking_date field explicitly
+            const payload = {
+                machine_id: bookingData.machine_id,
+                start_date: bookingData.start_date,
+                end_date: bookingData.end_date,
+                booking_date: bookingData.start_date, // Required by database
+            };
+
+            console.log('Sending booking payload:', payload); // Debug log
+
             const response = await axios.post(
                 'http://127.0.0.1:8000/api/user/bookings',
-                bookingData,
+                payload,
                 {
                     headers: {
                         'Accept': 'application/json',
@@ -201,6 +182,7 @@ export default function BookMachine() {
             }, 1500);
         } catch (error) {
             console.error('Booking error:', error);
+            console.error('Error response:', error.response?.data); // Debug log
             if (error.response?.data?.message) {
                 setBookingMessage('❌ ' + error.response.data.message);
             } else {
@@ -238,26 +220,54 @@ export default function BookMachine() {
         return bookedDates.includes(date);
     };
 
-    // Generate next 30 days for calendar
-    const generateNext30Days = () => {
-        const days = [];
+    // Generate calendar data with months - ✅ FIXED: Scrollable
+    const generateCalendarData = () => {
+        const calendar = [];
         const today = new Date();
-        for (let i = 0; i < 30; i++) {
-            const date = new Date(today);
-            date.setDate(today.getDate() + i);
-            days.push(date.toISOString().split('T')[0]);
+        const endDate = new Date(today);
+        endDate.setDate(today.getDate() + 30);
+
+        let currentDate = new Date(today);
+        let currentMonth = null;
+        let monthData = null;
+
+        while (currentDate <= endDate) {
+            const month = currentDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+            if (month !== currentMonth) {
+                if (monthData) {
+                    calendar.push(monthData);
+                }
+                currentMonth = month;
+                monthData = {
+                    monthName: month,
+                    days: []
+                };
+            }
+
+            const dateStr = currentDate.toISOString().split('T')[0];
+            monthData.days.push({
+                date: dateStr,
+                dayName: currentDate.toLocaleDateString('en-US', { weekday: 'short' }),
+                dayNumber: currentDate.getDate(),
+                isBooked: isDateBooked(dateStr)
+            });
+
+            currentDate.setDate(currentDate.getDate() + 1);
         }
-        return days;
+
+        if (monthData) {
+            calendar.push(monthData);
+        }
+
+        return calendar;
     };
 
     return (
         <div className="flex min-h-screen bg-gray-50">
-            {/* ✅ Shared Sidebar Component */}
             <UserSidebar expandedMenus={expandedMenus} toggleSubmenu={toggleSubmenu} />
 
-            {/* Main Content */}
             <div className="flex-1">
-                {/* Top Header */}
                 <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
                     <div className="px-6 py-4">
                         <h1 className="text-2xl font-bold text-gray-900">Book a Machine</h1>
@@ -265,9 +275,7 @@ export default function BookMachine() {
                     </div>
                 </header>
 
-                {/* Page Content */}
                 <main className="p-6">
-                    {/* Loading State */}
                     {loading && (
                         <div className="text-center py-12">
                             <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent"></div>
@@ -277,19 +285,40 @@ export default function BookMachine() {
 
                     {!loading && (
                         <>
-                            {/* Machines Grid */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                            {/* ✅ FIXED: 3 machines per row with proper card height */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                                 {machines.map((machine) => (
                                     <div key={machine.id} className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-lg transition-shadow overflow-hidden">
-                                        {/* Machine Image */}
-                                        <div className="h-48 bg-gradient-to-br from-blue-50 to-cyan-50 flex items-center justify-center">
-                                            <svg className="w-16 h-16 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                            </svg>
+                                        {/* ✅ FIXED: Show actual machine image with proper height */}
+                                        <div className="h-64 bg-gray-100 overflow-hidden">
+                                            {machine.image ? (
+                                                <img
+                                                    src={`http://127.0.0.1:8000/storage/${machine.image}`}
+                                                    alt={machine.name}
+                                                    className="w-full h-full object-cover"
+                                                    onError={(e) => {
+                                                        console.error('Image load failed:', machine.image);
+                                                        e.target.style.display = 'none';
+                                                        e.target.parentElement.innerHTML = `
+                                                            <div class="h-full bg-gradient-to-br from-blue-50 to-cyan-50 flex items-center justify-center">
+                                                                <svg class="w-20 h-20 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                                </svg>
+                                                            </div>
+                                                        `;
+                                                    }}
+                                                />
+                                            ) : (
+                                                <div className="h-full bg-gradient-to-br from-blue-50 to-cyan-50 flex items-center justify-center">
+                                                    <svg className="w-20 h-20 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                    </svg>
+                                                </div>
+                                            )}
                                         </div>
 
-                                        {/* Machine Info */}
                                         <div className="p-5">
                                             <h3 className="font-bold text-gray-900 text-lg mb-1">{machine.name}</h3>
                                             <p className="text-sm text-gray-600 mb-3">{machine.category}</p>
@@ -298,7 +327,6 @@ export default function BookMachine() {
                                                 {machine.status.charAt(0).toUpperCase() + machine.status.slice(1)}
                                             </span>
 
-                                            {/* Show training status badge */}
                                             {machine.required_courses?.length > 0 && (
                                                 <div className="mb-3">
                                                     <span className={`inline-block px-2 py-1 rounded text-[10px] font-medium ${machine.has_required_training
@@ -329,7 +357,6 @@ export default function BookMachine() {
                                 ))}
                             </div>
 
-                            {/* Empty State */}
                             {machines.length === 0 && (
                                 <div className="text-center py-12">
                                     <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -343,13 +370,10 @@ export default function BookMachine() {
                 </main>
             </div>
 
-            {/* ✅ FIXED: Machine Details Modal - Proper flex layout for scrolling */}
+            {/* Machine Details Modal - REMOVED Specifications section */}
             {showDetailsModal && selectedMachine && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={closeDetailsModal}>
-                    {/* ✅ FIXED: Single wrapper with flex column layout */}
                     <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
-
-                        {/* Modal Header - Sticky top */}
                         <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white rounded-t-2xl z-10">
                             <h3 className="text-xl font-bold text-gray-900">Machine Details</h3>
                             <button onClick={closeDetailsModal} className="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100 transition-colors">
@@ -359,17 +383,24 @@ export default function BookMachine() {
                             </button>
                         </div>
 
-                        {/* Modal Body - Scrollable content */}
                         <div className="p-6 overflow-y-auto flex-1">
-                            {/* Machine Image */}
-                            <div className="h-48 bg-gradient-to-br from-blue-50 to-cyan-50 rounded-lg mb-6 flex items-center justify-center">
-                                <svg className="w-20 h-20 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                </svg>
+                            <div className="h-64 bg-gray-100 rounded-lg mb-6 overflow-hidden">
+                                {selectedMachine.image ? (
+                                    <img
+                                        src={`http://127.0.0.1:8000/storage/${selectedMachine.image}`}
+                                        alt={selectedMachine.name}
+                                        className="w-full h-full object-cover"
+                                    />
+                                ) : (
+                                    <div className="h-full bg-gradient-to-br from-blue-50 to-cyan-50 flex items-center justify-center">
+                                        <svg className="w-20 h-20 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                        </svg>
+                                    </div>
+                                )}
                             </div>
 
-                            {/* Machine Info Grid */}
                             <div className="grid grid-cols-2 gap-4 mb-6">
                                 <div>
                                     <p className="text-sm text-gray-500 mb-1">Machine Name</p>
@@ -391,19 +422,11 @@ export default function BookMachine() {
                                 </div>
                             </div>
 
-                            {/* Description */}
                             <div className="mb-6 pb-6 border-b border-gray-200">
                                 <p className="text-sm text-gray-500 mb-2">Description</p>
                                 <p className="text-gray-900">{selectedMachine.description}</p>
                             </div>
 
-                            {/* Specs */}
-                            <div className="mb-6">
-                                <p className="text-sm text-gray-500 mb-2">Specifications</p>
-                                <p className="text-gray-900">{selectedMachine.specs}</p>
-                            </div>
-
-                            {/* Training Requirement Warning */}
                             {selectedMachine.required_courses?.length > 0 && (
                                 <div className={`mb-6 p-4 rounded-lg border ${hasTrainingForMachine(selectedMachine)
                                     ? 'bg-green-50 border-green-200'
@@ -440,7 +463,6 @@ export default function BookMachine() {
                             )}
                         </div>
 
-                        {/* Modal Footer - Sticky bottom */}
                         {selectedMachine.status === 'available' && (
                             <div className="px-6 py-4 border-t border-gray-200 sticky bottom-0 bg-white rounded-b-2xl">
                                 <button
@@ -461,13 +483,10 @@ export default function BookMachine() {
                 </div>
             )}
 
-            {/* ✅ FIXED: Booking Modal - Proper flex layout for scrolling */}
+            {/* Booking Modal - ✅ FIXED: Scrollable calendar */}
             {showBookingModal && selectedMachine && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={closeBookingModal}>
-                    {/* ✅ FIXED: Single wrapper with flex column layout */}
                     <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
-
-                        {/* Modal Header - Sticky top */}
                         <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white rounded-t-2xl z-10">
                             <div>
                                 <h3 className="text-xl font-bold text-gray-900">Book {selectedMachine.name}</h3>
@@ -480,10 +499,9 @@ export default function BookMachine() {
                             </button>
                         </div>
 
-                        {/* Modal Body - Scrollable form content */}
                         <form onSubmit={handleBookingSubmit} className="flex flex-col flex-1">
-                            <div className="p-6 space-y-6 overflow-y-auto flex-1">
-                                {/* Machine Info */}
+                            {/* ✅ FIXED: Scrollable content area */}
+                            <div className="p-6 space-y-6 overflow-y-auto flex-1 max-h-[60vh]">
                                 <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
                                     <p className="text-sm font-medium text-blue-900">{selectedMachine.name}</p>
                                     <p className="text-xs text-blue-700 mt-1">{selectedMachine.location}</p>
@@ -496,7 +514,6 @@ export default function BookMachine() {
                                     </div>
                                 )}
 
-                                {/* Date Selection */}
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-2">Start Date *</label>
@@ -524,43 +541,42 @@ export default function BookMachine() {
                                     </div>
                                 </div>
 
-                                {/* Available Dates Calendar */}
+                                {/* ✅ FIXED: Scrollable calendar with max-height */}
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-3">Available Dates (Next 30 Days)</label>
-                                    <div className="grid grid-cols-7 gap-2">
-                                        {generateNext30Days().map((date) => {
-                                            const isBooked = isDateBooked(date);
-                                            const isSelected = bookingData.start_date && bookingData.end_date &&
-                                                date >= bookingData.start_date && date <= bookingData.end_date;
-
-                                            return (
-                                                <div
-                                                    key={date}
-                                                    className={`
-                                                        p-2 text-center text-xs rounded-lg border transition-colors
-                                                        ${isBooked
-                                                            ? 'bg-red-100 border-red-300 text-red-700 cursor-not-allowed'
-                                                            : isSelected
-                                                                ? 'bg-blue-600 border-blue-600 text-white'
-                                                                : 'bg-white border-gray-200 text-gray-700 hover:bg-blue-50'
-                                                        }
-                                                    `}
-                                                >
-                                                    <div>{new Date(date).toLocaleDateString('en-US', { weekday: 'short' })}</div>
-                                                    <div className="font-semibold mt-1">{new Date(date).getDate()}</div>
-                                                    {isBooked && <div className="text-[10px] mt-1">Booked</div>}
+                                    <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
+                                        {generateCalendarData().map((monthData, monthIndex) => (
+                                            <div key={monthIndex} className="border border-gray-200 rounded-lg p-4">
+                                                <h4 className="text-sm font-semibold text-gray-900 mb-3">{monthData.monthName}</h4>
+                                                <div className="grid grid-cols-7 gap-2">
+                                                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                                                        <div key={day} className="text-center text-xs font-medium text-gray-500 py-1">
+                                                            {day}
+                                                        </div>
+                                                    ))}
+                                                    {monthData.days.map((dayInfo) => (
+                                                        <div
+                                                            key={dayInfo.date}
+                                                            className={`
+                                                                p-2 text-center text-xs rounded-lg border transition-colors
+                                                                ${dayInfo.isBooked
+                                                                    ? 'bg-red-100 border-red-300 text-red-700 cursor-not-allowed'
+                                                                    : 'bg-white border-gray-200 text-gray-700 hover:bg-blue-50'
+                                                                }
+                                                            `}
+                                                        >
+                                                            <div className="font-semibold">{dayInfo.dayNumber}</div>
+                                                            {dayInfo.isBooked && <div className="text-[10px] mt-1">Booked</div>}
+                                                        </div>
+                                                    ))}
                                                 </div>
-                                            );
-                                        })}
+                                            </div>
+                                        ))}
                                     </div>
                                     <div className="flex items-center gap-4 mt-3 text-xs">
                                         <div className="flex items-center gap-2">
                                             <div className="w-4 h-4 bg-white border border-gray-200 rounded"></div>
                                             <span>Available</span>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <div className="w-4 h-4 bg-blue-600 rounded"></div>
-                                            <span>Selected</span>
                                         </div>
                                         <div className="flex items-center gap-2">
                                             <div className="w-4 h-4 bg-red-100 border border-red-300 rounded"></div>
@@ -570,7 +586,6 @@ export default function BookMachine() {
                                 </div>
                             </div>
 
-                            {/* Modal Footer - Sticky bottom */}
                             <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-end gap-3 sticky bottom-0 bg-white rounded-b-2xl">
                                 <button
                                     type="button"

@@ -2,86 +2,35 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
-use Illuminate\Contracts\Auth\MustVerifyEmail;
-use App\Models\CourseEnrollment;
 
-class User extends Authenticatable implements MustVerifyEmail
+class User extends Authenticatable
 {
-    /** @use HasFactory<\Database\Factories\UserFactory> */
-	use HasApiTokens, HasFactory, Notifiable;
+    use HasApiTokens, HasFactory, Notifiable;
 
-    /**
- * The attributes that are mass assignable.
- *
- * @var list<string>
- */
-protected $fillable = [
-    'name',
-    'email',
-    'password',
-    'gender',
-    'phone',
-    'role',
-    'department',
-    'year_of_study',
-];
-    /**
-     * The attributes that should be hidden for serialization.
-     *
-     * @var list<string>
-     */
-    protected $hidden = [
+    // columns that can be filled
+    protected $fillable = [
+        'name',
+        'cid',
+        'gender',
+        'phone',
+        'account_type',
+        'email',
         'password',
-        'remember_token',
+        'role',
+        'is_trained',
     ];
 
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
-    protected function casts(): array
-    {
-        return [
-            'email_verified_at' => 'datetime',
-            'password' => 'hashed',
-        ];
-    }
-/**
- * Get the user's course enrollments
- */
-public function courses()
-{
-    return $this->hasMany(CourseEnrollment::class);
-}
+    // columns that are hidden from response
+    protected $hidden = [
+        'password', // never show password
+    ];
 
-/**
- * Get the user's completed courses (for training verification)
- */
-public function completedCourses()
-{
-    return $this->courses()->where('status', 'completed');
-}
-
-/**
- * Check if user has completed any of the required courses for a machine
- */
-public function hasTrainingForMachine($requiredCourses)
-{
-    if (empty($requiredCourses)) {
-        return true; // No training required
-    }
-
-    return $this->courses()
-        ->where('status', 'completed')
-        ->whereHas('course', function ($query) use ($requiredCourses) {
-            $query->whereIn('title', $requiredCourses);
-        })
-        ->exists();
-}
+    // columns data type
+    protected $casts = [
+        'is_trained' => 'boolean', // true or false
+    ];
 }

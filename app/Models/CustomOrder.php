@@ -2,45 +2,39 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class CustomOrder extends Model
 {
-    use HasFactory;
-
     protected $fillable = [
         'user_id',
+        'assigned_to',
         'title',
         'description',
+        'material',
         'quantity',
-        'design_image',
+        'deadline',
+        'file_path',
+        'notes',
         'status',
-        'estimated_price',
-        'rejection_reason',
-        'assigned_to',
-        'assigned_at',
+        'admin_note',
+        'production_note',
+        'completed_at',
     ];
 
     protected $casts = [
-        'estimated_price' => 'decimal:2',
-        'quantity' => 'integer',
-        'assigned_at' => 'datetime',
+        'deadline'     => 'date',
+        'completed_at' => 'datetime',
     ];
 
-    /**
-     * Get the user who placed the order.
-     */
-    public function user(): BelongsTo
+    // relationship - order belongs to user
+    public function user()
     {
         return $this->belongsTo(User::class);
     }
 
-    /**
-     * Get the assigned production team member.
-     */
-    public function assignedUser(): BelongsTo
+    // relationship - order assigned to production team member
+    public function assignedTo()
     {
         return $this->belongsTo(User::class, 'assigned_to');
     }

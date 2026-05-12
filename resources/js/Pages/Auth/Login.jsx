@@ -1,212 +1,195 @@
-import React, { useState } from 'react';
-import axios from 'axios';
-import { Link } from 'react-router-dom';
+import { useState } from "react";
+import axios from "axios";
+import { useNavigate, Link } from "react-router-dom";
 
 export default function Login() {
-    // Form state
-    const [formData, setFormData] = useState({
-        email: '',
-        password: '',
-    });
+  const [form, setForm] = useState({ email: "", password: "" });
+  const [errors, setErrors] = useState({});
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
 
-    // UI state
-    const [loading, setLoading] = useState(false);
-    const [message, setMessage] = useState('');
-    const [errors, setErrors] = useState({});
-    const [token, setToken] = useState(null);
+  const handleChange = (e) => {
+    setForm({ ...form, [e.target.name]: e.target.value });
+  };
 
-    // Handle input changes
-    const handleChange = (e) => {
-        const { name, value } = e.target;
-        setFormData(prev => ({
-            ...prev,
-            [name]: value
-        }));
-        // Clear error when user types
-        if (errors[name]) {
-            setErrors(prev => ({
-                ...prev,
-                [name]: ''
-            }));
-        }
-    };
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setErrors({});
+    setLoading(true);
 
-    // Handle form submission
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        setLoading(true);
-        setMessage('');
-        setErrors({});
+    try {
+      const res = await axios.post("http://localhost:8000/api/login", form);
+      localStorage.setItem("token", res.data.token);
+      localStorage.setItem("user", JSON.stringify(res.data.user));
+      navigate("/dashboard");
+    } catch (err) {
+      if (err.response?.status === 422) {
+        setErrors(err.response.data.errors);
+      } else {
+        setErrors({ general: ["Invalid email or password!"] });
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
-        try {
-            const response = await axios.post('http://127.0.0.1:8000/api/login', formData);
+  return (
+    <div style={styles.page}>
+      <div style={styles.card}>
 
-            // Save token to localStorage
-            localStorage.setItem('auth_token', response.data.token);
-
-            // ✅ ALSO save user data if returned
-            if (response.data.user) {
-                localStorage.setItem('user', JSON.stringify(response.data.user));
-            }
-
-            // ✅ REDIRECT TO USER DASHBOARD
-            window.location.href = '/user/dashboard';
-
-        } catch (error) {
-            console.error('Login error:', error);
-
-            if (error.response?.status === 403) {
-                if (error.response.data.message?.includes('verify')) {
-                    setMessage('⚠️ ' + error.response.data.message + ' Check your inbox.');
-                } else {
-                    setMessage('❌ ' + error.response.data.message);
-                }
-            } else if (error.response?.status === 422) {
-                if (error.response.data.errors) {
-                    setErrors(error.response.data.errors);
-                } else if (error.response.data.message) {
-                    setMessage('❌ ' + error.response.data.message);
-                }
-            } else if (error.response?.status === 401) {
-                setMessage('❌ Invalid email or password.');
-            } else {
-                setMessage('❌ Login failed. Please try again.');
-            }
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    // Handle logout
-    const handleLogout = () => {
-        localStorage.removeItem('auth_token');
-        setToken(null);
-        setMessage('👋 You have been logged out.');
-        setFormData({ email: '', password: '' });
-    };
-
-    
-
-    // Login form view
-    return (
-        <div className="min-h-screen bg-gray-50 flex">
-            {/* Left Side - Image with Blur */}
-            <div className="hidden lg:flex lg:w-1/2 relative">
-                <div
-                    className="absolute inset-0 bg-cover bg-center blur-sm"
-                    style={{
-                        backgroundImage: "url('/images/fablab-bg.jpg')"
-                    }}
-                >
-                    <div className="absolute inset-0 bg-black bg-opacity-20"></div>
-                </div>
-                <div className="relative z-10 flex flex-col justify-center items-center text-white p-12">
-                    <h1 className="text-4xl font-bold mb-4">FAB-Lab System</h1>
-                    <p className="text-lg text-center max-w-md">
-                        Access machines, enroll in training, and manage your bookings easily.
-                    </p>
-                </div>
-            </div>
-
-            {/* Right Side - Form */}
-            <div className="w-full lg:w-1/2 flex items-center justify-center p-8">
-                <div className="w-full max-w-md">
-                    {/* Logo */}
-                    <div className="text-center mb-8">
-                        <img
-                            src="/images/logo.png"
-                            alt="JNEC FABLAB Logo"
-                            className="mx-auto mb-4 w-16 h-16 rounded-full object-cover border-2 border-gray-200"
-                        />
-                    </div>
-
-                    {/* Navigation Tabs - Using React Router Link */}
-                    <div className="flex justify-center mb-8">
-                        <Link
-                            to="/login"
-                            className="px-6 py-2 text-gray-800 font-medium border-b-2 border-gray-800"
-                        >
-                            Login
-                        </Link>
-                        <Link
-                            to="/register"
-                            className="px-6 py-2 text-gray-600 font-medium hover:text-gray-800 transition"
-                        >
-                            Register
-                        </Link>
-                    </div>
-
-                    {/* Form Card */}
-                    <div className="bg-white rounded-2xl shadow-sm p-8">
-                        <h2 className="text-2xl font-semibold text-gray-800 mb-6">Login</h2>
-
-                        {message && (
-                            <div className={`mb-4 p-3 rounded-lg text-sm ${message.includes('✅')
-                                    ? 'bg-green-100 text-green-800'
-                                    : 'bg-red-100 text-red-800'
-                                }`}>
-                                {message}
-                            </div>
-                        )}
-
-                        <form onSubmit={handleSubmit}>
-                            {/* Email */}
-                            <div className="mb-4">
-                                <input
-                                    type="email"
-                                    name="email"
-                                    value={formData.email}
-                                    onChange={handleChange}
-                                    placeholder="Email"
-                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent placeholder-gray-500 italic"
-                                    required
-                                />
-                                {errors.email && (
-                                    <p className="mt-1 text-sm text-red-600">{errors.email[0]}</p>
-                                )}
-                            </div>
-
-                            {/* Password */}
-                            <div className="mb-6">
-                                <input
-                                    type="password"
-                                    name="password"
-                                    value={formData.password}
-                                    onChange={handleChange}
-                                    placeholder="Password"
-                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent placeholder-gray-500 italic"
-                                    required
-                                />
-                                {errors.password && (
-                                    <p className="mt-1 text-sm text-red-600">{errors.password[0]}</p>
-                                )}
-
-                                {/* Forgot Password Link */}
-                                <div className="text-right mt-2">
-                                    <Link
-                                        to="/forgot-password"
-                                        className="text-sm text-blue-600 hover:text-blue-700"
-                                    >
-                                        Forgot Password?
-                                    </Link>
-                                </div>
-                            </div>
-
-                            {/* Submit Button */}
-                            <button
-                                type="submit"
-                                disabled={loading}
-                                className={`w-full py-3 px-6 rounded-lg font-medium text-white transition duration-200 ${loading
-                                        ? 'bg-gray-400 cursor-not-allowed'
-                                        : 'bg-blue-400 hover:bg-blue-500'
-                                    }`}
-                            >
-                                {loading ? 'Logging in...' : 'Login'}
-                            </button>
-                        </form>
-                    </div>
-                </div>
-            </div>
+        {/* Logo */}
+        <div style={styles.logo}>
+          <h2 style={styles.logoText}>🏭 JNEC Fab Lab</h2>
+          <p style={styles.logoSub}>Student Portal</p>
         </div>
-    );
+
+        <h3 style={styles.title}>Welcome Back!</h3>
+        <p style={styles.subtitle}>Login to your account</p>
+
+        {errors.general && (
+          <p style={styles.errorBox}>{errors.general[0]}</p>
+        )}
+
+        <form onSubmit={handleSubmit} style={styles.form}>
+
+          <div style={styles.field}>
+            <label style={styles.label}>Email</label>
+            <input
+              name="email"
+              type="email"
+              value={form.email}
+              placeholder="Enter your email"
+              onChange={handleChange}
+              style={styles.input}
+            />
+            {errors.email && <p style={styles.error}>{errors.email[0]}</p>}
+          </div>
+
+          <div style={styles.field}>
+            <label style={styles.label}>Password</label>
+            <input
+              name="password"
+              type="password"
+              value={form.password}
+              placeholder="Enter your password"
+              onChange={handleChange}
+              style={styles.input}
+            />
+            {errors.password && <p style={styles.error}>{errors.password[0]}</p>}
+          </div>
+
+          <button type="submit" style={styles.button} disabled={loading}>
+            {loading ? "Logging in..." : "Login"}
+          </button>
+
+        </form>
+
+        <p style={styles.registerText}>
+          Don't have an account?{" "}
+          <Link to="/register" style={styles.link}>Register here</Link>
+        </p>
+
+      </div>
+    </div>
+  );
 }
+
+const styles = {
+  page: {
+    minHeight: "100vh",
+    backgroundColor: "#f1f5f9",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  card: {
+    backgroundColor: "white",
+    padding: "40px",
+    borderRadius: "12px",
+    boxShadow: "0 4px 20px rgba(0,0,0,0.1)",
+    width: "100%",
+    maxWidth: "400px",
+  },
+  logo: {
+    textAlign: "center",
+    marginBottom: "20px",
+  },
+  logoText: {
+    margin: 0,
+    color: "#0f172a",
+    fontSize: "22px",
+  },
+  logoSub: {
+    margin: 0,
+    color: "#64748b",
+    fontSize: "13px",
+  },
+  title: {
+    textAlign: "center",
+    margin: "0 0 5px",
+    color: "#0f172a",
+  },
+  subtitle: {
+    textAlign: "center",
+    color: "#64748b",
+    fontSize: "14px",
+    marginBottom: "25px",
+  },
+  form: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "15px",
+  },
+  field: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "5px",
+  },
+  label: {
+    fontSize: "14px",
+    fontWeight: "600",
+    color: "#374151",
+  },
+  input: {
+    padding: "10px",
+    fontSize: "14px",
+    borderRadius: "8px",
+    border: "1px solid #e2e8f0",
+    outline: "none",
+  },
+  button: {
+    padding: "12px",
+    backgroundColor: "#1e40af",
+    color: "white",
+    border: "none",
+    borderRadius: "8px",
+    cursor: "pointer",
+    fontSize: "15px",
+    fontWeight: "600",
+    marginTop: "5px",
+  },
+  errorBox: {
+    backgroundColor: "#fee2e2",
+    color: "#dc2626",
+    padding: "10px",
+    borderRadius: "8px",
+    fontSize: "13px",
+    marginBottom: "10px",
+  },
+  error: {
+    color: "#dc2626",
+    fontSize: "12px",
+    margin: 0,
+  },
+  registerText: {
+    textAlign: "center",
+    marginTop: "20px",
+    fontSize: "14px",
+    color: "#64748b",
+  },
+  link: {
+    color: "#1e40af",
+    textDecoration: "none",
+    fontWeight: "600",
+  },
+};

@@ -2,41 +2,29 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Machine extends Model
 {
-    use HasFactory;
-
     protected $fillable = [
         'name',
-        'type',
+        'category',
         'description',
         'status',
+        'requires_training',
         'image',
-        'runtime_hours',
-        'last_used_at',
-        'required_courses',  // ✅ ADD THIS
+        'max_booking_hours',
+        'is_active',
     ];
 
     protected $casts = [
-        'last_used_at' => 'datetime',
-        'required_courses' => 'array',  // ✅ ADD THIS
+        'requires_training' => 'boolean',
+        'is_active'         => 'boolean',
     ];
 
-    // Helper: Format runtime as "X hrs"
-    public function getRuntimeAttribute()
+    // relationship - machine has many bookings
+    public function bookings()
     {
-        return $this->runtime_hours . ' hrs';
-    }
-
-    // Helper: Format last used as "X hours ago"
-    public function getLastUsedAttribute()
-    {
-        if (!$this->last_used_at) return 'Never';
-        
-        $diff = $this->last_used_at->diffForHumans();
-        return $diff === 'now' ? 'Just now' : $diff;
+        return $this->hasMany(MachineBooking::class);
     }
 }

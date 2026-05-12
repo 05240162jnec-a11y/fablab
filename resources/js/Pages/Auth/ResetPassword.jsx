@@ -1,154 +1,90 @@
-import React, { useState } from 'react';
-import axios from 'axios';
-import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { useEffect } from 'react';
+import GuestLayout from '@/Layouts/GuestLayout';
+import InputError from '@/Components/InputError';
+import InputLabel from '@/Components/InputLabel';
+import PrimaryButton from '@/Components/PrimaryButton';
+import TextInput from '@/Components/TextInput';
+import { Head, useForm } from '@inertiajs/react';
 
-export default function ResetPassword() {
-    const { token } = useParams();
-    const [searchParams] = useSearchParams();
-    const email = searchParams.get('email');
-
-    const [formData, setFormData] = useState({
-        email: email || '',
+export default function ResetPassword({ token, email }) {
+    const { data, setData, post, processing, errors, reset } = useForm({
         token: token,
+        email: email,
         password: '',
         password_confirmation: '',
     });
-    const [loading, setLoading] = useState(false);
-    const [message, setMessage] = useState('');
-    const [errors, setErrors] = useState({});
 
-    const handleChange = (e) => {
-        const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
-        if (errors[name]) {
-            setErrors(prev => ({ ...prev, [name]: '' }));
-        }
-    };
+    useEffect(() => {
+        return () => {
+            reset('password', 'password_confirmation');
+        };
+    }, []);
 
-    const handleSubmit = async (e) => {
+    const submit = (e) => {
         e.preventDefault();
-        setLoading(true);
-        setMessage('');
-        setErrors({});
 
-        try {
-            const response = await axios.post('http://127.0.0.1:8000/api/reset-password', formData);
-            setMessage('✅ ' + response.data.message);
-            setFormData({ email: '', token: '', password: '', password_confirmation: '' });
-            
-            // Redirect to login after 2 seconds
-            setTimeout(() => {
-                window.location.href = '/login';
-            }, 2000);
-        } catch (error) {
-            if (error.response?.status === 422) {
-                if (error.response.data.errors) {
-                    setErrors(error.response.data.errors);
-                } else if (error.response.data.message) {
-                    setMessage('❌ ' + error.response.data.message);
-                }
-            } else if (error.response?.status === 400) {
-                setMessage('❌ ' + error.response.data.message);
-            } else {
-                setMessage('❌ Failed to reset password. Please try again.');
-            }
-        } finally {
-            setLoading(false);
-        }
+        post(route('password.store'));
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-            <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md w-full mx-4">
-                {/* Logo */}
-                <div className="text-center mb-8">
-                    <img 
-                        src="/images/logo.png" 
-                        alt="JNEC FABLAB Logo" 
-                        className="mx-auto mb-4 w-16 h-16 rounded-full object-cover border-2 border-gray-200"
+        <GuestLayout>
+            <Head title="Reset Password" />
+
+            <form onSubmit={submit}>
+                <div>
+                    <InputLabel htmlFor="email" value="Email" />
+
+                    <TextInput
+                        id="email"
+                        type="email"
+                        name="email"
+                        value={data.email}
+                        className="mt-1 block w-full"
+                        autoComplete="username"
+                        onChange={(e) => setData('email', e.target.value)}
                     />
-                    <h2 className="text-2xl font-bold text-gray-800 mb-2">Reset Password</h2>
-                    <p className="text-gray-600 text-sm">
-                        Enter your new password below.
-                    </p>
+
+                    <InputError message={errors.email} className="mt-2" />
                 </div>
 
-                {/* Message */}
-                {message && (
-                    <div className={`mb-4 p-3 rounded-lg text-sm ${
-                        message.includes('✅') 
-                            ? 'bg-green-100 text-green-800' 
-                            : 'bg-red-100 text-red-800'
-                    }`}>
-                        {message}
-                    </div>
-                )}
+                <div className="mt-4">
+                    <InputLabel htmlFor="password" value="Password" />
 
-                {/* Form */}
-                <form onSubmit={handleSubmit}>
-                    <div className="mb-4">
-                        <input
-                            type="email"
-                            name="email"
-                            value={formData.email}
-                            onChange={handleChange}
-                            placeholder="Email"
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent placeholder-gray-500 italic"
-                            required
-                            readOnly
-                        />
-                    </div>
+                    <TextInput
+                        id="password"
+                        type="password"
+                        name="password"
+                        value={data.password}
+                        className="mt-1 block w-full"
+                        autoComplete="new-password"
+                        isFocused={true}
+                        onChange={(e) => setData('password', e.target.value)}
+                    />
 
-                    <div className="mb-4">
-                        <input
-                            type="password"
-                            name="password"
-                            value={formData.password}
-                            onChange={handleChange}
-                            placeholder="New Password"
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent placeholder-gray-500 italic"
-                            required
-                        />
-                        {errors.password && (
-                            <p className="mt-1 text-sm text-red-600">{errors.password[0]}</p>
-                        )}
-                    </div>
-
-                    <div className="mb-6">
-                        <input
-                            type="password"
-                            name="password_confirmation"
-                            value={formData.password_confirmation}
-                            onChange={handleChange}
-                            placeholder="Confirm New Password"
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent placeholder-gray-500 italic"
-                            required
-                        />
-                    </div>
-
-                    <button 
-                        type="submit" 
-                        disabled={loading}
-                        className={`w-full py-3 px-6 rounded-lg font-medium text-white transition duration-200 ${
-                            loading 
-                                ? 'bg-gray-400 cursor-not-allowed' 
-                                : 'bg-blue-400 hover:bg-blue-500'
-                        }`}
-                    >
-                        {loading ? 'Resetting...' : 'Reset Password'}
-                    </button>
-                </form>
-
-                {/* Back to Login */}
-                <div className="mt-6 text-center">
-                    <Link 
-                        to="/login" 
-                        className="text-blue-600 hover:text-blue-700 text-sm font-medium"
-                    >
-                        ← Back to Login
-                    </Link>
+                    <InputError message={errors.password} className="mt-2" />
                 </div>
-            </div>
-        </div>
+
+                <div className="mt-4">
+                    <InputLabel htmlFor="password_confirmation" value="Confirm Password" />
+
+                    <TextInput
+                        type="password"
+                        name="password_confirmation"
+                        value={data.password_confirmation}
+                        className="mt-1 block w-full"
+                        autoComplete="new-password"
+                        onChange={(e) => setData('password_confirmation', e.target.value)}
+                    />
+
+                    <InputError message={errors.password_confirmation} className="mt-2" />
+                </div>
+
+                <div className="flex items-center justify-end mt-4">
+                    <PrimaryButton className="ms-4" disabled={processing}>
+                        Reset Password
+                    </PrimaryButton>
+                </div>
+            </form>
+        </GuestLayout>
     );
 }

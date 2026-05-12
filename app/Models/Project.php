@@ -11,22 +11,16 @@ class Project extends Model
 
     protected $fillable = [
         'user_id',
-        'student_name',
-        'department',
         'title',
         'description',
-        'pdf_file',
-        'video_file',
+        'category',
+        'file_path',
+        'video_url',
         'status',
-        'rejection_reason',
-        'submission_date',
+        'admin_note',
+        'is_featured',
     ];
 
-    protected $casts = [
-        'submission_date' => 'date',
-    ];
-
-    // Relationship: Project belongs to a User (student)
     public function user()
     {
         return $this->belongsTo(User::class);

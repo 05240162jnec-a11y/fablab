@@ -2,54 +2,37 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Course extends Model
 {
-    use HasFactory;
-
     protected $fillable = [
-    'title',
-    'instructor',
-    'duration',
-    'start_date',
-    'end_date',
-    'schedule',
-    'seat_limit',
-    'enrollment',
-    'status',
-    'registration_open',
-    'registration_status',
-    'description',
-    'image',
-    'certificate_template_path',  
-];
-
-    protected $casts = [
-        'start_date' => 'date',           // ✅ ADD THIS
-        'end_date' => 'date',             // ✅ ADD THIS
-        'registration_open' => 'boolean', // ✅ ADD THIS
+        'title',
+        'description',
+        'instructor',
+        'location',
+        'duration_weeks',
+        'schedule',
+        'max_seats',
+        'start_date',
+        'status',
+        'grants_certificate',
     ];
 
-    // Helper: Check if course is currently running
-    public function isOngoing()
+    protected $casts = [
+        'grants_certificate' => 'boolean',
+        'start_date'         => 'date',
+    ];
+
+    // relationship - course has many enrollments
+    public function enrollments()
     {
-        if (!$this->start_date || !$this->end_date) return false;
-        
-        $today = now()->startOfDay();
-        return $today->between($this->start_date, $this->end_date);
+        return $this->hasMany(CourseEnrollment::class);
     }
 
-    // Helper: Check if registration is open
-    public function canEnroll()
+    // count enrolled students
+    public function enrolledCount()
     {
-        return $this->registration_open && $this->enrollment < $this->seat_limit;
-    }
-
-    // Helper: Get available seats
-    public function getAvailableSeatsAttribute()
-    {
-        return max(0, $this->seat_limit - $this->enrollment);
+        return $this->enrollments()->where('status', 'enrolled')->count();
     }
 }

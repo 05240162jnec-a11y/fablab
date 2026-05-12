@@ -8,32 +8,17 @@ use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
 class Kernel extends ConsoleKernel
 {
     /**
-     * The Artisan commands provided by your application.
-     *
-     * @var array
-     */
-    protected $commands = [
-        // Register our custom auto-complete command
-        \App\Console\Commands\CompleteExpiredCourses::class,
-    ];
-
-    /**
      * Define the application's command schedule.
      */
-    protected function schedule(Schedule $schedule)
+    protected function schedule(Schedule $schedule): void
     {
-        // Auto-complete expired courses daily at midnight
-        $schedule->command('courses:complete-expired')
-                 ->dailyAt('00:00')
-                 ->timezone('Asia/Thimphu')
-                 ->withoutOverlapping()
-                 ->appendOutputTo(storage_path('logs/scheduler.log'));
+        // $schedule->command('inspire')->hourly();
     }
 
     /**
      * Register the commands for the application.
      */
-    protected function commands()
+    protected function commands(): void
     {
         $this->load(__DIR__.'/Commands');
 

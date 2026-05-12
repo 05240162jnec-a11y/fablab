@@ -2,25 +2,23 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Product extends Model
 {
-    use HasFactory;
-
     protected $fillable = [
         'name',
+        'category',
         'description',
-        'size',
         'price',
         'stock',
-        'status',
-        'images',
+        'unit',
+        'image',
+        'is_available',
     ];
 
     protected $casts = [
-        'images' => 'array',
-        'price' => 'decimal:2',
+        'is_available' => 'boolean',
+        'price'        => 'decimal:2',
     ];
 }

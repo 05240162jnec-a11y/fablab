@@ -71,14 +71,16 @@ class UserBookingController extends Controller
             ], 422);
         }
 
-        // Create booking
+        // ✅ FIXED: Create booking with ALL required fields including times
         $booking = Booking::create([
             'user_id' => $user->id,
             'machine_id' => $machine->id,
             'start_date' => $request->start_date,
             'end_date' => $request->end_date,
-            'status' => 'confirmed', // Instant booking, no approval needed
-            'purpose' => $request->purpose ?? 'General use',
+            'booking_date' => $request->start_date,
+            'start_time' => '09:00:00',  // Default: 9:00 AM
+            'end_time' => '17:00:00',    // Default: 5:00 PM
+            'status' => 'confirmed',
         ]);
 
         return response()->json([

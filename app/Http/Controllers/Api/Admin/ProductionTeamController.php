@@ -102,7 +102,7 @@ public function store(Request $request)
 
         $validated = $request->validate([
             'name' => 'sometimes|required|string|max:255',
-            'email' => ['sometimes', 'required', 'email', Rule::unique('production_team')->ignore($id)],
+            'email' => ['sometimes', 'required', 'email', Rule::unique('production_teams')->ignore($id)],
             'phone' => 'sometimes|nullable|string|max:20',
             'gender' => 'sometimes|in:male,female,other',
             'password' => 'sometimes|nullable|min:6|confirmed',

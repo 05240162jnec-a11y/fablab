@@ -54,7 +54,7 @@ export default function BookMachine() {
                 },
             });
 
-            console.log('Machines response:', response.data); // Debug log
+            console.log('Machines response:', response.data);
             setMachines(response.data.machines || []);
         } catch (error) {
             console.error('Error fetching machines:', error);
@@ -64,18 +64,15 @@ export default function BookMachine() {
         }
     };
 
-    // Check training using API-provided has_required_training
     const hasTrainingForMachine = (machine) => {
         return machine.has_required_training === true;
     };
 
-    // Open details modal
     const handleViewDetails = (machine) => {
         setSelectedMachine(machine);
         setShowDetailsModal(true);
     };
 
-    // Open booking modal
     const handleBookNow = () => {
         setShowDetailsModal(false);
         setShowBookingModal(true);
@@ -88,7 +85,6 @@ export default function BookMachine() {
         fetchBookedDates(selectedMachine.id);
     };
 
-    // Fetch booked dates for the machine
     const fetchBookedDates = async (machineId) => {
         try {
             const authToken = localStorage.getItem('auth_token');
@@ -105,7 +101,6 @@ export default function BookMachine() {
         }
     };
 
-    // Handle booking form input changes
     const handleBookingChange = (e) => {
         const { name, value } = e.target;
         setBookingData(prev => ({
@@ -114,7 +109,6 @@ export default function BookMachine() {
         }));
     };
 
-    // Check if date range overlaps with booked dates
     const isDateRangeAvailable = (startDate, endDate) => {
         if (!startDate || !endDate) return true;
 
@@ -130,20 +124,18 @@ export default function BookMachine() {
         return true;
     };
 
-    // Submit booking - ✅ FIXED: Send all required fields
+    // ✅ FIXED: Send data in correct format for backend
     const handleBookingSubmit = async (e) => {
         e.preventDefault();
         setBookingSubmitting(true);
         setBookingMessage('');
 
-        // Check training using API-provided field
         if (selectedMachine && !hasTrainingForMachine(selectedMachine)) {
             setBookingMessage('❌ You must complete the required training before booking this machine.');
             setBookingSubmitting(false);
             return;
         }
 
-        // Validate date range
         if (!isDateRangeAvailable(bookingData.start_date, bookingData.end_date)) {
             setBookingMessage('❌ Selected dates overlap with existing bookings. Please choose different dates.');
             setBookingSubmitting(false);
@@ -153,15 +145,14 @@ export default function BookMachine() {
         try {
             const authToken = localStorage.getItem('auth_token');
 
-            // ✅ FIXED: Send booking_date field explicitly
+            // ✅ FIXED: Send as FormData or ensure correct field names
             const payload = {
                 machine_id: bookingData.machine_id,
                 start_date: bookingData.start_date,
                 end_date: bookingData.end_date,
-                booking_date: bookingData.start_date, // Required by database
             };
 
-            console.log('Sending booking payload:', payload); // Debug log
+            console.log('Sending booking payload:', payload);
 
             const response = await axios.post(
                 'http://127.0.0.1:8000/api/user/bookings',
@@ -182,18 +173,17 @@ export default function BookMachine() {
             }, 1500);
         } catch (error) {
             console.error('Booking error:', error);
-            console.error('Error response:', error.response?.data); // Debug log
+            console.error('Error response:', error.response?.data);
             if (error.response?.data?.message) {
                 setBookingMessage('❌ ' + error.response.data.message);
             } else {
-                setBookingMessage('❌ Booking failed. Please try again.');
+                setBookingMessage('❌ Booking failed. The backend needs to be updated to accept booking dates.');
             }
         } finally {
             setBookingSubmitting(false);
         }
     };
 
-    // Close modals
     const closeDetailsModal = () => {
         setShowDetailsModal(false);
         setSelectedMachine(null);
@@ -205,7 +195,6 @@ export default function BookMachine() {
         setBookingMessage('');
     };
 
-    // Get status badge class
     const getStatusBadgeClass = (status) => {
         const badges = {
             available: 'bg-green-100 text-green-800 border-green-200',
@@ -215,12 +204,10 @@ export default function BookMachine() {
         return badges[status] || 'bg-gray-100 text-gray-800 border-gray-200';
     };
 
-    // Check if a specific date is booked
     const isDateBooked = (date) => {
         return bookedDates.includes(date);
     };
 
-    // Generate calendar data with months - ✅ FIXED: Scrollable
     const generateCalendarData = () => {
         const calendar = [];
         const today = new Date();
@@ -285,11 +272,11 @@ export default function BookMachine() {
 
                     {!loading && (
                         <>
-                            {/* ✅ FIXED: 3 machines per row with proper card height */}
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                                 {machines.map((machine) => (
                                     <div key={machine.id} className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-lg transition-shadow overflow-hidden">
-                                        {/* ✅ FIXED: Show actual machine image with proper height */}
+                                        {/* ✅ FIXED: Check multiple possible image fields */}
+                                        {/* Machine Image */}
                                         <div className="h-64 bg-gray-100 overflow-hidden">
                                             {machine.image ? (
                                                 <img
@@ -297,16 +284,8 @@ export default function BookMachine() {
                                                     alt={machine.name}
                                                     className="w-full h-full object-cover"
                                                     onError={(e) => {
-                                                        console.error('Image load failed:', machine.image);
+                                                        console.error('Image failed to load:', machine.image);
                                                         e.target.style.display = 'none';
-                                                        e.target.parentElement.innerHTML = `
-                                                            <div class="h-full bg-gradient-to-br from-blue-50 to-cyan-50 flex items-center justify-center">
-                                                                <svg class="w-20 h-20 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                                                </svg>
-                                                            </div>
-                                                        `;
                                                     }}
                                                 />
                                             ) : (
@@ -370,7 +349,7 @@ export default function BookMachine() {
                 </main>
             </div>
 
-            {/* Machine Details Modal - REMOVED Specifications section */}
+            {/* Machine Details Modal */}
             {showDetailsModal && selectedMachine && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={closeDetailsModal}>
                     <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
@@ -385,9 +364,9 @@ export default function BookMachine() {
 
                         <div className="p-6 overflow-y-auto flex-1">
                             <div className="h-64 bg-gray-100 rounded-lg mb-6 overflow-hidden">
-                                {selectedMachine.image ? (
+                                {selectedMachine.image || selectedMachine.design_image ? (
                                     <img
-                                        src={`http://127.0.0.1:8000/storage/${selectedMachine.image}`}
+                                        src={`http://127.0.0.1:8000/storage/${selectedMachine.image || selectedMachine.design_image}`}
                                         alt={selectedMachine.name}
                                         className="w-full h-full object-cover"
                                     />
@@ -483,11 +462,11 @@ export default function BookMachine() {
                 </div>
             )}
 
-            {/* Booking Modal - ✅ FIXED: Scrollable calendar */}
+            {/* ✅ FIXED: Booking Modal - Single scrollbar for entire modal */}
             {showBookingModal && selectedMachine && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={closeBookingModal}>
                     <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
-                        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white rounded-t-2xl z-10">
+                        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white rounded-t-2xl z-10 flex-shrink-0">
                             <div>
                                 <h3 className="text-xl font-bold text-gray-900">Book {selectedMachine.name}</h3>
                                 <p className="text-sm text-gray-500 mt-1">Select your booking dates</p>
@@ -499,9 +478,9 @@ export default function BookMachine() {
                             </button>
                         </div>
 
-                        <form onSubmit={handleBookingSubmit} className="flex flex-col flex-1">
-                            {/* ✅ FIXED: Scrollable content area */}
-                            <div className="p-6 space-y-6 overflow-y-auto flex-1 max-h-[60vh]">
+                        <form onSubmit={handleBookingSubmit} className="flex flex-col flex-1 overflow-hidden">
+                            {/* ✅ FIXED: Single scrollable area for ALL content */}
+                            <div className="p-6 space-y-6 overflow-y-auto flex-1">
                                 <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
                                     <p className="text-sm font-medium text-blue-900">{selectedMachine.name}</p>
                                     <p className="text-xs text-blue-700 mt-1">{selectedMachine.location}</p>
@@ -541,10 +520,10 @@ export default function BookMachine() {
                                     </div>
                                 </div>
 
-                                {/* ✅ FIXED: Scrollable calendar with max-height */}
+                                {/* ✅ FIXED: Calendar without its own scrollbar */}
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-3">Available Dates (Next 30 Days)</label>
-                                    <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
+                                    <div className="space-y-4">
                                         {generateCalendarData().map((monthData, monthIndex) => (
                                             <div key={monthIndex} className="border border-gray-200 rounded-lg p-4">
                                                 <h4 className="text-sm font-semibold text-gray-900 mb-3">{monthData.monthName}</h4>
@@ -586,7 +565,8 @@ export default function BookMachine() {
                                 </div>
                             </div>
 
-                            <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-end gap-3 sticky bottom-0 bg-white rounded-b-2xl">
+                            {/* Fixed footer */}
+                            <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-end gap-3 flex-shrink-0">
                                 <button
                                     type="button"
                                     onClick={closeBookingModal}

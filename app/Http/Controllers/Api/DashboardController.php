@@ -126,4 +126,19 @@ private function getRecentActivity()
 
     return $allActivities;
 }
+
+/**
+ * Get initials from a name string
+ */
+private function getInitials($name)
+{
+    $words = explode(' ', trim($name));
+    $initials = '';
+    foreach ($words as $word) {
+        if (strlen($word) > 0) {
+            $initials .= strtoupper($word[0]);
+        }
+    }
+    return substr($initials, 0, 2);
+}
 }

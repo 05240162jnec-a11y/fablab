@@ -44,7 +44,7 @@ class AuthController extends Controller
 
         // 3. OUTSIDER: Cannot use @jnec@rub.edu.bt domain
         if ($request->role === 'outsider') {
-            if (str_ends_with(strtolower($request->email), '@jnec@rub.edu.bt')) {
+            if (str_ends_with(strtolower($request->email), '.jnec@rub.edu.bt')) {
                 return response()->json([
                     'message' => 'College email addresses are only for students and faculty.',
                 ], 422);

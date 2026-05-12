@@ -13,10 +13,13 @@ class Booking extends Model
         'user_id',
         'machine_id',
         'booking_date',
+        'start_date',
+        'end_date',
         'start_time',
         'end_time',
         'status',
         'notes',
+        'purpose',
     ];
 
     protected $casts = [

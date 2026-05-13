@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import UserSidebar from './UserSidebar';
+
 export default function Dashboard() {
     const location = useLocation();
+    const navigate = useNavigate();
 
     const [expandedMenus, setExpandedMenus] = useState({
         shopOrders: false,
@@ -25,6 +27,7 @@ export default function Dashboard() {
     const [courses, setCourses] = useState([]);
     const [recentActivity, setRecentActivity] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
 
     // Toggle submenu
     const toggleSubmenu = (menu) => {
@@ -34,7 +37,7 @@ export default function Dashboard() {
         }));
     };
 
-    // Fetch dashboard data on component mount
+    // ✅ Fetch dashboard data on component mount
     useEffect(() => {
         fetchDashboardData();
     }, []);
@@ -42,72 +45,88 @@ export default function Dashboard() {
     const fetchDashboardData = async () => {
         try {
             setLoading(true);
+            setError(null);
+
             const authToken = localStorage.getItem('auth_token');
-            const response = await axios.get('http://127.0.0.1:8000/api/student/dashboard', {
+
+            // ✅ Check if user is logged in
+            if (!authToken) {
+                navigate('/login');
+                return;
+            }
+
+            // ✅ FIXED: Correct endpoint - /api/user/dashboard (not /api/student/dashboard)
+            const response = await axios.get('http://127.0.0.1:8000/api/user/dashboard', {
                 headers: {
                     'Accept': 'application/json',
                     'Authorization': `Bearer ${authToken}`,
                 },
             });
 
-            setStudent(response.data.student);
-            setStats(response.data.stats);
-            setAnnouncements(response.data.announcements);
-            setCourses(response.data.courses);
-            setRecentActivity(response.data.recentActivity);
+            // ✅ Update state with fresh data from API
+            setStudent(response.data.student || response.data.user || null);
+            setStats(response.data.stats || {
+                totalBookings: 0,
+                pendingBookings: 0,
+                approvedBookings: 0,
+                ongoingCourses: 0,
+            });
+            setAnnouncements(response.data.announcements || []);
+            setCourses(response.data.courses || []);
+            setRecentActivity(response.data.recentActivity || []);
+
         } catch (error) {
-            console.error('Error fetching dashboard ', error);
-            // Set sample data for frontend testing
-            setStudent({
-                name: 'Priya Sharma',
-                email: 'priya.sharma@jnec.edu.bt',
-                department: 'Computer Science',
-                year_of_study: 3,
-            });
+            console.error('Error fetching dashboard:', error);
+            setError('Failed to load dashboard. Please try again.');
+
+            // ✅ FIXED: For new users or API errors, show EMPTY state (not sample data)
+            // This ensures new users see 0 bookings, empty cart, etc.
+            setStudent(null);
             setStats({
-                totalBookings: 12,
-                pendingBookings: 3,
-                approvedBookings: 8,
-                ongoingCourses: 2,
+                totalBookings: 0,
+                pendingBookings: 0,
+                approvedBookings: 0,
+                ongoingCourses: 0,
             });
-            setAnnouncements([
-                {
-                    id: 1,
-                    title: 'New 3D Printer Available',
-                    message: 'Prusa MK4 is now available for booking in Lab B.',
-                    type: 'update',
-                    date: 'Mar 1, 2026',
-                },
-                {
-                    id: 2,
-                    title: 'Laser Cutting Workshop Registration Open',
-                    message: '2-week intensive workshop starting March 15. Limited seats.',
-                    type: 'course',
-                    date: 'Feb 28, 2026',
-                },
-                {
-                    id: 3,
-                    title: 'Lab Closed on Holi',
-                    message: 'Fab Lab will remain closed on March 14 for Holi celebrations.',
-                    type: 'important',
-                    date: 'Feb 27, 2026',
-                },
-            ]);
-            setCourses([
-                { id: 1, title: 'CNC Machining Fundamentals', duration: '6 weeks', status: 'Open', enrolled: true },
-                { id: 2, title: 'PCB Design & Fabrication', duration: '5 weeks', status: 'Open', enrolled: false },
-                { id: 3, title: 'Laser Cutting Workshop', duration: '2 weeks', status: 'Open', enrolled: false },
-                { id: 4, title: 'Introduction to 3D Printing', duration: '4 weeks', status: 'Closed', enrolled: true },
-            ]);
-            setRecentActivity([
-                { id: 1, action: 'Booked 3D Printer - Ultimaker S5', date: 'Mar 2, 2026', status: 'Pending' },
-                { id: 2, action: 'Registered for CNC Machining Fundamentals', date: 'Feb 28, 2026', status: 'Approved' },
-                { id: 3, action: 'Booked Laser Cutter - Epilog Zing 24', date: 'Feb 25, 2026', status: 'Approved' },
-                { id: 4, action: 'Booked PCB Mill - Bantam Tools', date: 'Feb 20, 2026', status: 'Rejected' },
-            ]);
+            setAnnouncements([]);
+            setCourses([]);
+            setRecentActivity([]);
+
+            // ✅ If 401/403, redirect to login (token expired or invalid)
+            if (error.response?.status === 401 || error.response?.status === 403) {
+                localStorage.removeItem('auth_token');
+                navigate('/login');
+            }
+
         } finally {
             setLoading(false);
         }
+    };
+
+    // ✅ Handle logout - clear ALL cached data
+    const handleLogout = () => {
+        // Clear auth token
+        localStorage.removeItem('auth_token');
+
+        // Clear ALL cached dashboard/cart data
+        localStorage.removeItem('dashboard_data');
+        localStorage.removeItem('cart_items');
+        localStorage.removeItem('user_profile');
+
+        // Clear React state
+        setStudent(null);
+        setStats({
+            totalBookings: 0,
+            pendingBookings: 0,
+            approvedBookings: 0,
+            ongoingCourses: 0,
+        });
+        setAnnouncements([]);
+        setCourses([]);
+        setRecentActivity([]);
+
+        // Redirect to login
+        navigate('/login');
     };
 
     // Get badge color based on type
@@ -135,7 +154,7 @@ export default function Dashboard() {
     return (
         <div className="flex min-h-screen bg-gray-50">
             {/* ✅ Shared Sidebar Component */}
-            <UserSidebar expandedMenus={expandedMenus} toggleSubmenu={toggleSubmenu} />
+            <UserSidebar expandedMenus={expandedMenus} toggleSubmenu={toggleSubmenu} onLogout={handleLogout} />
 
             {/* Main Content */}
             <div className="flex-1">
@@ -143,7 +162,7 @@ export default function Dashboard() {
                 <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
                     <div className="flex items-center justify-between px-6 py-4">
                         <div>
-                            <h2 className="text-xl font-semibold text-gray-800"></h2>
+                            <h2 className="text-xl font-semibold text-gray-800">Dashboard</h2>
                         </div>
 
                         {/* Right Side */}
@@ -159,7 +178,11 @@ export default function Dashboard() {
                             {/* Student Profile */}
                             <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-cyan-600 rounded-full flex items-center justify-center text-white font-bold text-sm">
-                                    {student?.name ? student.name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2) : 'PS'}
+                                    {student?.name ? student.name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2) : 'U'}
+                                </div>
+                                <div className="hidden md:block">
+                                    <p className="text-sm font-medium text-gray-900">{student?.name?.split(' ')[0] || 'User'}</p>
+                                    <p className="text-xs text-gray-500">{student?.department || 'Student'}</p>
                                 </div>
                             </div>
                         </div>
@@ -176,7 +199,20 @@ export default function Dashboard() {
                         </div>
                     )}
 
-                    {!loading && (
+                    {/* Error State */}
+                    {error && !loading && (
+                        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+                            <p className="text-red-700 text-sm">{error}</p>
+                            <button
+                                onClick={fetchDashboardData}
+                                className="mt-2 text-sm text-red-800 underline hover:text-red-900"
+                            >
+                                Try Again
+                            </button>
+                        </div>
+                    )}
+
+                    {!loading && !error && (
                         <>
                             {/* Welcome Section */}
                             <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm mb-6">
@@ -195,6 +231,7 @@ export default function Dashboard() {
                                         </svg>
                                     </div>
                                     <div className="text-3xl font-bold text-gray-900">{stats.totalBookings}</div>
+                                    <p className="text-xs text-gray-500 mt-1">All time</p>
                                 </div>
 
                                 {/* Pending Bookings */}
@@ -206,6 +243,7 @@ export default function Dashboard() {
                                         </svg>
                                     </div>
                                     <div className="text-3xl font-bold text-gray-900">{stats.pendingBookings}</div>
+                                    <p className="text-xs text-gray-500 mt-1">Awaiting approval</p>
                                 </div>
 
                                 {/* Approved Bookings */}
@@ -217,6 +255,7 @@ export default function Dashboard() {
                                         </svg>
                                     </div>
                                     <div className="text-3xl font-bold text-gray-900">{stats.approvedBookings}</div>
+                                    <p className="text-xs text-gray-500 mt-1">Confirmed</p>
                                 </div>
 
                                 {/* Ongoing Courses */}
@@ -229,6 +268,7 @@ export default function Dashboard() {
                                         </svg>
                                     </div>
                                     <div className="text-3xl font-bold text-gray-900">{stats.ongoingCourses}</div>
+                                    <p className="text-xs text-gray-500 mt-1">In progress</p>
                                 </div>
                             </div>
 
@@ -250,19 +290,25 @@ export default function Dashboard() {
                                             </svg>
                                         </Link>
                                     </div>
-                                    <div className="p-6 space-y-4">
-                                        {announcements.map((announcement) => (
-                                            <div key={announcement.id} className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                                                <div className="flex items-center gap-2 mb-2">
-                                                    <h3 className="font-semibold text-gray-900">{announcement.title}</h3>
-                                                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${getBadgeClass(announcement.type)}`}>
-                                                        {announcement.type}
-                                                    </span>
-                                                </div>
-                                                <p className="text-sm text-gray-600 mb-2">{announcement.message}</p>
-                                                <p className="text-xs text-gray-500">{announcement.date}</p>
+                                    <div className="p-6">
+                                        {announcements.length > 0 ? (
+                                            <div className="space-y-4">
+                                                {announcements.map((announcement) => (
+                                                    <div key={announcement.id} className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                                                        <div className="flex items-center gap-2 mb-2">
+                                                            <h3 className="font-semibold text-gray-900">{announcement.title}</h3>
+                                                            <span className={`px-2 py-0.5 rounded text-xs font-medium ${getBadgeClass(announcement.type)}`}>
+                                                                {announcement.type}
+                                                            </span>
+                                                        </div>
+                                                        <p className="text-sm text-gray-600 mb-2">{announcement.message}</p>
+                                                        <p className="text-xs text-gray-500">{announcement.date}</p>
+                                                    </div>
+                                                ))}
                                             </div>
-                                        ))}
+                                        ) : (
+                                            <p className="text-center text-gray-500 py-8">No announcements at this time.</p>
+                                        )}
                                     </div>
                                 </div>
 
@@ -283,27 +329,33 @@ export default function Dashboard() {
                                             </svg>
                                         </Link>
                                     </div>
-                                    <div className="p-6 space-y-3">
-                                        {courses.map((course) => (
-                                            <div key={course.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
-                                                <div>
-                                                    <h3 className="font-semibold text-gray-900">{course.title}</h3>
-                                                    <p className="text-sm text-gray-500">{course.duration}</p>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(course.status)}`}>
-                                                        {course.status}
-                                                    </span>
-                                                    {course.enrolled ? (
-                                                        <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">Enrolled</span>
-                                                    ) : (
-                                                        <button className="px-3 py-1 bg-white border border-gray-300 text-gray-700 rounded-full text-xs font-medium hover:bg-gray-50 transition-colors">
-                                                            View Details
-                                                        </button>
-                                                    )}
-                                                </div>
+                                    <div className="p-6">
+                                        {courses.length > 0 ? (
+                                            <div className="space-y-3">
+                                                {courses.map((course) => (
+                                                    <div key={course.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
+                                                        <div>
+                                                            <h3 className="font-semibold text-gray-900">{course.title}</h3>
+                                                            <p className="text-sm text-gray-500">{course.duration}</p>
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(course.status)}`}>
+                                                                {course.status}
+                                                            </span>
+                                                            {course.enrolled ? (
+                                                                <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">Enrolled</span>
+                                                            ) : (
+                                                                <button className="px-3 py-1 bg-white border border-gray-300 text-gray-700 rounded-full text-xs font-medium hover:bg-gray-50 transition-colors">
+                                                                    View Details
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                ))}
                                             </div>
-                                        ))}
+                                        ) : (
+                                            <p className="text-center text-gray-500 py-8">No courses available.</p>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -325,17 +377,24 @@ export default function Dashboard() {
                                     </Link>
                                 </div>
                                 <div className="divide-y divide-gray-200">
-                                    {recentActivity.map((activity) => (
-                                        <div key={activity.id} className="px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
-                                            <div>
-                                                <p className="font-medium text-gray-900">{activity.action}</p>
-                                                <p className="text-sm text-gray-500 mt-1">{activity.date}</p>
+                                    {recentActivity.length > 0 ? (
+                                        recentActivity.map((activity) => (
+                                            <div key={activity.id} className="px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
+                                                <div>
+                                                    <p className="font-medium text-gray-900">{activity.action}</p>
+                                                    <p className="text-sm text-gray-500 mt-1">{activity.date}</p>
+                                                </div>
+                                                <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(activity.status)}`}>
+                                                    {activity.status}
+                                                </span>
                                             </div>
-                                            <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(activity.status)}`}>
-                                                {activity.status}
-                                            </span>
+                                        ))
+                                    ) : (
+                                        <div className="px-6 py-8 text-center text-gray-500">
+                                            <p>No recent activity.</p>
+                                            <p className="text-sm mt-1">Start by booking a machine or enrolling in a course!</p>
                                         </div>
-                                    ))}
+                                    )}
                                 </div>
                             </div>
                         </>

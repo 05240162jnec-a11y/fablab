@@ -14,6 +14,9 @@ class UserBookingController extends Controller
 {
     /**
      * Create a new machine booking
+     * 
+     * ✅ TRAINING LOGIC: User must complete ANY course (general eligibility)
+     * Not machine-specific - Fab Lab has ONE general training course
      */
     public function store(Request $request)
     {
@@ -34,25 +37,22 @@ class UserBookingController extends Controller
             ], 422);
         }
 
-        // Check training requirement
-        if ($machine->required_course) {
-            $hasTraining = $user->courses()
-                ->where('course_id', function ($query) use ($machine) {
-                    $query->select('id')
-                          ->from('courses')
-                          ->where('title', $machine->required_course);
-                })
-                ->whereIn('status', ['completed', 'enrolled'])
-                ->exists();
+        // ✅ NEW LOGIC: Check if user has completed ANY course (general eligibility)
+        // Not machine-specific - if user completed any course, they can book any machine
+        // Only 'completed' status counts (not 'enrolled' or 'dropped')
+        // Admin controls this by deleting non-attendees from enrollments
+        $hasTraining = $user->courses()
+            ->whereIn('status', ['completed'])  // Only 'completed' counts
+            ->exists();
 
-            if (!$hasTraining) {
-                return response()->json([
-                    'message' => 'You must complete the required training before booking this machine.',
-                ], 422);
-            }
+        if (!$hasTraining) {
+            return response()->json([
+                'message' => 'You must complete the Fab Lab training course before booking machines.',
+                'help' => 'Please enroll in and complete the available training course.',
+            ], 422);
         }
 
-        // Check if dates are available
+        // Check if dates are available (no overlap with existing bookings)
         $existingBookings = Booking::where('machine_id', $machine->id)
             ->where('status', '!=', 'cancelled')
             ->where(function ($query) use ($request) {
@@ -71,15 +71,15 @@ class UserBookingController extends Controller
             ], 422);
         }
 
-        // ✅ FIXED: Create booking with ALL required fields including times
+        // ✅ Create booking with ALL required database fields
         $booking = Booking::create([
             'user_id' => $user->id,
             'machine_id' => $machine->id,
             'start_date' => $request->start_date,
             'end_date' => $request->end_date,
-            'booking_date' => $request->start_date,
-            'start_time' => '09:00:00',  // Default: 9:00 AM
-            'end_time' => '17:00:00',    // Default: 5:00 PM
+            'booking_date' => $request->start_date,  // Required by database
+            'start_time' => '09:00:00',              // Required by database (default: 9 AM)
+            'end_time' => '17:00:00',                // Required by database (default: 5 PM)
             'status' => 'confirmed',
         ]);
 

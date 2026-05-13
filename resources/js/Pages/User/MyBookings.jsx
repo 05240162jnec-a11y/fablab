@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import { Link } from 'react-router-dom';
 import UserSidebar from './UserSidebar';
+
 
 export default function MyBookings() {
     const [expandedMenus, setExpandedMenus] = useState({
@@ -37,97 +39,35 @@ export default function MyBookings() {
     const fetchBookings = async () => {
         try {
             setLoading(true);
-            // TODO: Replace with actual API call
-            // const response = await axios.get('http://127.0.0.1:8000/api/user/my-bookings', {
-            //     headers: {
-            //         'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-            //     }
-            // });
-            // setBookings(response.data.bookings);
+            // Real API call
+            const authToken = localStorage.getItem('auth_token');
+            const response = await axios.get('http://127.0.0.1:8000/api/user/my-bookings', {
+                headers: {
+                    'Accept': 'application/json',
+                    'Authorization': `Bearer ${authToken}`,
+                },
+            });
 
-            // Sample data for now
-            setBookings([
-                {
-                    id: 'BKG-2026-001',
-                    booking_date: '2026-05-08',
-                    start_time: '09:00 AM',
-                    end_time: '05:00 PM',
-                    machine: {
-                        id: 1,
-                        name: 'Ultimaker S5',
-                        type: '3D Printer',
-                        location: 'Lab A - Station 1',
-                        image: null
-                    },
-                    status: 'upcoming',
-                    purpose: 'Final year project prototype',
-                    created_at: '2026-05-05'
+            const apiBookings = response?.data?.bookings || [];
+
+            // Map backend booking shape into the UI shape expected by this component
+            setBookings(apiBookings.map((b) => ({
+                id: b.id,
+                booking_date: b.start_date || b.booking_date,
+                start_time: b.start_time || b.start_time,
+                end_time: b.end_time || b.end_time,
+                status: b.status === 'confirmed' ? 'upcoming' : b.status,
+                created_at: b.created_at,
+                purpose: b.purpose || 'Machine booking',
+                machine: {
+                    id: b.machine_id,
+                    name: b.machine_name,
+                    type: b.machine_type || '',
+                    location: b.machine_location || '',
+                    image: b.machine_image || null,
                 },
-                {
-                    id: 'BKG-2026-002',
-                    booking_date: '2026-05-03',
-                    start_time: '10:00 AM',
-                    end_time: '02:00 PM',
-                    machine: {
-                        id: 3,
-                        name: 'Glowforge Pro',
-                        type: 'Laser Cutter',
-                        location: 'Lab B - Station 2',
-                        image: null
-                    },
-                    status: 'completed',
-                    purpose: 'Laser cut acrylic keychains',
-                    created_at: '2026-05-01'
-                },
-                {
-                    id: 'BKG-2026-003',
-                    booking_date: '2026-05-10',
-                    start_time: '01:00 PM',
-                    end_time: '04:00 PM',
-                    machine: {
-                        id: 2,
-                        name: 'Prusa MK4',
-                        type: '3D Printer',
-                        location: 'Lab A - Station 3',
-                        image: null
-                    },
-                    status: 'upcoming',
-                    purpose: 'Phone stand prototype',
-                    created_at: '2026-05-06'
-                },
-                {
-                    id: 'BKG-2026-004',
-                    booking_date: '2026-04-28',
-                    start_time: '09:00 AM',
-                    end_time: '12:00 PM',
-                    machine: {
-                        id: 5,
-                        name: 'Shapeoko 5 Pro',
-                        type: 'CNC Router',
-                        location: 'Lab C - Station 1',
-                        image: null
-                    },
-                    status: 'cancelled',
-                    purpose: 'Wooden prayer wheel',
-                    created_at: '2026-04-25'
-                },
-                {
-                    id: 'BKG-2026-005',
-                    booking_date: '2026-05-01',
-                    start_time: '02:00 PM',
-                    end_time: '06:00 PM',
-                    machine: {
-                        id: 4,
-                        name: 'Form 3L',
-                        type: 'Resin 3D Printer',
-                        location: 'Lab A - Station 2',
-                        image: null
-                    },
-                    status: 'completed',
-                    purpose: 'High detail figurine print',
-                    created_at: '2026-04-29'
-                },
-            ]);
+            })));
+
         } catch (error) {
             console.error('Error fetching bookings:', error);
         } finally {

@@ -4,127 +4,175 @@ namespace App\Http\Controllers\Api\User;
 
 use App\Http\Controllers\Controller;
 use App\Models\CustomOrder;
-use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class CustomOrderController extends Controller
 {
-    /**
-     * Display user's custom orders.
-     */
     public function index(Request $request)
-    {
-        $user = Auth::user();
+{
+    $user = Auth::user();
 
-        $orders = CustomOrder::where('user_id', $user->id)
-            ->orderBy('created_at', 'desc')
-            ->get();
+    $query = CustomOrder::where('user_id', $user->id)
+        ->with('assignedUser');
 
-        // Calculate stats
-        $stats = [
-            'pending' => $orders->where('status', 'pending')->count(),
-            'in_progress' => $orders->where('status', 'in_progress')->count(),
-            'completed' => $orders->where('status', 'completed')->count(),
-            'rejected' => $orders->where('status', 'rejected')->count(),
-        ];
-
-        return response()->json([
-            'success' => true,
-            'data' => $orders,
-            'stats' => $stats
-        ]);
+    // Filter by status
+    if ($request->has('status') && $request->status) {
+        $query->where('status', $request->status);
     }
 
-    /**
-     * Store a new custom order.
-     */
-    public function store(Request $request)
-    {
-        
-        $validator = Validator::make($request->all(), [
-            'title' => 'required|string|max:255',
-            'description' => 'required|string',
-            'quantity' => 'required|integer|min:1',
-            'design_image' => 'required|image|mimes:jpeg,png,jpg,gif|max:5120',
-        ]);
+    $orders = $query->latest()->paginate(10);
 
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation failed',
-                'errors' => $validator->errors()
-            ], 422);
-        }
-
-        DB::beginTransaction();
-
-        try {
-            // Handle design image upload
-            $imagePath = null;
-            if ($request->hasFile('design_image')) {
-                $imagePath = $request->file('design_image')->store('custom_orders', 'public');
-            }
-
-            // Create the order
-            $order = CustomOrder::create([
-                'user_id' => Auth::id(),
-                'title' => $request->title,
-                'description' => $request->description,
-                'quantity' => $request->quantity,
-                'design_image' => $imagePath,
-                'status' => 'pending',
-            ]);
-
-            DB::commit();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Custom order submitted successfully! Our team will review it within 24-48 hours.',
-                'order' => $order
-            ], 201);
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-
-            // Delete uploaded image if exists
-            if ($imagePath) {
-                Storage::disk('public')->delete($imagePath);
-            }
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to submit order. Please try again.',
-                'error' => $e->getMessage()
-            ], 500);
-        }
-    }
+    return response()->json([
+        'success' => true,
+        'data' => $orders,  // Returns { success: true,  [...] }
+    ]);
+}
 
     /**
-     * Display a specific custom order.
+     * Get single custom order details
      */
     public function show($id)
     {
         $user = Auth::user();
+        $order = CustomOrder::where('user_id', $user->id)->findOrFail($id);
 
-        $order = CustomOrder::where('user_id', $user->id)
-            ->where('id', $id)
-            ->with(['assignedUser'])
-            ->first();
-
-        if (!$order) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Order not found'
-            ], 404);
-        }
+        $order->load('assignedUser');
 
         return response()->json([
             'success' => true,
-            'order' => $order
+            'data' => $order,
+        ]);
+    }
+
+    /**
+     * Create new custom order
+     */
+    public function store(Request $request)
+    {
+        $user = Auth::user();
+
+        $validated = $request->validate([
+            'title' => 'required|string|max:255',
+            'description' => 'required|string',
+            'quantity' => 'required|integer|min:1',
+            'design_image' => 'required|image|max:5120', // 5MB max
+        ]);
+
+        // Generate unique order number
+        $orderNumber = 'CO-' . date('Y') . '-' . strtoupper(Str::random(6));
+
+        // Handle image upload
+        if ($request->hasFile('design_image')) {
+            $validated['design_image'] = $request->file('design_image')->store('custom-orders', 'public');
+        }
+
+        $validated['user_id'] = $user->id;
+        $validated['order_number'] = $orderNumber;
+        $validated['status'] = 'pending'; // Initial status
+
+        $order = CustomOrder::create($validated);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Custom order submitted successfully!',
+            'data' => $order,
+        ], 201);
+    }
+
+    /**
+     * ✅ NEW: Upload payment screenshot
+     */
+    public function uploadPayment(Request $request, $id)
+    {
+        $user = Auth::user();
+        $order = CustomOrder::where('user_id', $user->id)->findOrFail($id);
+
+        // Validate order can accept payment
+        if (!$order->estimated_price) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Price not set yet. Please wait for admin to update the price.',
+            ], 422);
+        }
+
+        if ($order->payment_verified_at) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Payment already verified. No need to upload again.',
+            ], 422);
+        }
+
+        $validated = $request->validate([
+            'payment_screenshot' => 'required|image|max:5120', // 5MB max
+        ]);
+
+        // Delete old screenshot if exists
+        if ($order->payment_screenshot) {
+            Storage::disk('public')->delete($order->payment_screenshot);
+        }
+
+        // Upload new screenshot
+        $validated['payment_screenshot'] = $request->file('payment_screenshot')->store('custom-orders-payment', 'public');
+        $validated['status'] = 'pending'; // Reset to pending for admin review
+
+        $order->update($validated);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Payment screenshot uploaded successfully! Admin will verify shortly.',
+            'data' => $order,
+        ]);
+    }
+
+    /**
+     * ✅ NEW: Cancel order (only before payment is verified)
+     */
+    public function cancel(Request $request, $id)
+    {
+        $user = Auth::user();
+        $order = CustomOrder::where('user_id', $user->id)->findOrFail($id);
+
+        // Check if order can be cancelled
+        if ($order->payment_verified_at) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cannot cancel order after payment is verified. Please contact support.',
+            ], 422);
+        }
+
+        if ($order->status === 'completed') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cannot cancel completed order.',
+            ], 422);
+        }
+
+        $order->update([
+            'status' => 'cancelled',
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Order cancelled successfully!',
+            'data' => $order,
+        ]);
+    }
+
+    /**
+     * ✅ Get production team members (for display purposes)
+     */
+    public function getProductionTeam()
+    {
+        $team = \App\Models\User::whereIn('role', ['production', 'production_team', 'staff'])
+            ->select('id', 'name', 'department')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => $team,
         ]);
     }
 }

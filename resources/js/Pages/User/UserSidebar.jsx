@@ -1,12 +1,35 @@
 import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 
-export default function UserSidebar({ expandedMenus, toggleSubmenu }) {
+export default function UserSidebar({ expandedMenus, toggleSubmenu, onLogout }) {
     const location = useLocation();
+    const navigate = useNavigate();
 
     // Check if link is active
     const isActive = (path) => {
         return location.pathname === path;
+    };
+
+    // ✅ Handle logout - clear data and redirect
+    const handleLogout = (e) => {
+        e.preventDefault(); // Prevent default Link behavior
+
+        // Clear auth token
+        localStorage.removeItem('auth_token');
+
+        // Clear ALL cached data
+        localStorage.removeItem('dashboard_data');
+        localStorage.removeItem('cart_items');
+        localStorage.removeItem('user_profile');
+        localStorage.removeItem('booking_data');
+
+        // Call parent's onLogout if provided (for state cleanup)
+        if (onLogout) {
+            onLogout();
+        }
+
+        // Redirect to login
+        navigate('/login', { replace: true });
     };
 
     return (
@@ -26,8 +49,8 @@ export default function UserSidebar({ expandedMenus, toggleSubmenu }) {
                 <Link
                     to="/user/dashboard"
                     className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${isActive('/user/dashboard')
-                            ? 'bg-blue-600/20 border border-blue-500/30 text-blue-400 font-medium'
-                            : 'text-slate-300 hover:text-white hover:bg-slate-700/50'
+                        ? 'bg-blue-600/20 border border-blue-500/30 text-blue-400 font-medium'
+                        : 'text-slate-300 hover:text-white hover:bg-slate-700/50'
                         }`}
                 >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -58,19 +81,19 @@ export default function UserSidebar({ expandedMenus, toggleSubmenu }) {
                             <Link
                                 to="/user/shop-products"
                                 className={`block px-4 py-2 text-sm rounded-lg transition-all ${isActive('/user/shop-products')
-                                        ? 'text-blue-400 bg-blue-600/20'
-                                        : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+                                    ? 'text-blue-400 bg-blue-600/20'
+                                    : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
                                     }`}
                             >
-                                Shop Products
+                                Product List
                             </Link>
 
-                            {/* ✅ My Orders Link - ADD THIS */}
+                            {/* My Orders Link */}
                             <Link
                                 to="/user/my-orders"
                                 className={`block px-4 py-2 text-sm rounded-lg transition-all ${isActive('/user/my-orders')
-                                        ? 'text-blue-400 bg-blue-600/20'
-                                        : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+                                    ? 'text-blue-400 bg-blue-600/20'
+                                    : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
                                     }`}
                             >
                                 My Orders
@@ -80,8 +103,8 @@ export default function UserSidebar({ expandedMenus, toggleSubmenu }) {
                             <Link
                                 to="/user/custom-orders"
                                 className={`block px-4 py-2 text-sm rounded-lg transition-all ${isActive('/user/custom-orders')
-                                        ? 'text-blue-400 bg-blue-600/20'
-                                        : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+                                    ? 'text-blue-400 bg-blue-600/20'
+                                    : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
                                     }`}
                             >
                                 Custom Orders
@@ -113,19 +136,19 @@ export default function UserSidebar({ expandedMenus, toggleSubmenu }) {
                             <Link
                                 to="/user/book-machine"
                                 className={`block px-4 py-2 text-sm rounded-lg transition-all ${isActive('/user/book-machine')
-                                        ? 'text-blue-400 bg-blue-600/20'
-                                        : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+                                    ? 'text-blue-400 bg-blue-600/20'
+                                    : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
                                     }`}
                             >
                                 Book a Machine
                             </Link>
 
-                            {/* ✅ My Bookings Link - ADD THIS */}
+                            {/* My Bookings Link */}
                             <Link
                                 to="/user/my-bookings"
                                 className={`block px-4 py-2 text-sm rounded-lg transition-all ${isActive('/user/my-bookings')
-                                        ? 'text-blue-400 bg-blue-600/20'
-                                        : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+                                    ? 'text-blue-400 bg-blue-600/20'
+                                    : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
                                     }`}
                             >
                                 My Bookings
@@ -156,19 +179,19 @@ export default function UserSidebar({ expandedMenus, toggleSubmenu }) {
                             <Link
                                 to="/user/courses"
                                 className={`block px-4 py-2 text-sm rounded-lg transition-all ${isActive('/user/courses')
-                                        ? 'text-blue-400 bg-blue-600/20'
-                                        : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+                                    ? 'text-blue-400 bg-blue-600/20'
+                                    : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
                                     }`}
                             >
                                 Available Courses
                             </Link>
 
-                            {/* ✅ My Enrollments Link - ADD THIS */}
+                            {/* My Enrollments Link */}
                             <Link
                                 to="/user/my-enrollments"
                                 className={`block px-4 py-2 text-sm rounded-lg transition-all ${isActive('/user/my-enrollments')
-                                        ? 'text-blue-400 bg-blue-600/20'
-                                        : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+                                    ? 'text-blue-400 bg-blue-600/20'
+                                    : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
                                     }`}
                             >
                                 My Enrollments
@@ -198,8 +221,8 @@ export default function UserSidebar({ expandedMenus, toggleSubmenu }) {
                             <Link
                                 to="/user/projects-gallery"
                                 className={`block px-4 py-2 text-sm rounded-lg transition-all ${isActive('/user/projects-gallery')
-                                        ? 'text-blue-400 bg-blue-600/20'
-                                        : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+                                    ? 'text-blue-400 bg-blue-600/20'
+                                    : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
                                     }`}
                             >
                                 Projects Gallery
@@ -207,8 +230,8 @@ export default function UserSidebar({ expandedMenus, toggleSubmenu }) {
                             <Link
                                 to="/user/photo-gallery"
                                 className={`block px-4 py-2 text-sm rounded-lg transition-all ${isActive('/user/photo-gallery')
-                                        ? 'text-blue-400 bg-blue-600/20'
-                                        : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+                                    ? 'text-blue-400 bg-blue-600/20'
+                                    : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
                                     }`}
                             >
                                 Photo Gallery
@@ -216,8 +239,8 @@ export default function UserSidebar({ expandedMenus, toggleSubmenu }) {
                             <Link
                                 to="/user/announcements"
                                 className={`block px-4 py-2 text-sm rounded-lg transition-all ${isActive('/user/announcements')
-                                        ? 'text-blue-400 bg-blue-600/20'
-                                        : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+                                    ? 'text-blue-400 bg-blue-600/20'
+                                    : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
                                     }`}
                             >
                                 Announcements
@@ -247,8 +270,8 @@ export default function UserSidebar({ expandedMenus, toggleSubmenu }) {
                             <Link
                                 to="/user/faqs"
                                 className={`block px-4 py-2 text-sm rounded-lg transition-all ${isActive('/user/faqs')
-                                        ? 'text-blue-400 bg-blue-600/20'
-                                        : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+                                    ? 'text-blue-400 bg-blue-600/20'
+                                    : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
                                     }`}
                             >
                                 FAQs
@@ -256,8 +279,8 @@ export default function UserSidebar({ expandedMenus, toggleSubmenu }) {
                             <Link
                                 to="/user/submit-feedback"
                                 className={`block px-4 py-2 text-sm rounded-lg transition-all ${isActive('/user/submit-feedback')
-                                        ? 'text-blue-400 bg-blue-600/20'
-                                        : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+                                    ? 'text-blue-400 bg-blue-600/20'
+                                    : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
                                     }`}
                             >
                                 Submit Feedback
@@ -265,8 +288,8 @@ export default function UserSidebar({ expandedMenus, toggleSubmenu }) {
                             <Link
                                 to="/user/help-center"
                                 className={`block px-4 py-2 text-sm rounded-lg transition-all ${isActive('/user/help-center')
-                                        ? 'text-blue-400 bg-blue-600/20'
-                                        : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+                                    ? 'text-blue-400 bg-blue-600/20'
+                                    : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
                                     }`}
                             >
                                 Help Center
@@ -279,8 +302,8 @@ export default function UserSidebar({ expandedMenus, toggleSubmenu }) {
                 <Link
                     to="/user/transactions"
                     className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${isActive('/user/transactions')
-                            ? 'bg-blue-600/20 border border-blue-500/30 text-blue-400 font-medium'
-                            : 'text-slate-300 hover:text-white hover:bg-slate-700/50'
+                        ? 'bg-blue-600/20 border border-blue-500/30 text-blue-400 font-medium'
+                        : 'text-slate-300 hover:text-white hover:bg-slate-700/50'
                         }`}
                 >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -293,8 +316,8 @@ export default function UserSidebar({ expandedMenus, toggleSubmenu }) {
                 <Link
                     to="/user/profile"
                     className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${isActive('/user/profile')
-                            ? 'bg-blue-600/20 border border-blue-500/30 text-blue-400 font-medium'
-                            : 'text-slate-300 hover:text-white hover:bg-slate-700/50'
+                        ? 'bg-blue-600/20 border border-blue-500/30 text-blue-400 font-medium'
+                        : 'text-slate-300 hover:text-white hover:bg-slate-700/50'
                         }`}
                 >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -303,16 +326,16 @@ export default function UserSidebar({ expandedMenus, toggleSubmenu }) {
                     My Profile
                 </Link>
 
-                {/* Logout */}
-                <Link
-                    to="/login"
-                    className="flex items-center gap-3 px-4 py-3 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-all mt-4 border-t border-slate-700/50 pt-4"
+                {/* ✅ FIXED: Logout Button - Calls handleLogout instead of Link */}
+                <button
+                    onClick={handleLogout}
+                    className="flex items-center gap-3 w-full px-4 py-3 text-white-400 hover:text-white-300 hover:bg-white-500/10 rounded-lg transition-all mt-4 border-t border-slate-700/50 pt-4 text-left"
                 >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                     </svg>
                     Logout
-                </Link>
+                </button>
             </nav>
         </aside>
     );

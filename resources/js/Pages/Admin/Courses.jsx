@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
+import AdminSidebar from '../../Components/AdminSidebar'; // ✅ Import shared sidebar
 
 export default function Courses() {
-    const [sidebarOpen, setSidebarOpen] = useState(true);
+    // ✅ Use matching expandedMenus keys for AdminSidebar
     const [expandedMenus, setExpandedMenus] = useState({
-        userManagement: true,
-        operations: true,
+        userManagement: false,
+        operations: true,  // ✅ Keep Operations expanded (contains Courses)
         resources: false,
         contentMedia: false,
     });
@@ -19,19 +20,19 @@ export default function Courses() {
     const [selectedCourse, setSelectedCourse] = useState(null);
     const [registrationClosed, setRegistrationClosed] = useState(false);
 
-    // ✅ NEW: Enrolled Users States
+    // ✅ Enrolled Users States
     const [enrollments, setEnrollments] = useState([]);
     const [enrollmentFilter, setEnrollmentFilter] = useState('all');
     const [enrollmentsLoading, setEnrollmentsLoading] = useState(false);
     const [enrollmentError, setEnrollmentError] = useState(null);
 
-    // ✅ NEW: Certificate Template States
+    // ✅ Certificate Template States
     const [certificateTemplate, setCertificateTemplate] = useState(null);
     const [certificateUploading, setCertificateUploading] = useState(false);
     const [certificateMessage, setCertificateMessage] = useState('');
 
-    // ✅ NEW: Certificate Generation States
-    const [generatingCertificate, setGeneratingCertificate] = useState(null); // userId being generated
+    // ✅ Certificate Generation States
+    const [generatingCertificate, setGeneratingCertificate] = useState(null);
     const [generatingBulk, setGeneratingBulk] = useState(false);
 
     // Create/Edit Form State
@@ -87,7 +88,7 @@ export default function Courses() {
         }
     };
 
-    // ✅ UPDATED: Fetch enrolled users for a course (filtered by is_active)
+    // ✅ Fetch enrolled users for a course
     const fetchEnrollments = async (courseId) => {
         try {
             setEnrollmentsLoading(true);
@@ -112,7 +113,7 @@ export default function Courses() {
         }
     };
 
-    // ✅ UPDATED: Remove user from course (mark as dropped) - FIXED to use enrollment_id
+    // ✅ Remove user from course
     const handleRemoveUser = async (courseId, userId, userName, enrollmentId) => {
         if (!window.confirm(`Are you sure you want to remove "${userName}" from this course?`)) {
             return;
@@ -121,7 +122,6 @@ export default function Courses() {
         try {
             const token = localStorage.getItem('admin_token');
 
-            // ✅ Use enrollment_id instead of user_id for the API endpoint
             await axios.delete(`http://127.0.0.1:8000/api/admin/courses/${courseId}/enrollments/${enrollmentId}`, {
                 headers: {
                     'Accept': 'application/json',
@@ -129,11 +129,8 @@ export default function Courses() {
                 }
             });
 
-            // Remove from local state
             setEnrollments(prev => prev.filter(u => u.enrollment_id !== enrollmentId));
             alert(`✅ "${userName}" has been removed from the course.`);
-
-            // Refresh courses list to update enrollment count
             fetchCourses();
         } catch (err) {
             console.error('Remove user error:', err);
@@ -145,12 +142,11 @@ export default function Courses() {
         }
     };
 
-    // ✅ UPDATED: Download enrollments as CSV - FIXED to use axios blob
+    // ✅ Download enrollments as CSV
     const handleDownloadEnrollments = async (courseId, courseTitle) => {
         try {
             const token = localStorage.getItem('admin_token');
 
-            // ✅ Use axios with blob response to send Authorization header
             const response = await axios.get(
                 `http://127.0.0.1:8000/api/admin/courses/${courseId}/enrollments/download`,
                 {
@@ -158,15 +154,13 @@ export default function Courses() {
                         'Accept': 'text/csv',
                         'Authorization': `Bearer ${token}`,
                     },
-                    responseType: 'blob'  // ✅ Important for file download
+                    responseType: 'blob'
                 }
             );
 
-            // Create download link
             const url = window.URL.createObjectURL(new Blob([response.data]));
             const link = document.createElement('a');
             link.href = url;
-            // Sanitize filename
             const safeTitle = courseTitle.replace(/[^a-z0-9]/gi, '_');
             link.setAttribute('download', `${safeTitle}_enrollments.csv`);
             document.body.appendChild(link);
@@ -180,7 +174,7 @@ export default function Courses() {
         }
     };
 
-    // ✅ NEW: Clear active enrollments
+    // ✅ Clear active enrollments
     const handleClearEnrollments = async (courseId, courseTitle) => {
         if (!window.confirm(`⚠️ Are you sure you want to CLEAR all active enrollments for "${courseTitle}"?\n\n✅ Completion records will be PRESERVED for machine booking.\n✅ Only active (enrolled) users will be cleared.\n\nThis action cannot be undone.`)) {
             return;
@@ -202,9 +196,7 @@ export default function Courses() {
 
             if (response.data.success) {
                 alert(`✅ ${response.data.message}`);
-                // Refresh enrollments list (should now be empty)
                 await fetchEnrollments(courseId);
-                // Refresh courses list to update enrollment count
                 fetchCourses();
             }
         } catch (err) {
@@ -217,7 +209,7 @@ export default function Courses() {
         }
     };
 
-    // ✅ UPDATED: Upload certificate template - FIXED preview
+    // ✅ Upload certificate template
     const handleUploadCertificateTemplate = async (e) => {
         e.preventDefault();
         if (!certificateTemplate) return;
@@ -244,17 +236,11 @@ export default function Courses() {
 
             if (response.data.success) {
                 setCertificateMessage('✅ ' + response.data.message);
-
-                // ✅ FIX: Update selectedCourse with the path (not full URL)
                 setSelectedCourse(prev => ({
                     ...prev,
-                    certificate_template_path: response.data.data.path  // Just the path, not URL
+                    certificate_template_path: response.data.data.path
                 }));
-
-                // Refresh courses list
                 await fetchCourses();
-
-                // Reset file input
                 setCertificateTemplate(null);
                 e.target.reset();
             }
@@ -270,7 +256,7 @@ export default function Courses() {
         }
     };
 
-    // ✅ NEW: Remove certificate template
+    // ✅ Remove certificate template
     const handleRemoveCertificateTemplate = async () => {
         if (!window.confirm('Are you sure you want to remove the certificate template?')) {
             return;
@@ -291,12 +277,10 @@ export default function Courses() {
 
             if (response.data.success) {
                 alert('✅ ' + response.data.message);
-                // ✅ FIX: Update selectedCourse to remove template path
                 setSelectedCourse(prev => ({
                     ...prev,
                     certificate_template_path: null
                 }));
-                // Refresh course data
                 await fetchCourses();
             }
         } catch (err) {
@@ -305,14 +289,13 @@ export default function Courses() {
         }
     };
 
-    // ✅ UPDATED: Generate single certificate for a user - FIXED auth issue
+    // ✅ Generate single certificate
     const handleGenerateCertificate = async (userId, userName) => {
         setGeneratingCertificate(userId);
 
         try {
             const token = localStorage.getItem('admin_token');
 
-            // ✅ Use axios with blob response to send Authorization header
             const response = await axios.get(
                 `http://127.0.0.1:8000/api/admin/courses/${selectedCourse.id}/certificates/${userId}`,
                 {
@@ -320,11 +303,10 @@ export default function Courses() {
                         'Accept': 'application/pdf',
                         'Authorization': `Bearer ${token}`,
                     },
-                    responseType: 'blob'  // ✅ Important for PDF download
+                    responseType: 'blob'
                 }
             );
 
-            // Create download link
             const url = window.URL.createObjectURL(new Blob([response.data]));
             const link = document.createElement('a');
             link.href = url;
@@ -350,7 +332,7 @@ export default function Courses() {
         }
     };
 
-    // ✅ UPDATED: Generate bulk certificates for all completed users - FIXED auth issue
+    // ✅ Generate bulk certificates
     const handleGenerateBulkCertificates = async () => {
         if (!window.confirm(`Generate certificates for ALL completed users in "${selectedCourse.title}"?\n\nThis may take a moment for large classes.`)) {
             return;
@@ -361,7 +343,6 @@ export default function Courses() {
         try {
             const token = localStorage.getItem('admin_token');
 
-            // ✅ Use axios with blob response to send Authorization header
             const response = await axios.get(
                 `http://127.0.0.1:8000/api/admin/courses/${selectedCourse.id}/certificates/bulk`,
                 {
@@ -369,11 +350,10 @@ export default function Courses() {
                         'Accept': 'application/zip',
                         'Authorization': `Bearer ${token}`,
                     },
-                    responseType: 'blob'  // ✅ Important for ZIP download
+                    responseType: 'blob'
                 }
             );
 
-            // Create download link
             const url = window.URL.createObjectURL(new Blob([response.data]));
             const link = document.createElement('a');
             link.href = url;
@@ -441,7 +421,7 @@ export default function Courses() {
         return user.role === enrollmentFilter;
     });
 
-    // ✅ NEW: Check if course is ending soon (within 7 days)
+    // ✅ Check if course is ending soon
     const isCourseEndingSoon = (endDate) => {
         if (!endDate) return false;
         const end = new Date(endDate);
@@ -468,13 +448,11 @@ export default function Courses() {
         setShowCreateModal(true);
     };
 
-    // Open View Modal - ✅ Fetch enrollments when opening
+    // Open View Modal
     const handleViewCourse = async (course) => {
         setSelectedCourse(course);
         setRegistrationClosed(course.registration_status === 'closed');
         setShowViewModal(true);
-
-        // ✅ Fetch enrolled users for this course
         await fetchEnrollments(course.id);
     };
 
@@ -517,7 +495,7 @@ export default function Courses() {
             });
 
             setRegistrationClosed(!registrationClosed);
-            fetchCourses(); // Refresh list
+            fetchCourses();
             alert(`✅ Registration for "${selectedCourse.title}" has been ${!registrationClosed ? 'closed' : 'opened'}.`);
         } catch (err) {
             console.error('Toggle registration error:', err);
@@ -538,7 +516,7 @@ export default function Courses() {
 
             setShowDeleteModal(false);
             setSelectedCourse(null);
-            fetchCourses(); // Refresh list
+            fetchCourses();
             alert(`✅ Course "${selectedCourse.title}" deleted successfully!`);
         } catch (err) {
             console.error('Delete error:', err);
@@ -574,7 +552,7 @@ export default function Courses() {
             });
 
             setShowCreateModal(false);
-            fetchCourses(); // Refresh list
+            fetchCourses();
             alert(`✅ Course "${formState.title}" created successfully!`);
         } catch (err) {
             console.error('Create error:', err);
@@ -611,7 +589,7 @@ export default function Courses() {
 
             setShowEditModal(false);
             setSelectedCourse(null);
-            fetchCourses(); // Refresh list
+            fetchCourses();
             alert(`✅ Course "${formState.title}" updated successfully!`);
         } catch (err) {
             console.error('Update error:', err);
@@ -636,153 +614,8 @@ export default function Courses() {
 
     return (
         <div className="flex min-h-screen bg-gray-50">
-            {/* Sidebar - SAME AS YOUR ORIGINAL */}
-            <aside className="w-64 bg-slate-900 text-white flex flex-col h-screen sticky top-0">
-                {/* Logo Section */}
-                <div className="flex items-center gap-3 px-6 py-5 border-b border-slate-700/50">
-                    <img src="../images/logo.png" className="w-15 h-15 rounded-full object-cover" alt="Logo" />
-                    <div>
-                        <h1 className="text-lg font-bold text-white">JNEC Fab Lab</h1>
-                        <p className="text-xs text-slate-400">Admin Panel</p>
-                    </div>
-                </div>
-
-                {/* Navigation - SAME AS YOUR ORIGINAL */}
-                <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
-                    {/* Dashboard */}
-                    <Link
-                        to="/admin/dashboard"
-                        className="flex items-center gap-3 px-4 py-3 text-slate-300 hover:text-white hover:bg-slate-700/50 rounded-lg transition-all"
-                    >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-                        </svg>
-                        Dashboard
-                    </Link>
-
-                    {/* User Management */}
-                    <div>
-                        <button
-                            onClick={() => toggleSubmenu('userManagement')}
-                            className="flex items-center justify-between w-full px-4 py-3 text-slate-300 hover:text-white hover:bg-slate-700/50 rounded-lg transition-all"
-                        >
-                            <div className="flex items-center gap-3">
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-                                </svg>
-                                User Management
-                            </div>
-                            <svg className={`w-4 h-4 transition-transform ${expandedMenus.userManagement ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                            </svg>
-                        </button>
-                        {expandedMenus.userManagement && (
-                            <div className="ml-4 mt-1 space-y-1">
-                                <Link to="/admin/users" className="block px-4 py-2 text-slate-400 hover:text-white hover:bg-slate-700/50 rounded-lg text-sm transition-all">Users</Link>
-                                <Link to="/admin/production-team" className="block px-4 py-2 text-slate-400 hover:text-white hover:bg-slate-700/50 rounded-lg text-sm transition-all">Production Team</Link>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Operations */}
-                    <div>
-                        <button
-                            onClick={() => toggleSubmenu('operations')}
-                            className="flex items-center justify-between w-full px-4 py-3 text-slate-300 hover:text-white hover:bg-slate-700/50 rounded-lg transition-all"
-                        >
-                            <div className="flex items-center gap-3">
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                </svg>
-                                Operations
-                            </div>
-                            <svg className={`w-4 h-4 transition-transform ${expandedMenus.operations ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                            </svg>
-                        </button>
-                        {expandedMenus.operations && (
-                            <div className="ml-4 mt-1 space-y-1">
-                                <Link to="/admin/machines" className="block px-4 py-2 text-slate-400 hover:text-white hover:bg-slate-700/50 rounded-lg text-sm transition-all">Machines</Link>
-                                <Link to="/admin/bookings" className="block px-4 py-2 text-slate-400 hover:text-white hover:bg-slate-700/50 rounded-lg text-sm transition-all">Bookings</Link>
-                                <Link to="/admin/courses" className="block px-4 py-2 bg-blue-600/20 border border-blue-500/30 text-blue-400 rounded-lg text-sm font-medium">Courses</Link>
-                                <Link to="/admin/custom-orders" className="block px-4 py-2 text-slate-400 hover:text-white hover:bg-slate-700/50 rounded-lg text-sm transition-all">Custom Orders</Link>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Resources */}
-                    <div>
-                        <button
-                            onClick={() => toggleSubmenu('resources')}
-                            className="flex items-center justify-between w-full px-4 py-3 text-slate-300 hover:text-white hover:bg-slate-700/50 rounded-lg transition-all"
-                        >
-                            <div className="flex items-center gap-3">
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                                </svg>
-                                Resources
-                            </div>
-                            <svg className={`w-4 h-4 transition-transform ${expandedMenus.resources ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                            </svg>
-                        </button>
-                        {expandedMenus.resources && (
-                            <div className="ml-4 mt-1 space-y-1">
-                                <Link to="/admin/inventory" className="block px-4 py-2 text-slate-400 hover:text-white hover:bg-slate-700/50 rounded-lg text-sm transition-all">Inventory</Link>
-                                <Link to="/admin/projects" className="block px-4 py-2 text-slate-400 hover:text-white hover:bg-slate-700/50 rounded-lg text-sm transition-all">Projects</Link>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Content & Media */}
-                    <div>
-                        <button
-                            onClick={() => toggleSubmenu('contentMedia')}
-                            className="flex items-center justify-between w-full px-4 py-3 text-slate-300 hover:text-white hover:bg-slate-700/50 rounded-lg transition-all"
-                        >
-                            <div className="flex items-center gap-3">
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                </svg>
-                                Content & Media
-                            </div>
-                            <svg className={`w-4 h-4 transition-transform ${expandedMenus.contentMedia ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                            </svg>
-                        </button>
-                        {expandedMenus.contentMedia && (
-                            <div className="ml-4 mt-1 space-y-1">
-                                <Link to="/admin/gallery" className="block px-4 py-2 text-slate-400 hover:text-white hover:bg-slate-700/50 rounded-lg text-sm transition-all">Gallery</Link>
-                                <Link to="/admin/faq" className="block px-4 py-2 text-slate-400 hover:text-white hover:bg-slate-700/50 rounded-lg text-sm transition-all">FAQ</Link>
-                                <Link to="/admin/feedback" className="block px-4 py-2 text-slate-400 hover:text-white hover:bg-slate-700/50 rounded-lg text-sm transition-all">Feedback</Link>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Transactions */}
-                    <Link
-                        to="/admin/transactions"
-                        className="flex items-center gap-3 px-4 py-3 text-slate-300 hover:text-white hover:bg-slate-700/50 rounded-lg transition-all"
-                    >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                        </svg>
-                        Transactions
-                    </Link>
-
-                    {/* Logout */}
-                    <Link
-                        to="/admin/login"
-                        className="flex items-center gap-3 px-4 py-3 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-all mt-4 border-t border-slate-700/50 pt-4"
-                    >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                        </svg>
-                        Logout
-                    </Link>
-                </nav>
-            </aside>
+            {/* ✅ Use shared AdminSidebar component */}
+            <AdminSidebar expandedMenus={expandedMenus} toggleSubmenu={toggleSubmenu} />
 
             {/* Main Content */}
             <div className="flex-1">
@@ -806,6 +639,7 @@ export default function Courses() {
                                 </svg>
                                 Create Course
                             </button>
+
                             {/* Manage Certificates Button */}
                             <Link
                                 to="/admin/certificates"
@@ -816,7 +650,6 @@ export default function Courses() {
                                 </svg>
                                 Manage Certificates
                             </Link>
-
 
                             {/* Notifications */}
                             <button className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors">
@@ -908,7 +741,7 @@ export default function Courses() {
                 </main>
             </div>
 
-            {/* ===== VIEW COURSE DETAILS MODAL - ✅ UPDATED WITH CERTIFICATE GENERATION ===== */}
+            {/* ===== VIEW COURSE DETAILS MODAL ===== */}
             {showViewModal && selectedCourse && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col">
@@ -1031,9 +864,8 @@ export default function Courses() {
                                             onError={(e) => {
                                                 console.error('Image failed to load:', e.target.src);
                                                 e.target.onerror = null;
-                                                e.target.src = 'image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect fill="%23f0f0f0" width="100" height="100"/><text fill="%23999" x="50%" y="50%" text-anchor="middle" dy=".3em">No Preview</text></svg>';
+                                                e.target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect fill="%23f0f0f0" width="100" height="100"/><text fill="%23999" x="50%" y="50%" text-anchor="middle" dy=".3em">No Preview</text></svg>';
                                             }}
-                                            onLoad={() => console.log('Image loaded successfully!')}
                                         />
                                     </div>
                                 )}
@@ -1088,7 +920,7 @@ export default function Courses() {
                                             Download
                                         </button>
 
-                                        {/* ✅ Clear Button (only show if there are active enrollments) */}
+                                        {/* ✅ Clear Button */}
                                         {filteredEnrollments.length > 0 && (
                                             <button
                                                 onClick={() => handleClearEnrollments(selectedCourse.id, selectedCourse.title)}
@@ -1167,8 +999,8 @@ export default function Courses() {
                                                             <td className="px-4 py-3 text-gray-600 hidden md:table-cell">{user.email}</td>
                                                             <td className="px-4 py-3">
                                                                 <span className={`inline-flex px-2 py-1 rounded text-xs font-medium ${user.role === 'student' ? 'bg-blue-100 text-blue-700' :
-                                                                        user.role === 'faculty' ? 'bg-purple-100 text-purple-700' :
-                                                                            'bg-orange-100 text-orange-700'
+                                                                    user.role === 'faculty' ? 'bg-purple-100 text-purple-700' :
+                                                                        'bg-orange-100 text-orange-700'
                                                                     }`}>
                                                                     {capitalize(user.role)}
                                                                 </span>
@@ -1182,7 +1014,7 @@ export default function Courses() {
                                                             </td>
                                                             <td className="px-4 py-3 text-right">
                                                                 <div className="flex items-center justify-end gap-2">
-                                                                    {/* ✅ Generate Certificate Button (only for completed users with template) */}
+                                                                    {/* ✅ Generate Certificate Button */}
                                                                     {user.status === 'completed' && selectedCourse.certificate_template_path && (
                                                                         <button
                                                                             onClick={() => handleGenerateCertificate(user.user_id, user.name)}
@@ -1260,7 +1092,7 @@ export default function Courses() {
                 </div>
             )}
 
-            {/* ===== CREATE COURSE MODAL - SAME AS BEFORE ===== */}
+            {/* ===== CREATE COURSE MODAL ===== */}
             {showCreateModal && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -1445,7 +1277,7 @@ export default function Courses() {
                 </div>
             )}
 
-            {/* ===== EDIT COURSE MODAL - SAME AS BEFORE ===== */}
+            {/* ===== EDIT COURSE MODAL ===== */}
             {showEditModal && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -1627,7 +1459,7 @@ export default function Courses() {
                 </div>
             )}
 
-            {/* ===== DELETE CONFIRMATION MODAL - SAME AS BEFORE ===== */}
+            {/* ===== DELETE CONFIRMATION MODAL ===== */}
             {showDeleteModal && selectedCourse && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full">
@@ -1644,7 +1476,7 @@ export default function Courses() {
                             </p>
                         </div>
 
-                        {/* ModalFooter */}
+                        {/* Modal Footer */}
                         <div className="flex items-center justify-center gap-3 p-6 border-t border-gray-100">
                             <button
                                 onClick={closeAllModals}

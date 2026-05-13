@@ -32,40 +32,49 @@ Route::prefix('admin')->group(function () {
             ->only(['index']);
         Route::post('bookings/{id}/update-status', [\App\Http\Controllers\Api\Admin\BookingController::class, 'updateStatus']);
 
-        // ✅ FIXED: Product Orders (Admin Management) - Clean routes, no duplicates
+        // ✅ FIXED: Product Orders (Admin Management)
         Route::apiResource('product-orders', \App\Http\Controllers\Api\Admin\ProductOrderController::class)
             ->only(['index', 'show', 'destroy']);
         Route::post('product-orders/{id}/approve', [\App\Http\Controllers\Api\Admin\ProductOrderController::class, 'approve']);
         Route::post('product-orders/{id}/reject', [\App\Http\Controllers\Api\Admin\ProductOrderController::class, 'reject']);
         Route::get('product-orders/{id}/screenshot', [\App\Http\Controllers\Api\Admin\ProductOrderController::class, 'screenshot']);
 
-        /// Products
+        // Products
         Route::get('/products', [App\Http\Controllers\Api\Admin\ProductController::class, 'index']);
         Route::post('/products', [App\Http\Controllers\Api\Admin\ProductController::class, 'store']);
         Route::put('/products/{product}', [App\Http\Controllers\Api\Admin\ProductController::class, 'update']);
         Route::put('/products/{product}/toggle-status', [App\Http\Controllers\Api\Admin\ProductController::class, 'toggleStatus']);
         Route::delete('/products/{product}', [App\Http\Controllers\Api\Admin\ProductController::class, 'destroy']);
 
-        // ✅ Custom Orders (Admin Management)
+        // ✅ Custom Orders (Admin Management) - UPDATED
         Route::get('/custom-orders', [\App\Http\Controllers\Api\Admin\CustomOrderController::class, 'index']);
         Route::get('/custom-orders/production-team', [\App\Http\Controllers\Api\Admin\CustomOrderController::class, 'getProductionTeam']);
         Route::get('/custom-orders/{id}', [\App\Http\Controllers\Api\Admin\CustomOrderController::class, 'show']);
+        
+        // ✅ NEW: Update price and notify user via email
+        Route::post('/custom-orders/{id}/update-price', [\App\Http\Controllers\Api\Admin\CustomOrderController::class, 'updatePrice']);
+        
+        // ✅ NEW: Verify payment screenshot (approve/reject)
+        Route::post('/custom-orders/{id}/verify-payment', [\App\Http\Controllers\Api\Admin\CustomOrderController::class, 'verifyPayment']);
+        
+        // ✅ Assign to production team (after payment verified)
         Route::post('/custom-orders/{id}/assign', [\App\Http\Controllers\Api\Admin\CustomOrderController::class, 'assign']);
+        
         Route::post('/custom-orders/{id}/update-status', [\App\Http\Controllers\Api\Admin\CustomOrderController::class, 'updateStatus']);
+        Route::delete('/custom-orders/{id}', [\App\Http\Controllers\Api\Admin\CustomOrderController::class, 'destroy']);
         
         // Courses
         Route::apiResource('courses', \App\Http\Controllers\Api\Admin\CourseController::class);
         Route::post('courses/{id}/toggle-registration', [\App\Http\Controllers\Api\Admin\CourseController::class, 'toggleRegistration']);
         
-        
-        // ✅ NEW: Course Enrollments Management
+        // ✅ Course Enrollments Management
         Route::get('courses/{id}/enrollments', [\App\Http\Controllers\Api\Admin\CourseController::class, 'getEnrollments']);
         Route::delete('courses/{courseId}/enrollments/{userId}', [\App\Http\Controllers\Api\Admin\CourseController::class, 'removeEnrollment']);
 
         // Download enrolled users as CSV
         Route::get('courses/{id}/enrollments/download', [\App\Http\Controllers\Api\Admin\CourseController::class, 'downloadEnrollments']);
 
-        // Clear active enrollments (set is_active = false)
+        // Clear active enrollments
         Route::post('courses/{id}/enrollments/clear', [\App\Http\Controllers\Api\Admin\CourseController::class, 'clearActiveEnrollments']);
 
         // Certificate template management
@@ -107,8 +116,8 @@ Route::prefix('admin')->group(function () {
         Route::put('/faq/{id}', [App\Http\Controllers\Api\FAQController::class, 'update']);
         Route::delete('/faq/{id}', [App\Http\Controllers\Api\FAQController::class, 'destroy']);
         
-        // Dashboard Statistics (Admin)
-        Route::get('/dashboard/stats', [App\Http\Controllers\Api\DashboardController::class, 'index']);
+        // ✅ Admin Dashboard Stats
+        Route::get('/dashboard/stats', [App\Http\Controllers\Api\Admin\DashboardController::class, 'index']);
         
     }); // ← Close admin auth:sanctum middleware
 }); // ← Close admin prefix
@@ -142,27 +151,35 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/user/bookings', [App\Http\Controllers\Api\UserBookingController::class, 'store']);
     Route::get('/user/my-bookings', [App\Http\Controllers\Api\UserBookingController::class, 'myBookings']);
     
-    // ✅ Custom Orders (User)
+    // ✅ Custom Orders (User) - UPDATED
     Route::get('/user/custom-orders', [\App\Http\Controllers\Api\User\CustomOrderController::class, 'index']);
     Route::post('/user/custom-orders', [\App\Http\Controllers\Api\User\CustomOrderController::class, 'store']);
     Route::get('/user/custom-orders/{id}', [\App\Http\Controllers\Api\User\CustomOrderController::class, 'show']);
+    
+    // ✅ NEW: Upload payment screenshot
+    Route::post('/user/custom-orders/{id}/upload-payment', [\App\Http\Controllers\Api\User\CustomOrderController::class, 'uploadPayment']);
+    
+    // ✅ NEW: Cancel order (before payment verified)
+    Route::post('/user/custom-orders/{id}/cancel', [\App\Http\Controllers\Api\User\CustomOrderController::class, 'cancel']);
+    
+    // ✅ Get production team for display
+    Route::get('/user/custom-orders/production-team', [\App\Http\Controllers\Api\User\CustomOrderController::class, 'getProductionTeam']);
 
-    // ✅ Product Orders (Shop) - FIXED
+    // ✅ Product Orders (Shop)
     Route::get('/user/product-orders', [\App\Http\Controllers\Api\User\ProductOrderController::class, 'index']);
     Route::post('/user/product-orders', [\App\Http\Controllers\Api\User\ProductOrderController::class, 'store']);
     Route::get('/user/product-orders/{id}', [\App\Http\Controllers\Api\User\ProductOrderController::class, 'show']);
     
-    // ✅ FIXED: Use full namespace for cancel and screenshot
+    // ✅ Cancel and screenshot
     Route::post('/user/product-orders/{id}/cancel', [\App\Http\Controllers\Api\User\ProductOrderController::class, 'cancel']);
     Route::get('/user/product-orders/{id}/screenshot', [\App\Http\Controllers\Api\User\ProductOrderController::class, 'screenshot']);
     
 });
 
-// ← Email Verification Routes (outside admin group)
+// ← Email Verification Routes
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Http\Request;
 
-// Resend verification email (requires auth)
 Route::middleware(['auth:sanctum'])->group(function () {
     Route::post('/email/verification-notification', function (Request $request) {
         $request->user()->sendEmailVerificationNotification();
@@ -170,7 +187,6 @@ Route::middleware(['auth:sanctum'])->group(function () {
     })->middleware('throttle:6,1');
 });
 
-// Verify email endpoint (NO auth)
 Route::get('/email/verify/{id}/{hash}', function (Request $request) {
     $user = \App\Models\User::find($request->route('id'));
     

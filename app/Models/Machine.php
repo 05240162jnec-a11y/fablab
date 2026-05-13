@@ -17,12 +17,12 @@ class Machine extends Model
         'image',
         'runtime_hours',
         'last_used_at',
-        'required_courses',  // ✅ ADD THIS
+        'required_course',  // ✅ FIXED: Singular, matches database column
     ];
 
     protected $casts = [
         'last_used_at' => 'datetime',
-        'required_courses' => 'array',  // ✅ ADD THIS
+        'required_course' => 'string',  // ✅ FIXED: It's a string, not array
     ];
 
     // Helper: Format runtime as "X hrs"

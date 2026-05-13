@@ -4,7 +4,6 @@ import { Link } from 'react-router-dom';
 import UserSidebar from './UserSidebar';
 
 export default function CustomOrders() {
-    const [sidebarOpen, setSidebarOpen] = useState(true);
     const [expandedMenus, setExpandedMenus] = useState({
         shopOrders: false,
         machines: false,
@@ -22,9 +21,9 @@ export default function CustomOrders() {
     const [selectedOrder, setSelectedOrder] = useState(null);
 
     // Filter State
-    const [filter, setFilter] = useState('all'); // all, pending, in_progress, completed, rejected
+    const [filter, setFilter] = useState('all');
 
-    // Form State - ✅ Material removed
+    // Form State
     const [formState, setFormState] = useState({
         title: '',
         description: '',
@@ -59,7 +58,7 @@ export default function CustomOrders() {
         }));
     };
 
-    // Fetch orders from API
+    // ✅ Fetch orders with proper parsing
     const fetchOrders = async () => {
         try {
             setLoading(true);
@@ -72,14 +71,30 @@ export default function CustomOrders() {
                 }
             });
 
-            if (response.data.success) {
-                setOrders(response.data.data);
-                setStats(response.data.stats);
-                setError(null);
-            }
+            console.log('📦 API Response:', response.data);
+
+            // ✅ Parse paginated Laravel response: { success: true, data: { data: [...] } }
+            const ordersData = response.data?.data?.data || [];
+
+            console.log('✅ Extracted orders:', ordersData);
+            console.log('✅ Orders count:', ordersData.length);
+
+            setOrders(ordersData);
+
+            // ✅ Calculate stats from orders
+            const newStats = {
+                pending: ordersData.filter(o => o.status === 'pending').length,
+                in_progress: ordersData.filter(o => o.status === 'in_progress').length,
+                completed: ordersData.filter(o => o.status === 'completed').length,
+                rejected: ordersData.filter(o => o.status === 'rejected').length,
+            };
+            setStats(newStats);
+
+            setError(null);
         } catch (err) {
-            console.error('Fetch orders error:', err);
-            setError('Failed to load custom orders. Please try again.');
+            console.error('❌ Fetch error:', err);
+            setError('Failed to load custom orders.');
+            setOrders([]);
         } finally {
             setLoading(false);
         }
@@ -90,7 +105,7 @@ export default function CustomOrders() {
         fetchOrders();
     }, []);
 
-    // Open Create Modal - ✅ Material removed from reset
+    // Open Create Modal
     const handleCreateOrder = () => {
         setFormState({
             title: '',
@@ -108,7 +123,7 @@ export default function CustomOrders() {
         setShowViewModal(true);
     };
 
-    // Close all modals - ✅ Material removed from reset
+    // Close all modals
     const closeAllModals = () => {
         setShowCreateModal(false);
         setShowViewModal(false);
@@ -121,19 +136,19 @@ export default function CustomOrders() {
             design_image: null,
         });
 
-        // ✅ Clean up preview URL
+        // Clean up preview URL
         if (imagePreview) {
             URL.revokeObjectURL(imagePreview);
             setImagePreview(null);
         }
     };
 
-    // Submit New Order - ✅ Image required validation added
+    // Submit New Order
     const handleSubmitOrder = async (e) => {
         e.preventDefault();
         setSubmitting(true);
 
-        // ✅ Validate design image is uploaded
+        // Validate design image
         if (!formState.design_image) {
             alert('❌ Please upload a design image');
             setSubmitting(false);
@@ -146,7 +161,6 @@ export default function CustomOrders() {
             formData.append('title', formState.title);
             formData.append('description', formState.description);
             formData.append('quantity', formState.quantity);
-            // ✅ Material removed
             if (formState.design_image) {
                 formData.append('design_image', formState.design_image);
             }
@@ -169,6 +183,60 @@ export default function CustomOrders() {
             alert('❌ Failed to submit order. Please try again.');
         } finally {
             setSubmitting(false);
+        }
+    };
+
+    // ✅ NEW: Upload payment screenshot
+    const handleUploadPayment = async (orderId, file) => {
+        try {
+            const token = localStorage.getItem('auth_token');
+            const formData = new FormData();
+            formData.append('payment_screenshot', file);
+
+            const response = await axios.post(
+                `http://127.0.0.1:8000/api/user/custom-orders/${orderId}/upload-payment`,
+                formData,
+                {
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'multipart/form-data',
+                        'Authorization': `Bearer ${token}`,
+                    }
+                }
+            );
+
+            alert('✅ ' + response.data.message);
+            await fetchOrders(); // Refresh list
+        } catch (err) {
+            console.error('Upload payment error:', err);
+            const message = err.response?.data?.message || 'Failed to upload payment';
+            alert('❌ ' + message);
+        }
+    };
+
+    // ✅ NEW: Cancel order
+    const handleCancelOrder = async (orderId) => {
+        if (!window.confirm('Are you sure you want to cancel this order?')) return;
+
+        try {
+            const token = localStorage.getItem('auth_token');
+            const response = await axios.post(
+                `http://127.0.0.1:8000/api/user/custom-orders/${orderId}/cancel`,
+                {},
+                {
+                    headers: {
+                        'Accept': 'application/json',
+                        'Authorization': `Bearer ${token}`,
+                    }
+                }
+            );
+
+            alert('✅ ' + response.data.message);
+            await fetchOrders(); // Refresh list
+        } catch (err) {
+            console.error('Cancel error:', err);
+            const message = err.response?.data?.message || 'Failed to cancel order';
+            alert('❌ ' + message);
         }
     };
 
@@ -223,15 +291,16 @@ export default function CustomOrders() {
     // Capitalize first letter
     const capitalize = (str) => str.charAt(0).toUpperCase() + str.slice(1);
 
-    // Filter orders
-    const filteredOrders = orders.filter(order => {
+    // ✅ Filter orders with COMPLETE logic
+    const filteredOrders = (orders || []).filter(order => {
         if (filter === 'all') return true;
         return order.status === filter;
     });
 
     // Format currency
     const formatCurrency = (amount) => {
-        return `Nu. ${amount?.toLocaleString() || '0'}`;
+        if (!amount) return 'Pending';
+        return `Nu. ${parseFloat(amount).toFixed(2)}`;
     };
 
     // Format date
@@ -254,19 +323,9 @@ export default function CustomOrders() {
                 {/* Top Header */}
                 <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
                     <div className="flex items-center justify-between px-6 py-4">
-                        <div className="flex items-center gap-4">
-                            <button
-                                onClick={() => setSidebarOpen(!sidebarOpen)}
-                                className="p-2 hover:bg-gray-100 rounded-lg transition-colors lg:hidden"
-                            >
-                                <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
-                                </svg>
-                            </button>
-                            <div>
-                                <h2 className="text-xl font-semibold text-gray-800">Custom Orders</h2>
-                                <p className="text-sm text-gray-600">Request custom fabrication for your unique designs and projects</p>
-                            </div>
+                        <div>
+                            <h2 className="text-xl font-semibold text-gray-800">Custom Orders</h2>
+                            <p className="text-sm text-gray-600">Request custom fabrication for your unique designs and projects</p>
                         </div>
 
                         {/* Right Side */}
@@ -372,7 +431,7 @@ export default function CustomOrders() {
 
                             {/* Filter Tabs & New Order Button */}
                             <div className="flex items-center justify-between mb-6">
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 flex-wrap">
                                     <button
                                         onClick={() => setFilter('all')}
                                         className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === 'all'
@@ -409,6 +468,15 @@ export default function CustomOrders() {
                                     >
                                         Completed ({stats.completed})
                                     </button>
+                                    <button
+                                        onClick={() => setFilter('rejected')}
+                                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === 'rejected'
+                                            ? 'bg-blue-600 text-white'
+                                            : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
+                                            }`}
+                                    >
+                                        Rejected ({stats.rejected})
+                                    </button>
                                 </div>
 
                                 <button
@@ -440,12 +508,13 @@ export default function CustomOrders() {
                                     {filteredOrders.map((order) => (
                                         <div
                                             key={order.id}
-                                            onClick={() => handleViewOrder(order)}
-                                            className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow cursor-pointer"
+                                            className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow"
                                         >
                                             {/* Header */}
                                             <div className="flex items-center justify-between mb-4">
-                                                <h3 className="text-lg font-bold text-gray-900">{order.title}</h3>
+                                                <h3 className="text-lg font-bold text-gray-900 truncate" onClick={() => handleViewOrder(order)}>
+                                                    {order.title}
+                                                </h3>
                                                 <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(order.status)}`}>
                                                     {getStatusIcon(order.status)}
                                                     {capitalize(order.status.replace('_', ' '))}
@@ -453,25 +522,84 @@ export default function CustomOrders() {
                                             </div>
 
                                             {/* Description */}
-                                            <p className="text-sm text-gray-600 mb-4 line-clamp-2">{order.description}</p>
+                                            <p className="text-sm text-gray-600 mb-4 line-clamp-2" onClick={() => handleViewOrder(order)}>
+                                                {order.description}
+                                            </p>
 
-                                            {/* Details - ✅ Material removed */}
+                                            {/* Details */}
                                             <div className="flex items-center justify-between mb-4">
                                                 <div className="text-sm text-gray-600">
                                                     <span className="font-medium">Qty:</span> {order.quantity}
                                                 </div>
+                                                <div className="text-sm font-bold text-blue-600">
+                                                    {formatCurrency(order.estimated_price)}
+                                                </div>
                                             </div>
+
+                                            {/* ✅ Action Buttons */}
+                                            <div className="flex gap-2 mb-4">
+                                                {/* Make Payment Button - Enabled only if price is set */}
+                                                <label
+                                                    className={`flex-1 py-2 px-3 text-sm font-medium text-center rounded-lg transition-colors cursor-pointer ${order.estimated_price && !order.payment_verified_at && order.status !== 'cancelled'
+                                                            ? 'bg-green-600 text-white hover:bg-green-700'
+                                                            : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                                        }`}
+                                                    title={order.estimated_price ? 'Upload payment screenshot' : 'Waiting for admin to set price'}
+                                                >
+                                                    Make Payment
+                                                    {/* Hidden file input - only enabled if price is set */}
+                                                    {order.estimated_price && !order.payment_verified_at && order.status !== 'cancelled' && (
+                                                        <input
+                                                            type="file"
+                                                            accept="image/*"
+                                                            className="hidden"
+                                                            onChange={(e) => {
+                                                                if (e.target.files[0]) {
+                                                                    handleUploadPayment(order.id, e.target.files[0]);
+                                                                }
+                                                            }}
+                                                        />
+                                                    )}
+                                                </label>
+
+                                                {/* Cancel Order Button - Only if not verified and not completed */}
+                                                {!order.payment_verified_at && order.status !== 'completed' && order.status !== 'cancelled' && (
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleCancelOrder(order.id);
+                                                        }}
+                                                        className="py-2 px-3 text-sm font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
+                                                        title="Cancel Order"
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                )}
+                                            </div>
+
+                                            {/* Payment Status Note */}
+                                            {order.payment_screenshot && !order.payment_verified_at && (
+                                                <p className="text-xs text-indigo-600 bg-indigo-50 px-3 py-2 rounded mb-3">
+                                                    📤 Payment uploaded - awaiting verification
+                                                </p>
+                                            )}
+                                            {order.payment_verified_at && (
+                                                <p className="text-xs text-teal-600 bg-teal-50 px-3 py-2 rounded mb-3">
+                                                    ✅ Payment verified - order in progress
+                                                </p>
+                                            )}
 
                                             {/* Footer */}
                                             <div className="flex items-center justify-between pt-4 border-t border-gray-100">
                                                 <div className="text-xs text-gray-500">
                                                     Submitted: {formatDate(order.created_at)}
                                                 </div>
-                                                {order.estimated_price && (
-                                                    <div className="text-sm font-bold text-blue-600">
-                                                        {formatCurrency(order.estimated_price)}
-                                                    </div>
-                                                )}
+                                                <button
+                                                    onClick={() => handleViewOrder(order)}
+                                                    className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                                                >
+                                                    View Details →
+                                                </button>
                                             </div>
                                         </div>
                                     ))}
@@ -482,26 +610,26 @@ export default function CustomOrders() {
                 </main>
             </div>
 
-            {/* ===== CREATE ORDER MODAL - ✅ SCROLLABLE & FIXED SIZE ===== */}
+            {/* ===== CREATE ORDER MODAL ===== */}
             {showCreateModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col">
-                        {/* Modal Header - Fixed */}
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={closeAllModals}>
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+                        {/* Modal Header */}
                         <div className="flex items-center justify-between p-6 border-b border-gray-100 flex-shrink-0">
                             <div>
                                 <h3 className="text-xl font-bold text-gray-900">Request Custom Order</h3>
-                                <p className="text-sm text-gray-500 mt-1">Fill in the details of your custom fabrication request. Upload a design image to proceed.</p>
+                                <p className="text-sm text-gray-500 mt-1">Fill in the details of your custom fabrication request.</p>
                             </div>
-                            <button onClick={closeAllModals} className="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100 flex-shrink-0">
+                            <button onClick={closeAllModals} className="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100">
                                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
                                 </svg>
                             </button>
                         </div>
 
-                        {/* ✅ Form wraps entire scrollable content + footer */}
+                        {/* Form */}
                         <form onSubmit={handleSubmitOrder} className="flex flex-col flex-1 overflow-hidden">
-                            {/* Modal Body - Scrollable */}
+                            {/* Scrollable Content */}
                             <div className="overflow-y-auto flex-1 p-6 space-y-4">
                                 {/* Project Title */}
                                 <div>
@@ -511,7 +639,7 @@ export default function CustomOrders() {
                                         placeholder="e.g., Custom Trophy Stand"
                                         value={formState.title}
                                         onChange={(e) => setFormState({ ...formState, title: e.target.value })}
-                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                                         required
                                     />
                                 </div>
@@ -520,13 +648,13 @@ export default function CustomOrders() {
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-2">Description *</label>
                                     <textarea
-                                        placeholder="Describe your project in detail - dimensions, colors, specific requirements..."
+                                        placeholder="Describe your project in detail..."
                                         rows="4"
                                         value={formState.description}
                                         onChange={(e) => setFormState({ ...formState, description: e.target.value })}
-                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 resize-none"
                                         required
-                                    ></textarea>
+                                    />
                                 </div>
 
                                 {/* Quantity */}
@@ -537,12 +665,12 @@ export default function CustomOrders() {
                                         min="1"
                                         value={formState.quantity}
                                         onChange={(e) => setFormState({ ...formState, quantity: e.target.value })}
-                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                                         required
                                     />
                                 </div>
 
-                                {/* Design Image Upload - ✅ NOW REQUIRED with PERFECT FIT */}
+                                {/* Design Image Upload */}
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-2">
                                         Design Image <span className="text-red-500">*</span>
@@ -554,8 +682,6 @@ export default function CustomOrders() {
                                             onChange={(e) => {
                                                 const file = e.target.files[0];
                                                 setFormState({ ...formState, design_image: file });
-
-                                                // ✅ Create preview URL
                                                 if (file) {
                                                     const previewUrl = URL.createObjectURL(file);
                                                     setImagePreview(previewUrl);
@@ -566,25 +692,17 @@ export default function CustomOrders() {
                                             required
                                         />
                                         <label htmlFor="design-image-upload" className="cursor-pointer block">
-                                            {/* ✅ Show preview if image selected */}
                                             {imagePreview ? (
                                                 <div className="relative">
-                                                    {/* ✅ Image fills entire dash boundary */}
                                                     <div className="w-full h-64">
-                                                        <img
-                                                            src={imagePreview}
-                                                            alt="Preview"
-                                                            className="w-full h-full object-cover"
-                                                        />
+                                                        <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
                                                     </div>
-                                                    {/* ✅ Overlay with file info */}
                                                     <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white px-4 py-2">
                                                         <p className="text-sm font-medium truncate">✅ {formState.design_image?.name}</p>
-                                                        <p className="text-xs text-gray-300">Click to change image</p>
+                                                        <p className="text-xs text-gray-300">Click to change</p>
                                                     </div>
                                                 </div>
                                             ) : (
-                                                /* ✅ Show upload prompt if no image */
                                                 <div className="p-8 text-center">
                                                     <svg className="w-12 h-12 text-gray-400 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -595,30 +713,15 @@ export default function CustomOrders() {
                                             )}
                                         </label>
                                     </div>
-                                    {/* Validation message */}
-                                    {!formState.design_image && submitting && (
-                                        <p className="text-xs text-red-500 mt-1">Design image is required</p>
-                                    )}
                                 </div>
                             </div>
 
-                            {/* Modal Footer - Fixed with Submit Button INSIDE form */}
+                            {/* Footer */}
                             <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-100 flex-shrink-0">
-                                <button
-                                    type="button"
-                                    onClick={closeAllModals}
-                                    className="px-4 py-2 border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
-                                >
+                                <button type="button" onClick={closeAllModals} className="px-4 py-2 border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50">
                                     Cancel
                                 </button>
-                                <button
-                                    type="submit"
-                                    disabled={submitting}
-                                    className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-400"
-                                >
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                                    </svg>
+                                <button type="submit" disabled={submitting} className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400">
                                     {submitting ? 'Submitting...' : 'Submit Request'}
                                 </button>
                             </div>
@@ -629,9 +732,9 @@ export default function CustomOrders() {
 
             {/* ===== VIEW ORDER MODAL ===== */}
             {showViewModal && selectedOrder && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full">
-                        {/* Modal Header */}
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={closeAllModals}>
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full" onClick={(e) => e.stopPropagation()}>
+                        {/* Header */}
                         <div className="flex items-center justify-between p-6 border-b border-gray-100">
                             <div className="flex items-center gap-3">
                                 <h3 className="text-xl font-bold text-gray-900">{selectedOrder.title}</h3>
@@ -647,15 +750,18 @@ export default function CustomOrders() {
                             </button>
                         </div>
 
-                        {/* Modal Body */}
+                        {/* Body */}
                         <div className="p-6">
-                            {/* Design Image - ✅ Perfect fit */}
+                            {/* Design Image - ✅ Fixed: use design_image */}
                             {selectedOrder.design_image ? (
                                 <div className="w-full h-48 bg-gray-100 rounded-lg mb-4 overflow-hidden">
                                     <img
-                                        src={`http://127.0.0.1:8000/storage/${selectedOrder.image || selectedOrder.design_image}`}
+                                        src={`http://127.0.0.1:8000/storage/${selectedOrder.design_image}`}
                                         alt={selectedOrder.title}
                                         className="w-full h-full object-cover"
+                                        onError={(e) => {
+                                            e.target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect fill="%23f0f0f0" width="100" height="100"/><text fill="%23999" x="50%" y="50%" text-anchor="middle" dy=".3em">Image not found</text></svg>';
+                                        }}
                                     />
                                 </div>
                             ) : (
@@ -672,7 +778,7 @@ export default function CustomOrders() {
                                 <p className="text-gray-600 text-sm">{selectedOrder.description}</p>
                             </div>
 
-                            {/* Details Grid - ✅ Material removed */}
+                            {/* Details Grid */}
                             <div className="grid grid-cols-2 gap-4 mb-4">
                                 <div>
                                     <p className="text-xs text-gray-500 mb-1">Quantity</p>
@@ -684,13 +790,11 @@ export default function CustomOrders() {
                                 </div>
                                 <div className="col-span-2">
                                     <p className="text-xs text-gray-500 mb-1">Estimated Price</p>
-                                    <p className="font-bold text-blue-600">
-                                        {selectedOrder.estimated_price ? formatCurrency(selectedOrder.estimated_price) : 'Pending'}
-                                    </p>
+                                    <p className="font-bold text-blue-600">{formatCurrency(selectedOrder.estimated_price)}</p>
                                 </div>
                             </div>
 
-                            {/* Admin Rejection Reason (if rejected) */}
+                            {/* Rejection Reason */}
                             {selectedOrder.status === 'rejected' && selectedOrder.rejection_reason && (
                                 <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
                                     <p className="text-sm font-semibold text-red-800 mb-1">Rejection Reason:</p>
@@ -699,12 +803,9 @@ export default function CustomOrders() {
                             )}
                         </div>
 
-                        {/* Modal Footer */}
+                        {/* Footer */}
                         <div className="flex items-center justify-end p-6 border-t border-gray-100">
-                            <button
-                                onClick={closeAllModals}
-                                className="px-4 py-2 border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
-                            >
+                            <button onClick={closeAllModals} className="px-4 py-2 border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50">
                                 Close
                             </button>
                         </div>
@@ -714,8 +815,8 @@ export default function CustomOrders() {
 
             {/* ===== SUCCESS MODAL ===== */}
             {showSuccessModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center">
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={closeAllModals}>
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center" onClick={(e) => e.stopPropagation()}>
                         <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
                             <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
@@ -723,12 +824,9 @@ export default function CustomOrders() {
                         </div>
                         <h3 className="text-xl font-bold text-gray-900 mb-2">Order Submitted Successfully!</h3>
                         <p className="text-gray-600 text-sm mb-6">
-                            Your custom order request has been submitted. Our team will review it and get back to you within 24-48 hours with a price estimate.
+                            Your custom order request has been submitted. Our team will review it and get back to you within 24-48 hours.
                         </p>
-                        <button
-                            onClick={closeAllModals}
-                            className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                        >
+                        <button onClick={closeAllModals} className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
                             Close
                         </button>
                     </div>

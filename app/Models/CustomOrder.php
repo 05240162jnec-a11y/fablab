@@ -17,8 +17,10 @@ class CustomOrder extends Model
         'quantity',
         'design_image',
         'status',
-        'estimated_price',
+        'estimated_price',        // ✅ Fixed: Only once
         'rejection_reason',
+        'payment_screenshot',      // ✅ Added
+        'payment_verified_at',     // ✅ Added
         'assigned_to',
         'assigned_at',
     ];
@@ -27,6 +29,7 @@ class CustomOrder extends Model
         'estimated_price' => 'decimal:2',
         'quantity' => 'integer',
         'assigned_at' => 'datetime',
+        'payment_verified_at' => 'datetime',  // ✅ Added: Proper datetime handling
     ];
 
     /**

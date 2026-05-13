@@ -949,7 +949,7 @@ export default function ShopProducts() {
                                             <textarea
                                                 value={shippingAddress}
                                                 onChange={(e) => setShippingAddress(e.target.value)}
-                                                placeholder="Enter your full shipping address"
+                                                placeholder="Enter your current address address"
                                                 rows="3"
                                                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
                                             />

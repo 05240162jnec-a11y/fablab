@@ -16,6 +16,14 @@ class User extends Authenticatable implements MustVerifyEmail
 	use HasApiTokens, HasFactory, Notifiable;
 
     /**
+ * Get the user's custom orders.
+ */
+public function customOrders()
+{
+    return $this->hasMany(CustomOrder::class, 'user_id');
+}
+
+    /**
  * The attributes that are mass assignable.
  *
  * @var list<string>

@@ -1,14 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import AdminSidebar from '../../Components/AdminSidebar';
-export default function CustomOrders() {
-    const [expandedMenus, setExpandedMenus] = useState({
-        userManagement: false,
-        operations: true,        // ✅ Keep Operations expanded (contains Custom Orders)
-        resources: false,
-        contentMedia: false,
-    });
 
+export default function CustomOrders() {
     // Data States
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -35,14 +28,6 @@ export default function CustomOrders() {
     // UI States
     const [message, setMessage] = useState('');
     const [submitting, setSubmitting] = useState(false);
-
-    // Toggle submenu - works with any key name
-    const toggleSubmenu = (menu) => {
-        setExpandedMenus(prev => ({
-            ...prev,
-            [menu]: !prev[menu]
-        }));
-    };
 
     // Fetch orders on mount
     useEffect(() => {
@@ -296,209 +281,206 @@ export default function CustomOrders() {
     };
 
     return (
-        <div className="flex min-h-screen bg-gray-50">
-            <AdminSidebar expandedMenus={expandedMenus} toggleSubmenu={toggleSubmenu} />
+        // ✅ JUST the main content - sidebar is in AdminLayout now
+        <div className="flex-1">
+            <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
+                <div className="px-6 py-4">
+                    <h1 className="text-2xl font-bold text-gray-900">Custom Orders</h1>
+                    <p className="text-sm text-gray-600 mt-1">Manage custom design orders from users</p>
+                </div>
+            </header>
 
-            <div className="flex-1">
-                <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
-                    <div className="px-6 py-4">
-                        <h1 className="text-2xl font-bold text-gray-900">Custom Orders</h1>
-                        <p className="text-sm text-gray-600 mt-1">Manage custom design orders from users</p>
+            <main className="p-6">
+                {/* Message Display */}
+                {message && (
+                    <div className={`mb-4 p-4 rounded-lg ${message.includes('✅') ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                        {message}
+                        <button onClick={() => setMessage('')} className="float-right text-sm underline">Dismiss</button>
                     </div>
-                </header>
+                )}
 
-                <main className="p-6">
-                    {/* Message Display */}
-                    {message && (
-                        <div className={`mb-4 p-4 rounded-lg ${message.includes('✅') ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                            {message}
-                            <button onClick={() => setMessage('')} className="float-right text-sm underline">Dismiss</button>
+                {/* Filters */}
+                <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm mb-6">
+                    <div className="flex flex-col md:flex-row gap-4">
+                        <div className="flex-1">
+                            <input
+                                type="text"
+                                placeholder="Search by title or order number..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                            />
+                        </div>
+                        <div className="w-full md:w-48">
+                            <select
+                                value={statusFilter}
+                                onChange={(e) => setStatusFilter(e.target.value)}
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                            >
+                                <option value="">All Statuses</option>
+                                <option value="pending">Pending</option>
+                                <option value="in_progress">In Progress</option>
+                                <option value="completed">Completed</option>
+                                <option value="rejected">Rejected</option>
+                                <option value="cancelled">Cancelled</option>
+                                <option value="price_updated">Price Updated</option>
+                                <option value="payment_pending">Payment Pending</option>
+                                <option value="payment_verified">Payment Verified</option>
+                            </select>
+                        </div>
+                        <button
+                            onClick={fetchOrders}
+                            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                        >
+                            Search
+                        </button>
+                    </div>
+                </div>
+
+                {/* Orders Table */}
+                <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                    {loading ? (
+                        <div className="text-center py-12">
+                            <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent"></div>
+                            <p className="mt-4 text-gray-600">Loading orders...</p>
+                        </div>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="w-full">
+                                <thead className="bg-gray-50 border-b border-gray-200">
+                                    <tr>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Payment</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Assigned</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-200">
+                                    {orders.map((order) => (
+                                        <tr key={order.id} className="hover:bg-gray-50">
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-3">
+                                                    {/* ✅ Image with lightbox trigger */}
+                                                    <div
+                                                        className="w-12 h-12 rounded-lg overflow-hidden cursor-pointer border border-gray-200 hover:border-blue-400 transition-colors"
+                                                        onClick={() => {
+                                                            setSelectedOrder(order);
+                                                            setShowImageLightbox(true);
+                                                        }}
+                                                        title="Click to view larger"
+                                                    >
+                                                        {order.design_image ? (
+                                                            <img
+                                                                src={`http://127.0.0.1:8000/storage/${order.design_image}`}
+                                                                alt={order.title}
+                                                                className="w-full h-full object-cover"
+                                                            />
+                                                        ) : (
+                                                            <div className="w-full h-full bg-gray-100 flex items-center justify-center text-gray-400 text-xs">
+                                                                No Image
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-medium text-gray-900">{order.title}</p>
+                                                        <p className="text-xs text-gray-500">{order.order_number}</p>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <p className="text-sm text-gray-900">{order.user?.name || 'Unknown'}</p>
+                                                <p className="text-xs text-gray-500">{order.user?.email || ''}</p>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <p className={`text-sm font-medium ${order.estimated_price ? 'text-green-700' : 'text-gray-400'}`}>
+                                                    {formatPrice(order.estimated_price)}
+                                                </p>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                {order.payment_screenshot ? (
+                                                    <button
+                                                        onClick={() => openPaymentModal(order)}
+                                                        className="text-sm text-blue-600 hover:text-blue-700 underline"
+                                                    >
+                                                        View Screenshot
+                                                    </button>
+                                                ) : (
+                                                    <span className="text-sm text-gray-400">Not uploaded</span>
+                                                )}
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <p className="text-sm text-gray-900">{order.assignedUser?.name || 'Unassigned'}</p>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium border ${getStatusBadgeClass(order.status)}`}>
+                                                    {order.status?.replace('_', ' ').toUpperCase()}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-2">
+                                                    <button
+                                                        onClick={() => openDetailsModal(order)}
+                                                        className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                                        title="View Details"
+                                                    >
+                                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                                        </svg>
+                                                    </button>
+
+                                                    {/* ✅ Update Price Button (changes to Edit after first update) */}
+                                                    <button
+                                                        onClick={() => openPriceModal(order)}
+                                                        className="p-2 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                                                        title={order.estimated_price ? "Edit Price" : "Set Price"}
+                                                    >
+                                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                                        </svg>
+                                                    </button>
+
+                                                    {/* ✅ Assign Button (only if payment verified and in_progress) */}
+                                                    {order.payment_verified_at && order.status === 'in_progress' && (
+                                                        <button
+                                                            onClick={() => openAssignModal(order)}
+                                                            className="p-2 text-gray-600 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                                                            title="Assign to Production"
+                                                        >
+                                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                                                            </svg>
+                                                        </button>
+                                                    )}
+
+                                                    <button
+                                                        onClick={() => handleDelete(order.id)}
+                                                        className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                        title="Delete Order"
+                                                    >
+                                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                        </svg>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+
+                            {orders.length === 0 && (
+                                <div className="text-center py-12 text-gray-500">
+                                    No custom orders found.
+                                </div>
+                            )}
                         </div>
                     )}
-
-                    {/* Filters */}
-                    <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm mb-6">
-                        <div className="flex flex-col md:flex-row gap-4">
-                            <div className="flex-1">
-                                <input
-                                    type="text"
-                                    placeholder="Search by title or order number..."
-                                    value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                                />
-                            </div>
-                            <div className="w-full md:w-48">
-                                <select
-                                    value={statusFilter}
-                                    onChange={(e) => setStatusFilter(e.target.value)}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                                >
-                                    <option value="">All Statuses</option>
-                                    <option value="pending">Pending</option>
-                                    <option value="in_progress">In Progress</option>
-                                    <option value="completed">Completed</option>
-                                    <option value="rejected">Rejected</option>
-                                    <option value="cancelled">Cancelled</option>
-                                    <option value="price_updated">Price Updated</option>
-                                    <option value="payment_pending">Payment Pending</option>
-                                    <option value="payment_verified">Payment Verified</option>
-                                </select>
-                            </div>
-                            <button
-                                onClick={fetchOrders}
-                                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                            >
-                                Search
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Orders Table */}
-                    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-                        {loading ? (
-                            <div className="text-center py-12">
-                                <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent"></div>
-                                <p className="mt-4 text-gray-600">Loading orders...</p>
-                            </div>
-                        ) : (
-                            <div className="overflow-x-auto">
-                                <table className="w-full">
-                                    <thead className="bg-gray-50 border-b border-gray-200">
-                                        <tr>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order</th>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Payment</th>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Assigned</th>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-200">
-                                        {orders.map((order) => (
-                                            <tr key={order.id} className="hover:bg-gray-50">
-                                                <td className="px-6 py-4">
-                                                    <div className="flex items-center gap-3">
-                                                        {/* ✅ Image with lightbox trigger */}
-                                                        <div
-                                                            className="w-12 h-12 rounded-lg overflow-hidden cursor-pointer border border-gray-200 hover:border-blue-400 transition-colors"
-                                                            onClick={() => {
-                                                                setSelectedOrder(order);
-                                                                setShowImageLightbox(true);
-                                                            }}
-                                                            title="Click to view larger"
-                                                        >
-                                                            {order.design_image ? (
-                                                                <img
-                                                                    src={`http://127.0.0.1:8000/storage/${order.design_image}`}
-                                                                    alt={order.title}
-                                                                    className="w-full h-full object-cover"
-                                                                />
-                                                            ) : (
-                                                                <div className="w-full h-full bg-gray-100 flex items-center justify-center text-gray-400 text-xs">
-                                                                    No Image
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                        <div>
-                                                            <p className="font-medium text-gray-900">{order.title}</p>
-                                                            <p className="text-xs text-gray-500">{order.order_number}</p>
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <p className="text-sm text-gray-900">{order.user?.name || 'Unknown'}</p>
-                                                    <p className="text-xs text-gray-500">{order.user?.email || ''}</p>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <p className={`text-sm font-medium ${order.estimated_price ? 'text-green-700' : 'text-gray-400'}`}>
-                                                        {formatPrice(order.estimated_price)}
-                                                    </p>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    {order.payment_screenshot ? (
-                                                        <button
-                                                            onClick={() => openPaymentModal(order)}
-                                                            className="text-sm text-blue-600 hover:text-blue-700 underline"
-                                                        >
-                                                            View Screenshot
-                                                        </button>
-                                                    ) : (
-                                                        <span className="text-sm text-gray-400">Not uploaded</span>
-                                                    )}
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <p className="text-sm text-gray-900">{order.assignedUser?.name || 'Unassigned'}</p>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium border ${getStatusBadgeClass(order.status)}`}>
-                                                        {order.status?.replace('_', ' ').toUpperCase()}
-                                                    </span>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <div className="flex items-center gap-2">
-                                                        <button
-                                                            onClick={() => openDetailsModal(order)}
-                                                            className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                                            title="View Details"
-                                                        >
-                                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                                            </svg>
-                                                        </button>
-
-                                                        {/* ✅ Update Price Button (changes to Edit after first update) */}
-                                                        <button
-                                                            onClick={() => openPriceModal(order)}
-                                                            className="p-2 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                                                            title={order.estimated_price ? "Edit Price" : "Set Price"}
-                                                        >
-                                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                                            </svg>
-                                                        </button>
-
-                                                        {/* ✅ Assign Button (only if payment verified and in_progress) */}
-                                                        {order.payment_verified_at && order.status === 'in_progress' && (
-                                                            <button
-                                                                onClick={() => openAssignModal(order)}
-                                                                className="p-2 text-gray-600 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
-                                                                title="Assign to Production"
-                                                            >
-                                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-                                                                </svg>
-                                                            </button>
-                                                        )}
-
-                                                        <button
-                                                            onClick={() => handleDelete(order.id)}
-                                                            className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                                            title="Delete Order"
-                                                        >
-                                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                            </svg>
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-
-                                {orders.length === 0 && (
-                                    <div className="text-center py-12 text-gray-500">
-                                        No custom orders found.
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                    </div>
-                </main>
-            </div>
+                </div>
+            </main>
 
             {/* ✅ Order Details Modal */}
             {showDetailsModal && selectedOrder && (
@@ -555,7 +537,7 @@ export default function CustomOrders() {
                                     <p className="font-medium">{selectedOrder.user?.email}</p>
                                 </div>
                                 <div>
-                                    <p className="text-sm text-gray-500">Estimated Price</p>
+                                    <p className="text-sm text-gray-500">Estimated P X Q Price</p>
                                     <p className={`font-medium ${selectedOrder.estimated_price ? 'text-green-700' : 'text-gray-400'}`}>
                                         {formatPrice(selectedOrder.estimated_price)}
                                     </p>

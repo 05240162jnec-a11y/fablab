@@ -1,16 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
-import AdminSidebar from '../../Components/AdminSidebar';
 
 export default function ProductionTeam() {
-    const [sidebarOpen, setSidebarOpen] = useState(true);
-    const [expandedMenus, setExpandedMenus] = useState({
-        userManagement: true,
-        operations: false,
-        resources: false,
-        contentMedia: false,
-    });
+   
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
 
@@ -42,13 +35,7 @@ export default function ProductionTeam() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    // Toggle submenu
-    const toggleSubmenu = (menu) => {
-        setExpandedMenus(prev => ({
-            ...prev,
-            [menu]: !prev[menu]
-        }));
-    };
+    
 
     // Fetch members from API
     const fetchMembers = async () => {
@@ -242,8 +229,7 @@ export default function ProductionTeam() {
 
     return (
         <div className="flex min-h-screen bg-gray-50">
-            {/* Sidebar */}
-            <AdminSidebar expandedMenus={expandedMenus} toggleSubmenu={toggleSubmenu} />
+            
 
             {/* Main Content */}
             <div className="flex-1">

@@ -4,8 +4,11 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Machine;
+use App\Models\Booking;
+use App\Mail\MachineMaintenanceNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Mail;
 
 class MachineController extends Controller
 {
@@ -25,11 +28,11 @@ class MachineController extends Controller
 
         $machines = $query->latest()->get();
 
-        // Calculate stats
+        // Calculate stats - ✅ Use in_use (with underscore)
         $stats = [
             'total' => $machines->count(),
             'available' => Machine::where('status', 'available')->count(),
-            'in_use' => Machine::where('status', 'in-use')->count(),
+            'in_use' => Machine::where('status', 'in_use')->count(),
             'maintenance' => Machine::where('status', 'maintenance')->count(),
         ];
 
@@ -58,7 +61,7 @@ class MachineController extends Controller
             'name' => 'required|string|max:255',
             'type' => 'required|string',
             'description' => 'nullable|string',
-            'status' => 'required|in:available,in-use,maintenance',
+            'status' => 'required|in:available,in_use,maintenance', // ✅ Use in_use
             'image' => 'nullable|image|max:5120', // 5MB max
         ]);
 
@@ -85,7 +88,7 @@ class MachineController extends Controller
             'name' => 'sometimes|required|string|max:255',
             'type' => 'sometimes|required|string',
             'description' => 'sometimes|nullable|string',
-            'status' => 'sometimes|in:available,in-use,maintenance',
+            'status' => 'sometimes|in:available,in_use,maintenance', // ✅ Use in_use
             'image' => 'sometimes|nullable|image|max:5120',
         ]);
 
@@ -125,17 +128,46 @@ class MachineController extends Controller
         ]);
     }
 
-    // Toggle maintenance mode
-    public function toggleMaintenance($id)
+    // ✅ Toggle maintenance mode with email notification
+    public function toggleMaintenance(Request $request, $id)
     {
         $machine = Machine::findOrFail($id);
         
-        $machine->status = $machine->status === 'maintenance' ? 'available' : 'maintenance';
+        $newStatus = $request->input('status');
+        $notifyUsers = $request->input('notify_users', false);
+        
+        // Update machine status
+        $machine->status = $newStatus;
         $machine->save();
+        
+        // Send email notifications if setting to maintenance AND notify_users is true
+        if ($notifyUsers && $newStatus === 'maintenance') {
+            // Get all users who have active/pending bookings for this machine
+            $bookings = Booking::where('machine_id', $machine->id)
+                ->whereIn('status', ['pending', 'confirmed', 'approved'])
+                ->with('user')
+                ->get();
+            
+            foreach ($bookings as $booking) {
+                if ($booking->user && $booking->user->email) {
+                    try {
+                        // Send email notification
+                        Mail::to($booking->user->email)->send(
+                            new MachineMaintenanceNotification($machine, $booking)
+                        );
+                    } catch (\Exception $e) {
+                        // Log error but continue with other users
+                        \Log::error('Failed to send maintenance notification: ' . $e->getMessage());
+                    }
+                }
+            }
+        }
 
         return response()->json([
             'success' => true,
-            'message' => 'Status updated',
+            'message' => $newStatus === 'maintenance' 
+                ? 'Machine set to maintenance. Notifications sent to booked users.' 
+                : 'Machine is now available.',
             'data' => $machine
         ]);
     }

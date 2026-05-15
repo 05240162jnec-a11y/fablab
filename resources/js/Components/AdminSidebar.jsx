@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 
 export default function AdminSidebar({ expandedMenus, toggleSubmenu }) {
@@ -14,19 +14,41 @@ export default function AdminSidebar({ expandedMenus, toggleSubmenu }) {
 
     const isChildOf = (paths) => paths.some((p) => location.pathname.startsWith(p));
 
-    const shouldBeExpanded = {
-        userManagement: isChildOf(['/admin/users', '/admin/production-team']),
-        operations: isChildOf(['/admin/machines', '/admin/bookings', '/admin/products', '/admin/courses', '/admin/custom-orders']),
-        resources: isChildOf(['/admin/inventory', '/admin/projects']),
-        contentMedia: isChildOf(['/admin/gallery', '/admin/faq', '/admin/feedback']),
-    };
+    // ✅ FIXED: Only auto-expand the menu that matches current route
+    useEffect(() => {
+        const currentPath = location.pathname;
+
+        // Map routes to their parent menu
+        const routeToMenu = {
+            '/admin/users': 'userManagement',
+            '/admin/production-team': 'userManagement',
+            '/admin/machines': 'operations',
+            '/admin/bookings': 'operations',
+            '/admin/products': 'operations',
+            '/admin/courses': 'operations',
+            '/admin/custom-orders': 'operations',
+            '/admin/inventory': 'resources',
+            '/admin/projects': 'resources',
+            '/admin/gallery': 'contentMedia',
+            '/admin/faq': 'contentMedia',
+            '/admin/feedback': 'contentMedia',
+        };
+
+        // Find which menu this route belongs to
+        const matchingMenu = Object.entries(routeToMenu).find(([route]) =>
+            currentPath.startsWith(route)
+        )?.[1];
+
+        // Only auto-expand the matching menu if it's not already open
+        if (matchingMenu && !expandedMenus[matchingMenu]) {
+            toggleSubmenu(matchingMenu);
+        }
+    }, [location.pathname]); // Run when route changes
 
     // ✅ Handle logout - clear token and redirect
     const handleLogout = () => {
         localStorage.removeItem('admin_token');
-        // Clear any other cached admin data
         localStorage.removeItem('admin_dashboard_data');
-        // Redirect to login
         navigate('/admin/login', { replace: true });
     };
 
@@ -70,7 +92,7 @@ export default function AdminSidebar({ expandedMenus, toggleSubmenu }) {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
                         </svg>
                     </button>
-                    {(expandedMenus.userManagement || shouldBeExpanded.userManagement) && (
+                    {expandedMenus.userManagement && (
                         <div className="ml-4 mt-1 space-y-1">
                             <Link to="/admin/users" className={linkClass('/admin/users')}>Users</Link>
                             <Link to="/admin/production-team" className={linkClass('/admin/production-team')}>Production Team</Link>
@@ -95,7 +117,7 @@ export default function AdminSidebar({ expandedMenus, toggleSubmenu }) {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
                         </svg>
                     </button>
-                    {(expandedMenus.operations || shouldBeExpanded.operations) && (
+                    {expandedMenus.operations && (
                         <div className="ml-4 mt-1 space-y-1">
                             <Link to="/admin/machines" className={linkClass('/admin/machines')}>Machines</Link>
                             <Link to="/admin/bookings" className={linkClass('/admin/bookings')}>Bookings & Orders</Link>
@@ -122,7 +144,7 @@ export default function AdminSidebar({ expandedMenus, toggleSubmenu }) {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
                         </svg>
                     </button>
-                    {(expandedMenus.resources || shouldBeExpanded.resources) && (
+                    {expandedMenus.resources && (
                         <div className="ml-4 mt-1 space-y-1">
                             <Link to="/admin/inventory" className={linkClass('/admin/inventory')}>Inventory</Link>
                             <Link to="/admin/projects" className={linkClass('/admin/projects')}>Projects</Link>
@@ -146,7 +168,7 @@ export default function AdminSidebar({ expandedMenus, toggleSubmenu }) {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
                         </svg>
                     </button>
-                    {(expandedMenus.contentMedia || shouldBeExpanded.contentMedia) && (
+                    {expandedMenus.contentMedia && (
                         <div className="ml-4 mt-1 space-y-1">
                             <Link to="/admin/gallery" className={linkClass('/admin/gallery')}>Gallery</Link>
                             <Link to="/admin/faq" className={linkClass('/admin/faq')}>FAQ</Link>
@@ -168,10 +190,10 @@ export default function AdminSidebar({ expandedMenus, toggleSubmenu }) {
                     Transactions
                 </Link>
 
-                {/* ✅ FIXED: Logout Button (was Link, now button with proper handler) */}
+                {/* Logout Button */}
                 <button
                     onClick={handleLogout}
-                    className="flex items-center gap-3 w-full px-4 py-3 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-all mt-4 border-t border-slate-700/50 pt-4 text-left"
+                    className="flex items-center gap-3 w-full px-4 py-3 text-white-400 hover:text-white-300 hover:bg-white-500/10 rounded-lg transition-all mt-4 border-t border-slate-700/50 pt-4 text-left"
                 >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />

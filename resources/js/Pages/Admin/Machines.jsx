@@ -1,16 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import AdminSidebar from '../../Components/AdminSidebar';
 
 export default function Machines() {
-    const [sidebarOpen, setSidebarOpen] = useState(true);
-    const [expandedMenus, setExpandedMenus] = useState({
-        userManagement: true,
-        operations: true,
-        resources: false,
-        contentMedia: false,
-    });
-
     // Modal States
     const [showAddModal, setShowAddModal] = useState(false);
     const [showEditModal, setShowEditModal] = useState(false);
@@ -33,14 +24,6 @@ export default function Machines() {
     // Machines Data
     const [machines, setMachines] = useState([]);
     const [stats, setStats] = useState({ total: 0, available: 0, in_use: 0, maintenance: 0 });
-
-    // Toggle submenu
-    const toggleSubmenu = (menu) => {
-        setExpandedMenus(prev => ({
-            ...prev,
-            [menu]: !prev[menu]
-        }));
-    };
 
     // Fetch machines from API
     const fetchMachines = async () => {
@@ -229,35 +212,63 @@ export default function Machines() {
         }
     };
 
-    // Toggle Maintenance Status
+    // ✅ Toggle Maintenance Status with Email Notification
     const toggleMaintenance = async (machine) => {
+        const newStatus = machine.status === 'maintenance' ? 'available' : 'maintenance';
+
+        // Confirm before setting to maintenance
+        if (newStatus === 'maintenance') {
+            const confirmed = window.confirm(
+                `⚠️ Warning: Setting "${machine.name}" to maintenance mode.\n\n` +
+                `This will notify all users who have booked this machine via email.\n\n` +
+                `Do you want to continue?`
+            );
+
+            if (!confirmed) return;
+        }
+
         try {
             const token = localStorage.getItem('admin_token');
-            const newStatus = machine.status === 'maintenance' ? 'available' : 'maintenance';
 
-            const response = await axios.put(`http://127.0.0.1:8000/api/admin/machines/${machine.id}/status`, {
-                status: newStatus
-            }, {
-                headers: {
-                    'Accept': 'application/json',
-                    'Authorization': `Bearer ${token}`,
+            // ✅ CHANGE: Use POST instead of PUT
+            const response = await axios.post(
+                `http://127.0.0.1:8000/api/admin/machines/${machine.id}/toggle-maintenance`,
+                {
+                    status: newStatus,
+                    notify_users: newStatus === 'maintenance' // Only notify when going to maintenance
+                },
+                {
+                    headers: {
+                        'Accept': 'application/json',
+                        'Authorization': `Bearer ${token}`,
+                    }
                 }
-            });
+            );
 
             if (response.data.success) {
+                // Update local state
                 setMachines(prevMachines =>
                     prevMachines.map(m =>
                         m.id === machine.id ? { ...m, status: newStatus } : m
                     )
                 );
+
                 if (selectedMachine && selectedMachine.id === machine.id) {
                     setSelectedMachine({ ...selectedMachine, status: newStatus });
                 }
+
                 fetchMachines();
+
+                // Show success message
+                if (newStatus === 'maintenance') {
+                    alert(`✅ Machine set to maintenance mode.\n📧 Email notifications sent to booked users.`);
+                } else {
+                    alert(`✅ Machine is now available.`);
+                }
             }
         } catch (err) {
             console.error('Toggle maintenance error:', err);
-            alert('Failed to update machine status');
+            alert('Failed to update machine status: ' + (err.response?.data?.message || err.message));
         }
     };
 
@@ -284,181 +295,191 @@ export default function Machines() {
     };
 
     return (
-        <div className="flex min-h-screen bg-gray-50">
-            <AdminSidebar expandedMenus={expandedMenus} toggleSubmenu={toggleSubmenu} />
-
-            <div className="flex-1">
-                <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
-                    <div className="flex items-center justify-between px-6 py-4">
-                        <div>
-                            <h2 className="text-xl font-semibold text-gray-800">Machines</h2>
-                            <p className="text-sm text-gray-600">Manage laboratory equipment and machinery</p>
-                        </div>
-                        <div className="flex items-center gap-4">
-                            <button className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                                <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                                </svg>
-                                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-                            </button>
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-cyan-600 rounded-full flex items-center justify-center text-white font-bold text-sm">
-                                    AD
-                                </div>
-                            </div>
-                        </div>
+        // ✅ JUST the main content - sidebar is in AdminLayout now
+        <div className="flex-1">
+            <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
+                <div className="flex items-center justify-between px-6 py-4">
+                    <div>
+                        <h2 className="text-xl font-semibold text-gray-800">Machines</h2>
+                        <p className="text-sm text-gray-600">Manage laboratory equipment and machinery</p>
                     </div>
-                </header>
-
-                <main className="p-6">
-                    {/* Stats Cards */}
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-                        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                            <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                                    <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
-                                    </svg>
-                                </div>
-                                <div>
-                                    <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
-                                    <p className="text-sm text-gray-600">Total Machines</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                            <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                                    <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
-                                </div>
-                                <div>
-                                    <p className="text-2xl font-bold text-gray-900">{stats.available}</p>
-                                    <p className="text-sm text-gray-600">Available</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                            <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
-                                    <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
-                                </div>
-                                <div>
-                                    <p className="text-2xl font-bold text-gray-900">{stats.in_use}</p>
-                                    <p className="text-sm text-gray-600">In Use</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                            <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
-                                    <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                                    </svg>
-                                </div>
-                                <div>
-                                    <p className="text-2xl font-bold text-gray-900">{stats.maintenance}</p>
-                                    <p className="text-sm text-gray-600">Maintenance</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Add Machine Button */}
-                    <div className="flex justify-end mb-6">
-                        <button
-                            onClick={() => {
-                                resetForm();
-                                setShowAddModal(true);
-                            }}
-                            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                        >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+                    <div className="flex items-center gap-4">
+                        <button className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                            <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                             </svg>
-                            Add New Machine
+                            <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
                         </button>
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-cyan-600 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                                AD
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <main className="p-6">
+                {/* Stats Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                        <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                                </svg>
+                            </div>
+                            <div>
+                                <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
+                                <p className="text-sm text-gray-600">Total Machines</p>
+                            </div>
+                        </div>
                     </div>
 
-                    {/* Loading State */}
-                    {fetchLoading && (
-                        <div className="flex items-center justify-center py-20">
-                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                        <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                            </div>
+                            <div>
+                                <p className="text-2xl font-bold text-gray-900">{stats.available}</p>
+                                <p className="text-sm text-gray-600">Available</p>
+                            </div>
                         </div>
-                    )}
+                    </div>
 
-                    {/* Error State */}
-                    {error && !fetchLoading && (
-                        <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg mb-6">
-                            {error}
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                        <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
+                                <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                            </div>
+                            <div>
+                                <p className="text-2xl font-bold text-gray-900">{stats.in_use}</p>
+                                <p className="text-sm text-gray-600">In Use</p>
+                            </div>
                         </div>
-                    )}
+                    </div>
 
-                    {/* Machines Grid */}
-                    {!fetchLoading && !error && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {machines.map((machine) => (
-                                <div key={machine.id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
-                                    <div className="w-full h-56 bg-gray-100 overflow-hidden">
-                                        {machine.image ? (
-                                            <img
-                                                src={`http://127.0.0.1:8000/storage/${machine.image}`}
-                                                alt={machine.name}
-                                                className="w-full h-full object-cover object-center"
-                                            />
-                                        ) : (
-                                            <div className="w-full h-full bg-gradient-to-br from-blue-400 to-cyan-500 flex items-center justify-center">
-                                                <svg className="w-20 h-20 text-white/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                        <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
+                                <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                </svg>
+                            </div>
+                            <div>
+                                <p className="text-2xl font-bold text-gray-900">{stats.maintenance}</p>
+                                <p className="text-sm text-gray-600">Maintenance</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Add Machine Button */}
+                <div className="flex justify-end mb-6">
+                    <button
+                        onClick={() => {
+                            resetForm();
+                            setShowAddModal(true);
+                        }}
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+                        </svg>
+                        Add New Machine
+                    </button>
+                </div>
+
+                {/* Loading State */}
+                {fetchLoading && (
+                    <div className="flex items-center justify-center py-20">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                    </div>
+                )}
+
+                {/* Error State */}
+                {error && !fetchLoading && (
+                    <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg mb-6">
+                        {error}
+                    </div>
+                )}
+
+                {/* Machines Grid */}
+                {!fetchLoading && !error && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {machines.map((machine) => (
+                            <div key={machine.id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
+                                {/* ✅ Machine Image with Available Badge */}
+                                <div className="relative w-full h-56 bg-gray-100 overflow-hidden">
+                                    {/* Available Badge - Top Right */}
+                                    {machine.status === 'available' && (
+                                        <div className="absolute top-3 right-3 z-10">
+                                            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-green-500 text-white shadow-lg">
+                                                <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                                                 </svg>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    <div className="p-5">
-                                        <div className="mb-3">
-                                            <h3 className="text-lg font-bold text-gray-900">{machine.name}</h3>
-                                        </div>
-
-                                        <div className="mb-4">
-                                            <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(machine.status)}`}>
-                                                {formatStatus(machine.status)}
+                                                Available
                                             </span>
                                         </div>
+                                    )}
 
-                                        <button
-                                            onClick={() => handleViewClick(machine)}
-                                            className="w-full py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
-                                        >
-                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                    {machine.image ? (
+                                        <img
+                                            src={`http://127.0.0.1:8000/storage/${machine.image}`}
+                                            alt={machine.name}
+                                            className="w-full h-full object-cover object-center"
+                                        />
+                                    ) : (
+                                        <div className="w-full h-full bg-gradient-to-br from-blue-400 to-cyan-500 flex items-center justify-center">
+                                            <svg className="w-20 h-20 text-white/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
                                             </svg>
-                                            View Details
-                                        </button>
-                                    </div>
+                                        </div>
+                                    )}
                                 </div>
-                            ))}
-                        </div>
-                    )}
 
-                    {machines.length === 0 && !fetchLoading && (
-                        <div className="text-center py-12">
-                            <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
-                            </svg>
-                            <p className="text-gray-500 text-lg font-medium">No machines found</p>
-                            <p className="text-gray-400 text-sm mt-1">Click "Add New Machine" to get started</p>
-                        </div>
-                    )}
-                </main>
-            </div>
+                                <div className="p-5">
+                                    <div className="mb-3">
+                                        <h3 className="text-lg font-bold text-gray-900">{machine.name}</h3>
+                                    </div>
+
+                                    <div className="mb-4">
+                                        <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(machine.status)}`}>
+                                            {formatStatus(machine.status)}
+                                        </span>
+                                    </div>
+
+                                    <button
+                                        onClick={() => handleViewClick(machine)}
+                                        className="w-full py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                                    >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                        </svg>
+                                        View Details
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {machines.length === 0 && !fetchLoading && (
+                    <div className="text-center py-12">
+                        <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                        </svg>
+                        <p className="text-gray-500 text-lg font-medium">No machines found</p>
+                        <p className="text-gray-400 text-sm mt-1">Click "Add New Machine" to get started</p>
+                    </div>
+                )}
+            </main>
 
             {/* ===== ADD MACHINE MODAL ===== */}
             {showAddModal && (

@@ -1,9 +1,57 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 
 export default function UserSidebar({ expandedMenus, toggleSubmenu, onLogout }) {
     const location = useLocation();
     const navigate = useNavigate();
+
+    // ✅ Auto-expand menus based on current route
+    useEffect(() => {
+        const currentPath = location.pathname;
+
+        // Shop & Orders menu items
+        if (currentPath.startsWith('/user/shop-products') ||
+            currentPath.startsWith('/user/my-orders') ||
+            currentPath.startsWith('/user/custom-orders')) {
+            if (!expandedMenus.shopOrders) {
+                toggleSubmenu('shopOrders');
+            }
+        }
+
+        // Machines menu items
+        if (currentPath.startsWith('/user/book-machine') ||
+            currentPath.startsWith('/user/my-bookings')) {
+            if (!expandedMenus.machines) {
+                toggleSubmenu('machines');
+            }
+        }
+
+        // Learning menu items
+        if (currentPath.startsWith('/user/courses') ||
+            currentPath.startsWith('/user/my-enrollments')) {
+            if (!expandedMenus.learning) {
+                toggleSubmenu('learning');
+            }
+        }
+
+        // Explore menu items
+        if (currentPath.startsWith('/user/projects-gallery') ||
+            currentPath.startsWith('/user/photo-gallery') ||
+            currentPath.startsWith('/user/announcements')) {
+            if (!expandedMenus.explore) {
+                toggleSubmenu('explore');
+            }
+        }
+
+        // Support menu items
+        if (currentPath.startsWith('/user/faqs') ||
+            currentPath.startsWith('/user/submit-feedback') ||
+            currentPath.startsWith('/user/help-center')) {
+            if (!expandedMenus.support) {
+                toggleSubmenu('support');
+            }
+        }
+    }, [location.pathname]); // Run when route changes
 
     // Check if link is active
     const isActive = (path) => {

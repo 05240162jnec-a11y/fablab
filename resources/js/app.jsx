@@ -3,6 +3,7 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 
+
 // Auth Pages
 import Login from './Pages/Auth/Login';
 import Register from './Pages/Auth/Register';
@@ -39,6 +40,8 @@ import AdminProjects from './Pages/Admin/Projects';
 import AdminGallery from './Pages/Admin/Gallery';
 import AdminFAQ from './Pages/Admin/FAQ';
 import AdminProducts from './Pages/Admin/Products';
+
+import AdminLayout from './Pages/Admin/AdminLayout';
 
 // User Pages
 import UserDashboard from './Pages/User/Dashboard';
@@ -78,21 +81,24 @@ root.render(
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password/:token" element={<ResetPassword />} />
 
-            {/* Admin Pages */}
             <Route path="/admin/login" element={<AdminLogin />} />
-            <Route path="/admin/dashboard" element={<AdminDashboard />} />
-            <Route path="/admin/users" element={<Users />} />
-            <Route path="/admin/production-team" element={<ProductionTeam />} />
-            <Route path="/admin/machines" element={<AdminMachines />} />
-            <Route path="/admin/bookings" element={<AdminBookings />} />
-            <Route path="/admin/products" element={<AdminProducts />} />
-            <Route path="/admin/courses" element={<AdminCourses />} />
-            <Route path="/admin/certificates" element={<Certificates />} />
-            <Route path="/admin/custom-orders" element={<AdminCustomOrders />} />
-            <Route path="/admin/inventory" element={<AdminInventory />} />
-            <Route path="/admin/projects" element={<AdminProjects />} />
-            <Route path="/admin/gallery" element={<AdminGallery />} />
-            <Route path="/admin/faq" element={<AdminFAQ />} />
+
+            {/* Admin Pages - Using Layout for persistent sidebar */}
+            <Route path="/admin" element={<AdminLayout />}>
+                <Route path="dashboard" element={<AdminDashboard />} />
+                <Route path="users" element={<Users />} />
+                <Route path="production-team" element={<ProductionTeam />} />
+                <Route path="machines" element={<AdminMachines />} />
+                <Route path="bookings" element={<AdminBookings />} />
+                <Route path="products" element={<AdminProducts />} />
+                <Route path="courses" element={<AdminCourses />} />
+                <Route path="certificates" element={<Certificates />} />
+                <Route path="custom-orders" element={<AdminCustomOrders />} />
+                <Route path="inventory" element={<AdminInventory />} />
+                <Route path="projects" element={<AdminProjects />} />
+                <Route path="gallery" element={<AdminGallery />} />
+                <Route path="faq" element={<AdminFAQ />} />
+            </Route>
             
 
             {/* User Pages */}

@@ -2,6 +2,74 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import UserSidebar from './UserSidebar';
 
+// ✅ Professional Dialog Component
+const Dialog = ({ type, title, message, onConfirm, onCancel, show }) => {
+    if (!show) return null;
+
+    const styles = {
+        success: {
+            icon: (
+                <svg className="w-16 h-16 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+            ),
+            buttonClass: 'bg-green-600 hover:bg-green-700',
+        },
+        error: {
+            icon: (
+                <svg className="w-16 h-16 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+            ),
+            buttonClass: 'bg-red-600 hover:bg-red-700',
+        },
+        warning: {
+            icon: (
+                <svg className="w-16 h-16 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+            ),
+            buttonClass: 'bg-yellow-600 hover:bg-yellow-700',
+        },
+        info: {
+            icon: (
+                <svg className="w-16 h-16 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+            ),
+            buttonClass: 'bg-blue-600 hover:bg-blue-700',
+        },
+    };
+
+    const style = styles[type] || styles.info;
+
+    return (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 text-center animate-fade-in">
+                <div className="mb-4 flex justify-center">{style.icon}</div>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">{title}</h3>
+                <p className="text-gray-600 mb-6">{message}</p>
+                <div className="flex gap-3">
+                    {onCancel && (
+                        <button
+                            onClick={onCancel}
+                            className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                        >
+                            Cancel
+                        </button>
+                    )}
+                    <button
+                        onClick={onConfirm}
+                        className={`flex-1 px-4 py-2 text-white rounded-lg transition-colors ${style.buttonClass}`}
+                    >
+                        {onCancel ? 'Confirm' : 'OK'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 export default function ShopProducts() {
     const [expandedMenus, setExpandedMenus] = useState({
         shopOrders: true,
@@ -34,6 +102,16 @@ export default function ShopProducts() {
     // Notification State
     const [showNotification, setShowNotification] = useState(false);
 
+    // Dialog State
+    const [dialog, setDialog] = useState({
+        show: false,
+        type: 'info',
+        title: '',
+        message: '',
+        onConfirm: null,
+        onCancel: null,
+    });
+
     // Delivery & Payment States
     const [deliveryOption, setDeliveryOption] = useState('pickup');
     const [shippingAddress, setShippingAddress] = useState('');
@@ -53,6 +131,71 @@ export default function ShopProducts() {
         }));
     };
 
+    // Show professional dialog
+    const showDialog = (type, title, message, onConfirm = null, onCancel = null) => {
+        setDialog({
+            show: true,
+            type,
+            title,
+            message,
+            onConfirm,
+            onCancel,
+        });
+    };
+
+    // Close dialog
+    const closeDialog = () => {
+        setDialog({
+            show: false,
+            type: 'info',
+            title: '',
+            message: '',
+            onConfirm: null,
+            onCancel: null,
+        });
+    };
+
+    // ✅ NEW: Refresh cart items with latest stock from API
+    const refreshCartStock = async () => {
+        if (cart.length === 0) return;
+
+        try {
+            const userToken = localStorage.getItem('auth_token');
+            const productIds = cart.map(item => item.id);
+
+            // Fetch latest product data
+            const response = await axios.get('http://127.0.0.1:8000/api/user/products', {
+                headers: {
+                    'Accept': 'application/json',
+                    'Authorization': `Bearer ${userToken}`
+                }
+            });
+
+            if (response.data.success) {
+                const latestProducts = response.data.products;
+
+                // Update cart with latest stock
+                const updatedCart = cart.map(cartItem => {
+                    const latestProduct = latestProducts.find(p => p.id === cartItem.id);
+                    if (latestProduct) {
+                        return {
+                            ...cartItem,
+                            stock: latestProduct.stock, // Update stock
+                            size: latestProduct.size,    // Update other fields too
+                            price: latestProduct.price,
+                        };
+                    }
+                    return cartItem;
+                });
+
+                setCart(updatedCart);
+                localStorage.setItem('cart', JSON.stringify(updatedCart));
+            }
+        } catch (error) {
+            console.error('Error refreshing cart stock:', error);
+        }
+    };
+
     // Fetch products on mount
     useEffect(() => {
         fetchProducts();
@@ -64,9 +207,18 @@ export default function ShopProducts() {
         }
     }, []);
 
+    // ✅ Refresh cart stock when cart drawer opens
+    useEffect(() => {
+        if (showCartDrawer && cart.length > 0) {
+            refreshCartStock();
+        }
+    }, [showCartDrawer]);
+
     // Update "Select All" checkbox when cart or selection changes
     useEffect(() => {
-        if (cart.length > 0 && selectedCartItems.length === cart.length) {
+        // Only count in-stock items for "Select All"
+        const inStockItems = cart.filter(item => item.stock > 0);
+        if (inStockItems.length > 0 && selectedCartItems.length === inStockItems.length) {
             setIsSelectAll(true);
         } else {
             setIsSelectAll(false);
@@ -176,6 +328,11 @@ export default function ShopProducts() {
 
     // Buy Now - Direct to checkout (selects this single product)
     const buyNow = (product, qty = 1) => {
+        if (product.stock === 0) {
+            showDialog('error', 'Out of Stock', 'This product is currently out of stock. Please check back later.', closeDialog);
+            return;
+        }
+
         setDirectCheckoutProduct({ ...product, quantity: qty });
         setShowDetailsModal(false);
         setDeliveryOption('pickup');
@@ -184,8 +341,16 @@ export default function ShopProducts() {
         setShowDeliveryModal(true);
     };
 
-    // ✅ Toggle item selection
+    // ✅ Toggle item selection (only for in-stock items)
     const toggleItemSelection = (productId) => {
+        const item = cart.find(i => i.id === productId);
+
+        // Prevent selection of out-of-stock items
+        if (item && item.stock === 0) {
+            showDialog('warning', 'Out of Stock', 'This item is currently out of stock and cannot be selected for checkout.', closeDialog);
+            return;
+        }
+
         if (selectedCartItems.includes(productId)) {
             setSelectedCartItems(selectedCartItems.filter(id => id !== productId));
         } else {
@@ -193,12 +358,14 @@ export default function ShopProducts() {
         }
     };
 
-    // ✅ Toggle Select All
+    // ✅ Toggle Select All (only in-stock items)
     const toggleSelectAll = () => {
+        const inStockItems = cart.filter(item => item.stock > 0);
+
         if (isSelectAll) {
             setSelectedCartItems([]);
         } else {
-            setSelectedCartItems(cart.map(item => item.id));
+            setSelectedCartItems(inStockItems.map(item => item.id));
         }
     };
 
@@ -206,11 +373,21 @@ export default function ShopProducts() {
     const deleteSelectedItems = () => {
         if (selectedCartItems.length === 0) return;
 
-        const newCart = cart.filter(item => !selectedCartItems.includes(item.id));
-        setCart(newCart);
-        localStorage.setItem('cart', JSON.stringify(newCart));
-        setSelectedCartItems([]);
-        setCartProductIds(prev => prev.filter(id => !selectedCartItems.includes(id)));
+        showDialog(
+            'warning',
+            'Delete Items',
+            `Are you sure you want to remove ${selectedCartItems.length} item(s) from your cart?`,
+            () => {
+                const newCart = cart.filter(item => !selectedCartItems.includes(item.id));
+                setCart(newCart);
+                localStorage.setItem('cart', JSON.stringify(newCart));
+                setSelectedCartItems([]);
+                setCartProductIds(prev => prev.filter(id => !selectedCartItems.includes(id)));
+                closeDialog();
+                showDialog('success', 'Deleted', 'Selected items have been removed from your cart.', closeDialog);
+            },
+            closeDialog
+        );
     };
 
     // Remove from cart
@@ -238,19 +415,26 @@ export default function ShopProducts() {
     const selectedItemsTotal = selectedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
     const selectedItemsCount = selectedItems.reduce((sum, item) => sum + item.quantity, 0);
 
+    // ✅ Check if any selected items are in stock
+    const hasInStockItems = selectedItems.some(item => item.stock > 0);
+
     // Badge count (unique products in cart)
     const cartItemCount = cartProductIds.length;
 
-    // Shipping calculation
-    const shippingCost = deliveryOption === 'shipping' ? 150 : 0;
-    const totalWithShipping = selectedItemsTotal + shippingCost;
+    // ✅ Removed shipping cost calculation - shipping will be paid separately
 
     // Proceed to checkout
     const handleCheckout = () => {
         if (selectedCartItems.length === 0) {
-            alert('Please select at least one item to checkout');
+            showDialog('warning', 'No Items Selected', 'Please select at least one item to checkout.', closeDialog);
             return;
         }
+
+        if (!hasInStockItems) {
+            showDialog('error', 'All Items Out of Stock', 'All selected items are currently out of stock. Please remove them or wait until they are back in stock.', closeDialog);
+            return;
+        }
+
         setShowCartDrawer(false);
         setDeliveryOption('pickup');
         setShippingAddress('');
@@ -273,12 +457,12 @@ export default function ShopProducts() {
     // Submit order
     const handleSubmitOrder = async () => {
         if (!paymentScreenshot) {
-            alert('❌ Please upload payment screenshot');
+            showDialog('error', 'Missing Payment Proof', 'Please upload payment screenshot.', closeDialog);
             return;
         }
 
         if (deliveryOption === 'shipping' && !shippingAddress.trim()) {
-            alert('❌ Please enter shipping address');
+            showDialog('error', 'Missing Address', 'Please enter shipping address.', closeDialog);
             return;
         }
 
@@ -310,9 +494,10 @@ export default function ShopProducts() {
                 formData.append(`items[${index}][quantity]`, item.quantity);
             });
 
+            // ✅ Removed shipping cost from total calculation
             const finalTotal = directCheckoutProduct
-                ? (directCheckoutProduct.price * directCheckoutProduct.quantity) + (deliveryOption === 'shipping' ? 150 : 0)
-                : totalWithShipping;
+                ? (directCheckoutProduct.price * directCheckoutProduct.quantity)
+                : selectedItemsTotal;
 
             formData.append('total_amount', finalTotal);
             formData.append('delivery_option', deliveryOption);
@@ -338,36 +523,43 @@ export default function ShopProducts() {
             );
 
             if (response.data.success) {
-                alert('✅ Order submitted successfully! We will review your payment and confirm shortly.');
+                closeDialog();
+                showDialog(
+                    'success',
+                    'Order Submitted!',
+                    'Your order has been submitted successfully! We will review your payment and confirm shortly.',
+                    () => {
+                        // Remove purchased items from cart
+                        const purchasedIds = directCheckoutProduct
+                            ? [directCheckoutProduct.id]
+                            : selectedCartItems;
 
-                // Remove purchased items from cart
-                const purchasedIds = directCheckoutProduct
-                    ? [directCheckoutProduct.id]
-                    : selectedCartItems;
+                        const remainingCart = cart.filter(item => !purchasedIds.includes(item.id));
+                        setCart(remainingCart);
+                        localStorage.setItem('cart', JSON.stringify(remainingCart));
+                        setCartProductIds(prev => prev.filter(id => !purchasedIds.includes(id)));
 
-                const remainingCart = cart.filter(item => !purchasedIds.includes(item.id));
-                setCart(remainingCart);
-                localStorage.setItem('cart', JSON.stringify(remainingCart));
-                setCartProductIds(prev => prev.filter(id => !purchasedIds.includes(id)));
+                        setSelectedCartItems([]);
+                        setDirectCheckoutProduct(null);
+                        setPaymentScreenshot(null);
+                        setScreenshotPreview(null);
+                        setShowPaymentModal(false);
+                        setShowDeliveryModal(false);
+                        closeDialog();
 
-                setSelectedCartItems([]);
-                setDirectCheckoutProduct(null);
-                setPaymentScreenshot(null);
-                setScreenshotPreview(null);
-                setShowPaymentModal(false);
-                setShowDeliveryModal(false);
-
-                fetchProducts();
+                        fetchProducts();
+                    }
+                );
             }
         } catch (error) {
             console.error('Order submission error:', error);
             if (error.response?.data?.errors) {
                 const errors = Object.values(error.response.data.errors).flat().join('\n');
-                alert('❌ Validation failed:\n' + errors);
+                showDialog('error', 'Validation Failed', errors, closeDialog);
             } else if (error.response?.data?.message) {
-                alert('❌ ' + error.response.data.message);
+                showDialog('error', 'Error', error.response.data.message, closeDialog);
             } else {
-                alert('❌ Failed to submit order. Please try again.');
+                showDialog('error', 'Submission Failed', 'Failed to submit order. Please try again.', closeDialog);
             }
         } finally {
             setSubmitting(false);
@@ -443,6 +635,16 @@ export default function ShopProducts() {
                         </div>
                     </div>
                 )}
+
+                {/* Professional Dialog */}
+                <Dialog
+                    show={dialog.show}
+                    type={dialog.type}
+                    title={dialog.title}
+                    message={dialog.message}
+                    onConfirm={dialog.onConfirm}
+                    onCancel={dialog.onCancel}
+                />
 
                 {/* Products Grid */}
                 <main className="p-6">
@@ -586,8 +788,8 @@ export default function ShopProducts() {
                                                     key={index}
                                                     onClick={() => goToImage(index)}
                                                     className={`flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-all ${currentImageIndex === index
-                                                            ? 'border-blue-600 ring-2 ring-blue-600/20'
-                                                            : 'border-gray-200 hover:border-gray-300'
+                                                        ? 'border-blue-600 ring-2 ring-blue-600/20'
+                                                        : 'border-gray-200 hover:border-gray-300'
                                                         }`}
                                                 >
                                                     <img
@@ -609,8 +811,8 @@ export default function ShopProducts() {
                                         <div className="flex items-center gap-4 mb-4">
                                             <span className="text-3xl font-bold text-blue-600">{formatCurrency(selectedProduct.price)}</span>
                                             <span className={`text-sm px-3 py-1 rounded-full ${selectedProduct.stock > 0
-                                                    ? 'text-green-700 bg-green-100'
-                                                    : 'text-red-700 bg-red-100'
+                                                ? 'text-green-700 bg-green-100'
+                                                : 'text-red-700 bg-red-100'
                                                 }`}>
                                                 {selectedProduct.stock > 0 ? `${selectedProduct.stock} available` : 'Out of Stock'}
                                             </span>
@@ -670,7 +872,7 @@ export default function ShopProducts() {
                 </div>
             )}
 
-            {/* ✅ UPDATED: Cart Drawer with Checkboxes */}
+            {/* ✅ UPDATED: Cart Drawer with Disabled Out-of-Stock Items */}
             {showCartDrawer && (
                 <>
                     <div
@@ -708,7 +910,7 @@ export default function ShopProducts() {
                                             className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
                                         />
                                         <span className="text-sm font-medium text-gray-700">
-                                            Select All ({cart.length})
+                                            Select All ({cart.filter(item => item.stock > 0).length} in stock)
                                         </span>
                                     </label>
                                     {selectedCartItems.length > 0 && (
@@ -742,86 +944,106 @@ export default function ShopProducts() {
                                     </div>
                                 ) : (
                                     <div className="space-y-4">
-                                        {cart.map((item) => (
-                                            <div key={item.id} className={`flex items-start gap-4 p-4 rounded-lg border transition-all ${selectedCartItems.includes(item.id)
-                                                    ? 'bg-blue-50 border-blue-200'
-                                                    : 'bg-gray-50 border-gray-200'
-                                                }`}>
-                                                {/* ✅ Checkbox */}
-                                                <input
-                                                    type="checkbox"
-                                                    checked={selectedCartItems.includes(item.id)}
-                                                    onChange={() => toggleItemSelection(item.id)}
-                                                    className="mt-1 w-5 h-5 text-blue-600 rounded focus:ring-blue-500 cursor-pointer"
-                                                />
+                                        {cart.map((item) => {
+                                            const isOutOfStock = item.stock === 0;
+                                            const isSelected = selectedCartItems.includes(item.id);
 
-                                                {/* Clickable Product Image */}
+                                            return (
                                                 <div
-                                                    onClick={() => viewProductFromCart(item)}
-                                                    className="w-20 h-20 bg-gray-200 rounded-lg flex items-center justify-center flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity overflow-hidden"
+                                                    key={item.id}
+                                                    className={`flex items-start gap-4 p-4 rounded-lg border transition-all ${isOutOfStock
+                                                            ? 'bg-gray-100 border-gray-200 opacity-60'
+                                                            : isSelected
+                                                                ? 'bg-blue-50 border-blue-200'
+                                                                : 'bg-gray-50 border-gray-200'
+                                                        }`}
                                                 >
-                                                    {getProductImage(item) ? (
-                                                        <img
-                                                            src={getProductImage(item)}
-                                                            alt={item.name}
-                                                            className="w-full h-full object-cover"
-                                                        />
-                                                    ) : (
-                                                        <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                                        </svg>
-                                                    )}
-                                                </div>
+                                                    {/* ✅ Checkbox - Disabled for out-of-stock */}
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={isSelected}
+                                                        onChange={() => toggleItemSelection(item.id)}
+                                                        disabled={isOutOfStock}
+                                                        className={`mt-1 w-5 h-5 rounded focus:ring-blue-500 ${isOutOfStock
+                                                                ? 'cursor-not-allowed text-gray-400'
+                                                                : 'text-blue-600 cursor-pointer'
+                                                            }`}
+                                                    />
 
-                                                {/* Product Info */}
-                                                <div className="flex-1">
-                                                    <div className="flex justify-between items-start">
-                                                        <div>
-                                                            <h3
-                                                                onClick={() => viewProductFromCart(item)}
-                                                                className="font-semibold text-gray-900 cursor-pointer hover:text-blue-600 transition-colors"
-                                                            >
-                                                                {item.name}
-                                                            </h3>
-                                                            <p className="text-xs text-gray-500">{item.size}</p>
-                                                        </div>
-                                                        <button
-                                                            onClick={() => removeFromCart(item.id)}
-                                                            className="text-gray-400 hover:text-red-600 transition-colors"
-                                                        >
-                                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                                    {/* Clickable Product Image */}
+                                                    <div
+                                                        onClick={() => viewProductFromCart(item)}
+                                                        className="w-20 h-20 bg-gray-200 rounded-lg flex items-center justify-center flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity overflow-hidden"
+                                                    >
+                                                        {getProductImage(item) ? (
+                                                            <img
+                                                                src={getProductImage(item)}
+                                                                alt={item.name}
+                                                                className="w-full h-full object-cover"
+                                                            />
+                                                        ) : (
+                                                            <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                                                             </svg>
-                                                        </button>
+                                                        )}
                                                     </div>
 
-                                                    <p className="text-sm font-bold text-blue-600 mt-2">{formatCurrency(item.price)}</p>
+                                                    {/* Product Info */}
+                                                    <div className="flex-1">
+                                                        <div className="flex justify-between items-start">
+                                                            <div>
+                                                                <h3
+                                                                    onClick={() => viewProductFromCart(item)}
+                                                                    className={`font-semibold cursor-pointer transition-colors ${isOutOfStock ? 'text-gray-500' : 'text-gray-900 hover:text-blue-600'
+                                                                        }`}
+                                                                >
+                                                                    {item.name}
+                                                                </h3>
+                                                                <p className="text-xs text-gray-500">{item.size}</p>
+                                                            </div>
+                                                            <button
+                                                                onClick={() => removeFromCart(item.id)}
+                                                                className="text-gray-400 hover:text-red-600 transition-colors"
+                                                            >
+                                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                                                </svg>
+                                                            </button>
+                                                        </div>
 
-                                                    {/* Quantity Controls */}
-                                                    <div className="flex items-center gap-2 mt-2">
-                                                        <button
-                                                            onClick={() => updateCartQuantity(item.id, item.quantity - 1)}
-                                                            className="w-7 h-7 rounded border border-gray-300 flex items-center justify-center hover:bg-gray-100 text-sm"
-                                                        >
-                                                            −
-                                                        </button>
-                                                        <span className="w-8 text-center text-sm font-medium">{item.quantity}</span>
-                                                        <button
-                                                            onClick={() => updateCartQuantity(item.id, item.quantity + 1)}
-                                                            className="w-7 h-7 rounded border border-gray-300 flex items-center justify-center hover:bg-gray-100 text-sm"
-                                                        >
-                                                            +
-                                                        </button>
+                                                        <p className="text-sm font-bold text-blue-600 mt-2">{formatCurrency(item.price)}</p>
+
+                                                        {/* Quantity Controls */}
+                                                        <div className="flex items-center gap-2 mt-2">
+                                                            <button
+                                                                onClick={() => updateCartQuantity(item.id, item.quantity - 1)}
+                                                                className="w-7 h-7 rounded border border-gray-300 flex items-center justify-center hover:bg-gray-100 text-sm"
+                                                            >
+                                                                −
+                                                            </button>
+                                                            <span className="w-8 text-center text-sm font-medium">{item.quantity}</span>
+                                                            <button
+                                                                onClick={() => updateCartQuantity(item.id, item.quantity + 1)}
+                                                                className="w-7 h-7 rounded border border-gray-300 flex items-center justify-center hover:bg-gray-100 text-sm"
+                                                            >
+                                                                +
+                                                            </button>
+                                                        </div>
+
+                                                        {isOutOfStock && (
+                                                            <div className="flex items-center gap-1 mt-1">
+                                                                <svg className="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                                </svg>
+                                                                <p className="text-xs text-red-600 font-medium">
+                                                                    Out of stock - Cannot checkout
+                                                                </p>
+                                                            </div>
+                                                        )}
                                                     </div>
-
-                                                    {item.stock === 0 && (
-                                                        <p className="text-xs text-red-600 mt-1 font-medium">
-                                                            ⚠ Currently out of stock
-                                                        </p>
-                                                    )}
                                                 </div>
-                                            </div>
-                                        ))}
+                                            );
+                                        })}
                                     </div>
                                 )}
                             </div>
@@ -831,7 +1053,10 @@ export default function ShopProducts() {
                                 <div className="border-t border-gray-200 p-6 bg-white">
                                     <div className="flex justify-between items-center mb-4">
                                         <span className="text-lg font-semibold text-gray-700">
-                                            Selected ({selectedCartItems.length})
+                                            Selected ({selectedCartItems.filter(id => {
+                                                const item = cart.find(i => i.id === id);
+                                                return item && item.stock > 0;
+                                            }).length})
                                         </span>
                                         <span className="text-2xl font-bold text-blue-600">
                                             {formatCurrency(selectedItemsTotal)}
@@ -839,10 +1064,15 @@ export default function ShopProducts() {
                                     </div>
                                     <button
                                         onClick={handleCheckout}
-                                        disabled={selectedCartItems.length === 0}
+                                        disabled={selectedCartItems.length === 0 || !hasInStockItems}
                                         className="w-full py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold disabled:bg-gray-300 disabled:cursor-not-allowed"
                                     >
-                                        Proceed to Checkout
+                                        {selectedCartItems.length === 0
+                                            ? 'Select Items to Checkout'
+                                            : !hasInStockItems
+                                                ? 'All Items Out of Stock'
+                                                : 'Proceed to Checkout'
+                                        }
                                     </button>
                                 </div>
                             )}
@@ -851,7 +1081,7 @@ export default function ShopProducts() {
                 </>
             )}
 
-            {/* ✅ UPDATED: Delivery Options Modal with Order Summary */}
+            {/* ✅ UPDATED: Delivery Options Modal - Shipping text changed */}
             {showDeliveryModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
                     <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col">
@@ -930,13 +1160,8 @@ export default function ShopProducts() {
                                                     <span className="font-semibold text-gray-900">Ship to Address</span>
                                                 </div>
                                                 <p className="text-sm text-gray-600 mt-1">
-                                                    We will ship your order to your provided address
+                                                    We will ship your order to your provided address. Shipping cost must be bare by you
                                                 </p>
-                                                {deliveryOption === 'shipping' && (
-                                                    <p className="text-sm font-semibold text-purple-600 mt-2">
-                                                        Shipping Cost (Fixed): {formatCurrency(150)}
-                                                    </p>
-                                                )}
                                             </div>
                                         </label>
                                     </div>
@@ -957,7 +1182,7 @@ export default function ShopProducts() {
                                     )}
                                 </div>
 
-                                {/* ✅ Right: Order Summary */}
+                                {/* ✅ Right: Order Summary - Removed shipping cost */}
                                 <div className="lg:col-span-1">
                                     <div className="bg-gray-50 rounded-xl p-6 sticky top-0">
                                         <h3 className="text-lg font-semibold text-gray-900 mb-4">Order Summary</h3>
@@ -996,19 +1221,14 @@ export default function ShopProducts() {
                                                 </span>
                                             </div>
 
-                                            {deliveryOption === 'shipping' && (
-                                                <div className="flex justify-between text-sm">
-                                                    <span className="text-gray-600">Shipping Cost:</span>
-                                                    <span className="font-medium text-purple-600">{formatCurrency(150)}</span>
-                                                </div>
-                                            )}
+                                            {/* ✅ Removed shipping cost display */}
 
                                             <div className="border-t border-gray-200 pt-2 flex justify-between">
                                                 <span className="text-base font-semibold text-gray-900">Total:</span>
                                                 <span className="text-lg font-bold text-blue-600">
                                                     {directCheckoutProduct
-                                                        ? formatCurrency((directCheckoutProduct.price * directCheckoutProduct.quantity) + (deliveryOption === 'shipping' ? 150 : 0))
-                                                        : formatCurrency(totalWithShipping)
+                                                        ? formatCurrency(directCheckoutProduct.price * directCheckoutProduct.quantity)
+                                                        : formatCurrency(selectedItemsTotal)
                                                     }
                                                 </span>
                                             </div>
@@ -1036,7 +1256,7 @@ export default function ShopProducts() {
                             <button
                                 onClick={() => {
                                     if (deliveryOption === 'shipping' && !shippingAddress.trim()) {
-                                        alert('❌ Please enter shipping address');
+                                        showDialog('error', 'Missing Address', 'Please enter shipping address.', closeDialog);
                                         return;
                                     }
                                     setShowDeliveryModal(false);
@@ -1051,7 +1271,7 @@ export default function ShopProducts() {
                 </div>
             )}
 
-            {/* ✅ UPDATED: Payment Modal with Order Summary */}
+            {/* ✅ UPDATED: Payment Modal - Removed shipping cost */}
             {showPaymentModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
                     <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col">
@@ -1159,7 +1379,7 @@ export default function ShopProducts() {
                                     </div>
                                 </div>
 
-                                {/* ✅ Right: Order Summary */}
+                                {/* ✅ Right: Order Summary - Removed shipping cost */}
                                 <div className="lg:col-span-1">
                                     <div className="bg-gray-50 rounded-xl p-6 sticky top-0">
                                         <h3 className="text-lg font-semibold text-gray-900 mb-4">Order Summary</h3>
@@ -1198,19 +1418,14 @@ export default function ShopProducts() {
                                                 </span>
                                             </div>
 
-                                            {deliveryOption === 'shipping' && (
-                                                <div className="flex justify-between text-sm">
-                                                    <span className="text-gray-600">Shipping Cost:</span>
-                                                    <span className="font-medium text-purple-600">{formatCurrency(150)}</span>
-                                                </div>
-                                            )}
+                                            {/* ✅ Removed shipping cost */}
 
                                             <div className="border-t border-gray-200 pt-2 flex justify-between">
                                                 <span className="text-base font-semibold text-gray-900">Total:</span>
                                                 <span className="text-lg font-bold text-blue-600">
                                                     {directCheckoutProduct
-                                                        ? formatCurrency((directCheckoutProduct.price * directCheckoutProduct.quantity) + (deliveryOption === 'shipping' ? 150 : 0))
-                                                        : formatCurrency(totalWithShipping)
+                                                        ? formatCurrency(directCheckoutProduct.price * directCheckoutProduct.quantity)
+                                                        : formatCurrency(selectedItemsTotal)
                                                     }
                                                 </span>
                                             </div>

@@ -1,15 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import AdminSidebar from '../../Components/AdminSidebar';
 
 export default function Products() {
-    const [expandedMenus, setExpandedMenus] = useState({
-        userManagement: true,
-        operations: true,
-        resources: false,
-        contentMedia: false,
-    });
-
     // Product States
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -40,14 +32,6 @@ export default function Products() {
     const [previewImages, setPreviewImages] = useState([]);
     const [otherImages, setOtherImages] = useState([]);
     const [formLoading, setFormLoading] = useState(false);
-
-    // Toggle submenu
-    const toggleSubmenu = (menu) => {
-        setExpandedMenus(prev => ({
-            ...prev,
-            [menu]: !prev[menu]
-        }));
-    };
 
     // Fetch products from API
     const fetchProducts = async () => {
@@ -456,254 +440,251 @@ export default function Products() {
     };
 
     return (
-        <div className="flex min-h-screen bg-gray-50">
-            <AdminSidebar expandedMenus={expandedMenus} toggleSubmenu={toggleSubmenu} />
+        // ✅ JUST the main content - sidebar is in AdminLayout now
+        <div className="flex-1">
+            <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
+                <div className="flex items-center justify-between px-6 py-4">
+                    <div>
+                        <h1 className="text-2xl font-bold text-gray-900">Products</h1>
+                        <p className="text-sm text-gray-600 mt-1">Manage product listings for the Fab Lab shop</p>
+                    </div>
+                    <button
+                        onClick={() => {
+                            resetForm();
+                            setShowAddModal(true);
+                        }}
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                    >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                        </svg>
+                        Add Product
+                    </button>
+                </div>
+            </header>
 
-            <div className="flex-1">
-                <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
-                    <div className="flex items-center justify-between px-6 py-4">
-                        <div>
-                            <h1 className="text-2xl font-bold text-gray-900">Products</h1>
-                            <p className="text-sm text-gray-600 mt-1">Manage product listings for the Fab Lab shop</p>
-                        </div>
+            <main className="p-6">
+                {loading && (
+                    <div className="text-center py-12">
+                        <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent"></div>
+                        <p className="mt-4 text-gray-600">Loading products...</p>
+                    </div>
+                )}
+
+                {error && !loading && (
+                    <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg mb-6">
+                        {error}
                         <button
-                            onClick={() => {
-                                resetForm();
-                                setShowAddModal(true);
-                            }}
-                            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                            onClick={fetchProducts}
+                            className="ml-4 underline hover:text-red-700"
                         >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                            </svg>
-                            Add Product
+                            Retry
                         </button>
                     </div>
-                </header>
+                )}
 
-                <main className="p-6">
-                    {loading && (
-                        <div className="text-center py-12">
-                            <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent"></div>
-                            <p className="mt-4 text-gray-600">Loading products...</p>
-                        </div>
-                    )}
-
-                    {error && !loading && (
-                        <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg mb-6">
-                            {error}
-                            <button
-                                onClick={fetchProducts}
-                                className="ml-4 underline hover:text-red-700"
-                            >
-                                Retry
-                            </button>
-                        </div>
-                    )}
-
-                    {!loading && !error && (
-                        <>
-                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                                <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <p className="text-sm text-gray-600">Total Products</p>
-                                            <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
-                                        </div>
-                                        <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                                        </svg>
-                                    </div>
-                                </div>
-
-                                <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <p className="text-sm text-gray-600">Active Listings</p>
-                                            <p className="text-2xl font-bold text-green-600">{stats.active}</p>
-                                        </div>
-                                        <svg className="w-8 h-8 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                        </svg>
-                                    </div>
-                                </div>
-
-                                <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <p className="text-sm text-gray-600">Out of Stock</p>
-                                            <p className="text-2xl font-bold text-red-600">{stats.outOfStock}</p>
-                                        </div>
-                                        <svg className="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                        </svg>
-                                    </div>
-                                </div>
-
-                                <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <p className="text-sm text-gray-600">Low Stock</p>
-                                            <p className="text-2xl font-bold text-yellow-600">{stats.lowStock}</p>
-                                        </div>
-                                        <svg className="w-8 h-8 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                                        </svg>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 mb-6">
+                {!loading && !error && (
+                    <>
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
                                 <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                        <svg className="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                                        </svg>
-                                        <div>
-                                            <p className="font-semibold text-gray-900">Stock Alert Threshold</p>
-                                            <p className="text-sm text-gray-600">Products with stock below this value will be highlighted</p>
-                                        </div>
+                                    <div>
+                                        <p className="text-sm text-gray-600">Total Products</p>
+                                        <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
                                     </div>
-                                    <div className="flex items-center gap-3">
-                                        <input
-                                            type="number"
-                                            value={stockAlertThreshold}
-                                            onChange={(e) => setStockAlertThreshold(parseInt(e.target.value) || 0)}
-                                            className="w-20 px-3 py-2 border border-gray-300 rounded-lg text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                            min="0"
-                                        />
-                                        <span className="text-sm text-gray-600">units</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
-                                <div className="relative flex-1 max-w-md">
-                                    <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                    <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                                     </svg>
-                                    <input
-                                        type="text"
-                                        placeholder="Search products..."
-                                        value={searchQuery}
-                                        onChange={(e) => setSearchQuery(e.target.value)}
-                                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                    />
-                                </div>
-
-                                <div className="relative">
-                                    <select
-                                        value={filterStatus}
-                                        onChange={(e) => setFilterStatus(e.target.value)}
-                                        className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
-                                    >
-                                        <option value="all">All Status</option>
-                                        <option value="active">Active</option>
-                                        <option value="inactive">Inactive</option>
-                                        <option value="out_of_stock">Out of Stock</option>
-                                    </select>
                                 </div>
                             </div>
 
-                            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                                <div className="overflow-x-auto">
-                                    <table className="w-full">
-                                        <thead className="bg-gray-50 border-b border-gray-100">
+                            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="text-sm text-gray-600">Active Listings</p>
+                                        <p className="text-2xl font-bold text-green-600">{stats.active}</p>
+                                    </div>
+                                    <svg className="w-8 h-8 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                    </svg>
+                                </div>
+                            </div>
+
+                            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="text-sm text-gray-600">Out of Stock</p>
+                                        <p className="text-2xl font-bold text-red-600">{stats.outOfStock}</p>
+                                    </div>
+                                    <svg className="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                </div>
+                            </div>
+
+                            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="text-sm text-gray-600">Low Stock</p>
+                                        <p className="text-2xl font-bold text-yellow-600">{stats.lowStock}</p>
+                                    </div>
+                                    <svg className="w-8 h-8 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                    </svg>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 mb-6">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <svg className="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                    </svg>
+                                    <div>
+                                        <p className="font-semibold text-gray-900">Stock Alert Threshold</p>
+                                        <p className="text-sm text-gray-600">Products with stock below this value will be highlighted</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <input
+                                        type="number"
+                                        value={stockAlertThreshold}
+                                        onChange={(e) => setStockAlertThreshold(parseInt(e.target.value) || 0)}
+                                        className="w-20 px-3 py-2 border border-gray-300 rounded-lg text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        min="0"
+                                    />
+                                    <span className="text-sm text-gray-600">units</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+                            <div className="relative flex-1 max-w-md">
+                                <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                </svg>
+                                <input
+                                    type="text"
+                                    placeholder="Search products..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                />
+                            </div>
+
+                            <div className="relative">
+                                <select
+                                    value={filterStatus}
+                                    onChange={(e) => setFilterStatus(e.target.value)}
+                                    className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                                >
+                                    <option value="all">All Status</option>
+                                    <option value="active">Active</option>
+                                    <option value="inactive">Inactive</option>
+                                    <option value="out_of_stock">Out of Stock</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                            <div className="overflow-x-auto">
+                                <table className="w-full">
+                                    <thead className="bg-gray-50 border-b border-gray-100">
+                                        <tr>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Image</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Product Name</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Size</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price (Nu.)</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Active</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100">
+                                        {filteredProducts.length === 0 ? (
                                             <tr>
-                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Image</th>
-                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Product Name</th>
-                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Size</th>
-                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price (Nu.)</th>
-                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock</th>
-                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Active</th>
+                                                <td colSpan="6" className="px-6 py-12 text-center text-gray-500">
+                                                    <svg className="w-12 h-12 text-gray-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                                                    </svg>
+                                                    <p>No products found</p>
+                                                    <button
+                                                        onClick={() => setShowAddModal(true)}
+                                                        className="mt-2 text-blue-600 hover:text-blue-700 font-medium"
+                                                    >
+                                                        Add your first product
+                                                    </button>
+                                                </td>
                                             </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-gray-100">
-                                            {filteredProducts.length === 0 ? (
-                                                <tr>
-                                                    <td colSpan="6" className="px-6 py-12 text-center text-gray-500">
-                                                        <svg className="w-12 h-12 text-gray-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                                                        </svg>
-                                                        <p>No products found</p>
+                                        ) : (
+                                            filteredProducts.map((product) => (
+                                                <tr
+                                                    key={product.id}
+                                                    onClick={() => handleViewDetails(product)}
+                                                    className={`hover:bg-gray-50 cursor-pointer transition-colors ${product.stock > 0 && product.stock <= stockAlertThreshold ? 'bg-yellow-50 hover:bg-yellow-100' : ''
+                                                        }`}
+                                                >
+                                                    <td className="px-6 py-4">
+                                                        <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
+                                                            {product.images && product.images.length > 0 ? (
+                                                                <img
+                                                                    src={`http://127.0.0.1:8000/storage/${product.images[0]}`}
+                                                                    alt={product.name}
+                                                                    className="w-full h-full object-cover rounded-lg"
+                                                                />
+                                                            ) : (
+                                                                <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                                </svg>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <div>
+                                                            <p className="font-semibold text-gray-900">{product.name}</p>
+                                                            <p className="text-sm text-gray-500 line-clamp-1">{product.description}</p>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <span className="text-sm text-gray-600">{product.size}</span>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <span className="font-semibold text-gray-900">{formatCurrency(product.price)}</span>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${product.stock === 0 ? 'bg-red-100 text-red-700' :
+                                                            product.stock <= stockAlertThreshold ? 'bg-yellow-100 text-yellow-700' :
+                                                                'bg-green-100 text-green-700'
+                                                            }`}>
+                                                            {product.stock}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-6 py-4">
                                                         <button
-                                                            onClick={() => setShowAddModal(true)}
-                                                            className="mt-2 text-blue-600 hover:text-blue-700 font-medium"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                toggleStatus(product.id);
+                                                            }}
+                                                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${product.status === 'active' ? 'bg-blue-600' : 'bg-gray-300'
+                                                                }`}
                                                         >
-                                                            Add your first product
+                                                            <span
+                                                                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${product.status === 'active' ? 'translate-x-6' : 'translate-x-1'
+                                                                    }`}
+                                                            />
                                                         </button>
                                                     </td>
                                                 </tr>
-                                            ) : (
-                                                filteredProducts.map((product) => (
-                                                    <tr
-                                                        key={product.id}
-                                                        onClick={() => handleViewDetails(product)}
-                                                        className={`hover:bg-gray-50 cursor-pointer transition-colors ${product.stock > 0 && product.stock <= stockAlertThreshold ? 'bg-yellow-50 hover:bg-yellow-100' : ''
-                                                            }`}
-                                                    >
-                                                        <td className="px-6 py-4">
-                                                            <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
-                                                                {product.images && product.images.length > 0 ? (
-                                                                    <img
-                                                                        src={`http://127.0.0.1:8000/storage/${product.images[0]}`}
-                                                                        alt={product.name}
-                                                                        className="w-full h-full object-cover rounded-lg"
-                                                                    />
-                                                                ) : (
-                                                                    <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                                                    </svg>
-                                                                )}
-                                                            </div>
-                                                        </td>
-                                                        <td className="px-6 py-4">
-                                                            <div>
-                                                                <p className="font-semibold text-gray-900">{product.name}</p>
-                                                                <p className="text-sm text-gray-500 line-clamp-1">{product.description}</p>
-                                                            </div>
-                                                        </td>
-                                                        <td className="px-6 py-4">
-                                                            <span className="text-sm text-gray-600">{product.size}</span>
-                                                        </td>
-                                                        <td className="px-6 py-4">
-                                                            <span className="font-semibold text-gray-900">{formatCurrency(product.price)}</span>
-                                                        </td>
-                                                        <td className="px-6 py-4">
-                                                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${product.stock === 0 ? 'bg-red-100 text-red-700' :
-                                                                product.stock <= stockAlertThreshold ? 'bg-yellow-100 text-yellow-700' :
-                                                                    'bg-green-100 text-green-700'
-                                                                }`}>
-                                                                {product.stock}
-                                                            </span>
-                                                        </td>
-                                                        <td className="px-6 py-4">
-                                                            <button
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    toggleStatus(product.id);
-                                                                }}
-                                                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${product.status === 'active' ? 'bg-blue-600' : 'bg-gray-300'
-                                                                    }`}
-                                                            >
-                                                                <span
-                                                                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${product.status === 'active' ? 'translate-x-6' : 'translate-x-1'
-                                                                        }`}
-                                                                />
-                                                            </button>
-                                                        </td>
-                                                    </tr>
-                                                ))
-                                            )}
-                                        </tbody>
-                                    </table>
-                                </div>
+                                            ))
+                                        )}
+                                    </tbody>
+                                </table>
                             </div>
-                        </>
-                    )}
-                </main>
-            </div>
+                        </div>
+                    </>
+                )}
+            </main>
 
             {/* ✅ UPDATED: Product Details Modal WITH CAROUSEL */}
             {showDetailsModal && selectedProduct && (
@@ -781,8 +762,8 @@ export default function Products() {
                                                     key={index}
                                                     onClick={() => goToImage(index)}
                                                     className={`flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-all ${currentImageIndex === index
-                                                            ? 'border-blue-600 ring-2 ring-blue-600/20'
-                                                            : 'border-gray-200 hover:border-gray-300'
+                                                        ? 'border-blue-600 ring-2 ring-blue-600/20'
+                                                        : 'border-gray-200 hover:border-gray-300'
                                                         }`}
                                                 >
                                                     <img
@@ -1024,8 +1005,8 @@ export default function Products() {
                                         ))}
                                         {previewImages.length < 4 && (
                                             <label className={`aspect-square rounded-lg border-2 border-dashed flex items-center justify-center cursor-pointer transition-colors ${previewImages.length >= 4
-                                                    ? 'border-gray-200 bg-gray-50 cursor-not-allowed'
-                                                    : 'border-gray-300 hover:border-blue-500 hover:bg-blue-50'
+                                                ? 'border-gray-200 bg-gray-50 cursor-not-allowed'
+                                                : 'border-gray-300 hover:border-blue-500 hover:bg-blue-50'
                                                 }`}>
                                                 <input
                                                     type="file"
@@ -1245,8 +1226,8 @@ export default function Products() {
                                     ))}
                                     {otherImages.length < 4 && (
                                         <label className={`aspect-square rounded-lg border-2 border-dashed flex items-center justify-center cursor-pointer transition-colors ${otherImages.length >= 4
-                                                ? 'border-gray-200 bg-gray-50 cursor-not-allowed'
-                                                : 'border-gray-300 hover:border-blue-500 hover:bg-blue-50'
+                                            ? 'border-gray-200 bg-gray-50 cursor-not-allowed'
+                                            : 'border-gray-300 hover:border-blue-500 hover:bg-blue-50'
                                             }`}>
                                             <input
                                                 type="file"

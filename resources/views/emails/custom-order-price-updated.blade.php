@@ -33,7 +33,7 @@
         </div>
         
         <div class="price">
-            Total Estimated Price: Nu. {{ number_format($customOrder->estimated_price, 2) }}
+            Total Estimated Price (Price X Quantity): Nu. {{ number_format($customOrder->estimated_price, 2) }}
         </div>
         
         <p>To proceed with your order, please complete the payment using the details below:</p>

@@ -17,8 +17,10 @@ export default function MyOrders() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
+    // ✅ Tab State (replaces statusFilter dropdown)
+    const [activeTab, setActiveTab] = useState('verifying'); // verifying, confirm, cancel, rejected
+
     // Filter States
-    const [statusFilter, setStatusFilter] = useState('all');
     const [searchTerm, setSearchTerm] = useState('');
     const [dateFrom, setDateFrom] = useState('');
     const [dateTo, setDateTo] = useState('');
@@ -83,12 +85,28 @@ export default function MyOrders() {
         fetchOrders();
     }, []);
 
-    // Filter orders
+    // ✅ Filter orders by tab and other filters
     const filteredOrders = orders.filter(order => {
-        // Status filter
-        if (statusFilter !== 'all' && order.status !== statusFilter) {
-            return false;
+        // ✅ Tab filter (replaces dropdown)
+        let statusMatch = false;
+        switch (activeTab) {
+            case 'verifying':
+                statusMatch = order.status === 'pending';
+                break;
+            case 'confirm':
+                statusMatch = order.status === 'approved';
+                break;
+            case 'cancel':
+                statusMatch = order.status === 'cancelled';
+                break;
+            case 'rejected':
+                statusMatch = order.status === 'rejected';
+                break;
+            default:
+                statusMatch = true;
         }
+
+        if (!statusMatch) return false;
 
         // Search filter
         if (searchTerm) {
@@ -119,12 +137,31 @@ export default function MyOrders() {
         return true;
     });
 
+    // ✅ Get tab counts
+    const getTabCount = (tabName) => {
+        return orders.filter(order => {
+            switch (tabName) {
+                case 'verifying':
+                    return order.status === 'pending';
+                case 'confirm':
+                    return order.status === 'approved';
+                case 'cancel':
+                    return order.status === 'cancelled';
+                case 'rejected':
+                    return order.status === 'rejected';
+                default:
+                    return false;
+            }
+        }).length;
+    };
+
     // Get status badge class
     const getStatusBadgeClass = (status) => {
         switch (status) {
             case 'pending': return 'bg-yellow-100 text-yellow-700 border border-yellow-200';
             case 'approved': return 'bg-green-100 text-green-700 border border-green-200';
             case 'rejected': return 'bg-red-100 text-red-700 border border-red-200';
+            case 'cancelled': return 'bg-gray-100 text-gray-700 border border-gray-200';
             default: return 'bg-gray-100 text-gray-700 border border-gray-200';
         }
     };
@@ -295,24 +332,88 @@ export default function MyOrders() {
                     {/* Orders Table */}
                     {!loading && !error && orders.length > 0 && (
                         <>
+                            {/* ✅ TABS - Replaces Status Dropdown */}
+                            <div className="mb-6">
+                                <div className="border-b border-gray-200">
+                                    <nav className="-mb-px flex space-x-8">
+                                        {/* Verifying Order Tab */}
+                                        <button
+                                            onClick={() => setActiveTab('verifying')}
+                                            className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${activeTab === 'verifying'
+                                                    ? 'border-yellow-500 text-yellow-600'
+                                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                                }`}
+                                        >
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                            Verifying Order
+                                            <span className={`ml-2 py-0.5 px-2 rounded-full text-xs ${activeTab === 'verifying' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-600'
+                                                }`}>
+                                                {getTabCount('verifying')}
+                                            </span>
+                                        </button>
+
+                                        {/* Confirm Tab */}
+                                        <button
+                                            onClick={() => setActiveTab('confirm')}
+                                            className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${activeTab === 'confirm'
+                                                    ? 'border-green-500 text-green-600'
+                                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                                }`}
+                                        >
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                            Confirm
+                                            <span className={`ml-2 py-0.5 px-2 rounded-full text-xs ${activeTab === 'confirm' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
+                                                }`}>
+                                                {getTabCount('confirm')}
+                                            </span>
+                                        </button>
+
+                                        {/* Cancel Tab */}
+                                        <button
+                                            onClick={() => setActiveTab('cancel')}
+                                            className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${activeTab === 'cancel'
+                                                    ? 'border-gray-500 text-gray-600'
+                                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                                }`}
+                                        >
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                            </svg>
+                                            Cancel
+                                            <span className={`ml-2 py-0.5 px-2 rounded-full text-xs ${activeTab === 'cancel' ? 'bg-gray-100 text-gray-700' : 'bg-gray-100 text-gray-600'
+                                                }`}>
+                                                {getTabCount('cancel')}
+                                            </span>
+                                        </button>
+
+                                        {/* Rejected Tab */}
+                                        <button
+                                            onClick={() => setActiveTab('rejected')}
+                                            className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${activeTab === 'rejected'
+                                                    ? 'border-red-500 text-red-600'
+                                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                                }`}
+                                        >
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                            Rejected
+                                            <span className={`ml-2 py-0.5 px-2 rounded-full text-xs ${activeTab === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'
+                                                }`}>
+                                                {getTabCount('rejected')}
+                                            </span>
+                                        </button>
+                                    </nav>
+                                </div>
+                            </div>
+
                             {/* Filters */}
                             <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 mb-6">
-                                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                                    {/* Status Filter */}
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                                        <select
-                                            value={statusFilter}
-                                            onChange={(e) => setStatusFilter(e.target.value)}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                        >
-                                            <option value="all">All Status</option>
-                                            <option value="pending">Pending</option>
-                                            <option value="approved">Approved</option>
-                                            <option value="rejected">Rejected</option>
-                                        </select>
-                                    </div>
-
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     {/* Date From */}
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-1">From Date</label>
@@ -354,11 +455,10 @@ export default function MyOrders() {
                                 </div>
 
                                 {/* Clear Filters */}
-                                {(statusFilter !== 'all' || searchTerm || dateFrom || dateTo) && (
+                                {(searchTerm || dateFrom || dateTo) && (
                                     <div className="mt-4">
                                         <button
                                             onClick={() => {
-                                                setStatusFilter('all');
                                                 setSearchTerm('');
                                                 setDateFrom('');
                                                 setDateTo('');
@@ -381,13 +481,13 @@ export default function MyOrders() {
                                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Product</th>
                                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
                                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
-                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                                {/* ✅ STATUS COLUMN REMOVED */}
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-gray-100">
                                             {filteredOrders.length === 0 ? (
                                                 <tr>
-                                                    <td colSpan="5" className="px-6 py-12 text-center text-gray-500">
+                                                    <td colSpan="4" className="px-6 py-12 text-center text-gray-500">
                                                         <p>No orders found matching your filters</p>
                                                     </td>
                                                 </tr>
@@ -428,11 +528,7 @@ export default function MyOrders() {
                                                         <td className="px-6 py-4">
                                                             <span className="text-sm font-semibold text-gray-900">{formatCurrency(order.total_amount)}</span>
                                                         </td>
-                                                        <td className="px-6 py-4">
-                                                            <span className={`inline-flex px-3 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(order.status)}`}>
-                                                                {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
-                                                            </span>
-                                                        </td>
+                                                        {/* ✅ STATUS COLUMN REMOVED */}
                                                     </tr>
                                                 ))
                                             )}
@@ -443,7 +539,7 @@ export default function MyOrders() {
 
                             {/* Results count */}
                             <div className="mt-4 text-sm text-gray-600">
-                                Showing {filteredOrders.length} of {orders.length} order(s)
+                                Showing {filteredOrders.length} order(s) in {activeTab === 'verifying' ? 'Verifying Order' : activeTab === 'confirm' ? 'Confirm' : activeTab === 'cancel' ? 'Cancel' : 'Rejected'} tab
                             </div>
                         </>
                     )}
@@ -569,23 +665,9 @@ export default function MyOrders() {
                             <div className="mb-6">
                                 <h4 className="text-lg font-semibold text-gray-900 mb-4">Payment Breakdown</h4>
                                 <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
-                                    <div className="space-y-2">
-                                        <div className="flex justify-between text-sm">
-                                            <span className="text-gray-600">Products Total:</span>
-                                            <span className="font-medium text-gray-900">
-                                                {formatCurrency(selectedOrder.total_amount - (selectedOrder.shipping_cost || 0))}
-                                            </span>
-                                        </div>
-                                        {selectedOrder.shipping_cost > 0 && (
-                                            <div className="flex justify-between text-sm">
-                                                <span className="text-gray-600">Shipping Cost:</span>
-                                                <span className="font-medium text-purple-600">{formatCurrency(selectedOrder.shipping_cost)}</span>
-                                            </div>
-                                        )}
-                                        <div className="border-t border-blue-200 pt-2 flex justify-between">
-                                            <span className="font-semibold text-gray-900">Total Paid:</span>
-                                            <span className="text-xl font-bold text-blue-600">{formatCurrency(selectedOrder.total_amount)}</span>
-                                        </div>
+                                    <div className="flex justify-between items-center">
+                                        <span className="font-semibold text-gray-900">Total Order Amount:</span>
+                                        <span className="text-xl font-bold text-blue-600">{formatCurrency(selectedOrder.total_amount)}</span>
                                     </div>
                                 </div>
                             </div>
@@ -600,17 +682,54 @@ export default function MyOrders() {
                                 </div>
                             )}
 
-                            {/* Payment Screenshot */}
+                            {/* ✅ UPDATED: Payment Breakdown - Matching Admin Design */}
+                            <div className="mb-6">
+                                <h4 className="text-lg font-semibold text-gray-900 mb-4">Payment Breakdown</h4>
+                                <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                                    <div className="space-y-2">
+                                        {/* Products Total (without shipping) */}
+                                        <div className="flex justify-between text-sm">
+                                            <span className="text-gray-600">Products Total:</span>
+                                            <span className="font-medium text-gray-900">
+                                                Nu. {(parseFloat(selectedOrder.total_amount || 0) - parseFloat(selectedOrder.shipping_cost || 0)).toFixed(2)}
+                                            </span>
+                                        </div>
+
+                                        {/* Shipping Cost - Only if shipping */}
+                                        {selectedOrder.delivery_option === 'shipping' && selectedOrder.shipping_cost > 0 && (
+                                            <div className="flex justify-between text-sm">
+                                                <span className="text-gray-600">Shipping Cost (Fixed):</span>
+                                                <span className="font-medium text-purple-600">
+                                                    Nu. {parseFloat(selectedOrder.shipping_cost || 0).toFixed(2)}
+                                                </span>
+                                            </div>
+                                        )}
+
+                                        {/* Total Paid */}
+                                        <div className="flex justify-between text-base pt-2 border-t border-blue-200">
+                                            <span className="font-semibold text-gray-900">Total Paid:</span>
+                                            <span className="font-bold text-blue-600">
+                                                Nu. {parseFloat(selectedOrder.total_amount || 0).toFixed(2)}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* ✅ UPDATED: Payment Screenshot - Centered, Medium Size, Clickable */}
                             {selectedOrder.payment_screenshot && (
                                 <div>
                                     <h4 className="text-lg font-semibold text-gray-900 mb-4">Payment Proof</h4>
                                     <div className="bg-gray-50 rounded-lg p-4">
-                                        <img
-                                            src={`http://127.0.0.1:8000/storage/${selectedOrder.payment_screenshot}`}
-                                            alt="Payment Screenshot"
-                                            className="w-full h-auto rounded-lg shadow-md cursor-pointer hover:opacity-90 transition-opacity"
-                                            onClick={() => setShowScreenshotModal(true)}
-                                        />
+                                        {/* ✅ Medium-sized image (w-48 = 192px) - CENTERED */}
+                                        <div className="flex justify-center">
+                                            <img
+                                                src={`http://127.0.0.1:8000/storage/${selectedOrder.payment_screenshot}`}
+                                                alt="Payment Screenshot"
+                                                className="w-48 h-auto max-w-full rounded-lg shadow-md cursor-pointer hover:opacity-90 transition-opacity"
+                                                onClick={() => setShowScreenshotModal(true)}
+                                            />
+                                        </div>
                                         <p className="text-xs text-gray-500 mt-2 text-center">Click to view full size</p>
                                     </div>
                                 </div>

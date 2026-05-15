@@ -42,7 +42,6 @@ export default function BookMachine() {
         fetchMachines();
     }, []);
 
-    // ✅ FIXED: Fetch machines with correct response structure
     const fetchMachines = async () => {
         try {
             setLoading(true);
@@ -55,9 +54,6 @@ export default function BookMachine() {
                 },
             });
 
-            console.log('Machines response:', response.data);
-
-            // ✅ FIXED: User endpoint returns {machines: [...]}, not {data: [...]}
             setMachines(response.data.machines || response.data.data || []);
         } catch (error) {
             console.error('Error fetching machines:', error);
@@ -67,8 +63,6 @@ export default function BookMachine() {
         }
     };
 
-    // ✅ NEW LOGIC: Check if user has completed ANY course (general eligibility)
-    // Not machine-specific - Fab Lab has ONE general training course
     const hasTrainingForMachine = (machine) => {
         return machine.has_required_training === true;
     };
@@ -78,16 +72,17 @@ export default function BookMachine() {
         setShowDetailsModal(true);
     };
 
-    const handleBookNow = () => {
+    const handleBookNow = (machine) => {
+        setSelectedMachine(machine);
         setShowDetailsModal(false);
         setShowBookingModal(true);
         setBookingData({
-            machine_id: selectedMachine.id,
+            machine_id: machine.id,
             start_date: '',
             end_date: '',
         });
         setBookingMessage('');
-        fetchBookedDates(selectedMachine.id);
+        fetchBookedDates(machine.id);
     };
 
     const fetchBookedDates = async (machineId) => {
@@ -116,33 +111,26 @@ export default function BookMachine() {
 
     const isDateRangeAvailable = (startDate, endDate) => {
         if (!startDate || !endDate) return true;
-
         const start = new Date(startDate);
         const end = new Date(endDate);
-
         for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
             const dateStr = d.toISOString().split('T')[0];
-            if (bookedDates.includes(dateStr)) {
-                return false;
-            }
+            if (bookedDates.includes(dateStr)) return false;
         }
         return true;
     };
 
-    // ✅ Submit booking
     const handleBookingSubmit = async (e) => {
         e.preventDefault();
         setBookingSubmitting(true);
         setBookingMessage('');
 
-        // Check training using API-provided has_required_training field
         if (selectedMachine && !hasTrainingForMachine(selectedMachine)) {
             setBookingMessage('❌ You must complete the Fab Lab training course before booking machines.');
             setBookingSubmitting(false);
             return;
         }
 
-        // Validate date range
         if (!isDateRangeAvailable(bookingData.start_date, bookingData.end_date)) {
             setBookingMessage('❌ Selected dates overlap with existing bookings. Please choose different dates.');
             setBookingSubmitting(false);
@@ -151,14 +139,11 @@ export default function BookMachine() {
 
         try {
             const authToken = localStorage.getItem('auth_token');
-
             const payload = {
                 machine_id: bookingData.machine_id,
                 start_date: bookingData.start_date,
                 end_date: bookingData.end_date,
             };
-
-            console.log('Sending booking payload:', payload);
 
             const response = await axios.post(
                 'http://127.0.0.1:8000/api/user/bookings',
@@ -179,7 +164,6 @@ export default function BookMachine() {
             }, 1500);
         } catch (error) {
             console.error('Booking error:', error);
-            console.error('Error response:', error.response?.data);
             if (error.response?.data?.message) {
                 setBookingMessage('❌ ' + error.response.data.message);
             } else {
@@ -199,57 +183,41 @@ export default function BookMachine() {
         setShowBookingModal(false);
         setSelectedMachine(null);
         setBookingMessage('');
+        setBookingData({ machine_id: '', start_date: '', end_date: '' });
     };
 
     const getStatusBadgeClass = (status) => {
         const badges = {
-            available: 'bg-green-100 text-green-800 border-green-200',
-            busy: 'bg-red-100 text-red-800 border-red-200',
-            maintenance: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+            available: 'bg-gradient-to-r from-green-400 to-emerald-500 text-white',
+            busy: 'bg-gradient-to-r from-blue-400 to-indigo-500 text-white',
+            maintenance: 'bg-gradient-to-r from-amber-400 to-orange-500 text-white',
         };
-        return badges[status] || 'bg-gray-100 text-gray-800 border-gray-200';
+        return badges[status] || 'bg-gray-200 text-gray-700';
     };
 
-    const isDateBooked = (date) => {
-        return bookedDates.includes(date);
-    };
+    const isDateBooked = (date) => bookedDates.includes(date);
 
-    // ✅ Generate calendar with correct day/date alignment
     const generateCalendarData = () => {
         const calendar = [];
         const today = new Date();
         const endDate = new Date(today);
         endDate.setDate(today.getDate() + 30);
-
         let currentDate = new Date(today);
         let currentMonth = null;
         let monthData = null;
 
         while (currentDate <= endDate) {
             const month = currentDate.toLocaleString('default', { month: 'long', year: 'numeric' });
-
             if (month !== currentMonth) {
-                if (monthData) {
-                    calendar.push(monthData);
-                }
+                if (monthData) calendar.push(monthData);
                 currentMonth = month;
-                monthData = {
-                    monthName: month,
-                    emptyDays: [],
-                    days: []
-                };
-
-                // Calculate empty days before 1st of month
+                monthData = { monthName: month, emptyDays: [], days: [] };
                 const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
                 const dayOfWeek = firstDayOfMonth.getDay();
-
                 if (currentDate.getDate() === 1 || monthData.days.length === 0) {
-                    for (let i = 0; i < dayOfWeek; i++) {
-                        monthData.emptyDays.push(i);
-                    }
+                    for (let i = 0; i < dayOfWeek; i++) monthData.emptyDays.push(i);
                 }
             }
-
             const dateStr = currentDate.toISOString().split('T')[0];
             monthData.days.push({
                 date: dateStr,
@@ -258,115 +226,152 @@ export default function BookMachine() {
                 dayOfWeek: currentDate.getDay(),
                 isBooked: isDateBooked(dateStr)
             });
-
             currentDate.setDate(currentDate.getDate() + 1);
         }
-
-        if (monthData) {
-            calendar.push(monthData);
-        }
-
+        if (monthData) calendar.push(monthData);
         return calendar;
     };
 
     return (
-        <div className="flex min-h-screen bg-gray-50">
+        <div className="flex min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
             <UserSidebar expandedMenus={expandedMenus} toggleSubmenu={toggleSubmenu} />
 
             <div className="flex-1">
-                <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
+                {/* Header */}
+                <header className="bg-white/80 backdrop-blur-md border-b border-gray-200 sticky top-0 z-30 shadow-sm">
                     <div className="px-6 py-4">
-                        <h1 className="text-2xl font-bold text-gray-900">Book a Machine</h1>
-                        <p className="text-sm text-gray-600 mt-1">Reserve a machine for your project</p>
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
+                                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                                </svg>
+                            </div>
+                            <div>
+                                <h1 className="text-2xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">Book a Machine</h1>
+                                <p className="text-sm text-gray-500">Reserve equipment for your creative projects</p>
+                            </div>
+                        </div>
                     </div>
                 </header>
 
                 <main className="p-6">
                     {loading && (
-                        <div className="text-center py-12">
-                            <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent"></div>
-                            <p className="mt-4 text-gray-600">Loading machines...</p>
+                        <div className="flex flex-col items-center justify-center py-20">
+                            <div className="relative">
+                                <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                    <div className="w-8 h-8 bg-blue-600 rounded-full animate-pulse"></div>
+                                </div>
+                            </div>
+                            <p className="mt-6 text-gray-600 font-medium">Loading machines...</p>
                         </div>
                     )}
 
                     {!loading && (
                         <>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                 {machines.map((machine) => (
-                                    <div key={machine.id} className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-lg transition-shadow overflow-hidden">
-                                        {/* Machine Image */}
-                                        <div className="h-64 bg-gray-100 overflow-hidden">
+                                    <div
+                                        key={machine.id}
+                                        className="group bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden hover:-translate-y-1"
+                                    >
+                                        {/* Machine Image with Badges */}
+                                        <div className="relative h-56 bg-gradient-to-br from-gray-100 to-gray-200 overflow-hidden">
+                                            {/* Status Badges */}
+                                            <div className="absolute top-3 left-3 z-10 flex gap-2">
+                                                {machine.status === 'available' && (
+                                                    <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-bold bg-gradient-to-r from-green-400 to-emerald-500 text-white shadow-lg animate-pulse">
+                                                        <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                                        </svg>
+                                                        Available
+                                                    </span>
+                                                )}
+                                                {machine.status === 'maintenance' && (
+                                                    <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-bold bg-gradient-to-r from-amber-400 to-orange-500 text-white shadow-lg">
+                                                        <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                                        </svg>
+                                                        Maintenance
+                                                    </span>
+                                                )}
+                                            </div>
+
+                                            {/* Training Badge */}
+                                            <div className="absolute top-3 right-3 z-10">
+                                                <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-bold shadow-md ${hasTrainingForMachine(machine)
+                                                        ? 'bg-gradient-to-r from-green-100 to-emerald-100 text-green-700 border border-green-200'
+                                                        : 'bg-gradient-to-r from-red-100 to-rose-100 text-red-700 border border-red-200'
+                                                    }`}>
+                                                    {hasTrainingForMachine(machine) ? '✅' : '🚫'} {hasTrainingForMachine(machine) ? 'Trained' : 'Training'}
+                                                </span>
+                                            </div>
+
+                                            {/* Machine Image */}
                                             {machine.image ? (
                                                 <img
                                                     src={`http://127.0.0.1:8000/storage/${machine.image}`}
                                                     alt={machine.name}
-                                                    className="w-full h-full object-cover"
-                                                    onError={(e) => {
-                                                        console.error('Image failed to load:', machine.image);
-                                                        e.target.style.display = 'none';
-                                                        e.target.parentElement.innerHTML = `
-                                                            <div class="h-full bg-gradient-to-br from-blue-50 to-cyan-50 flex items-center justify-center">
-                                                                <svg class="w-20 h-20 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                                                </svg>
-                                                            </div>
-                                                        `;
-                                                    }}
+                                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                                                 />
                                             ) : (
-                                                <div className="h-full bg-gradient-to-br from-blue-50 to-cyan-50 flex items-center justify-center">
-                                                    <svg className="w-20 h-20 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                <div className="h-full bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center">
+                                                    <svg className="w-16 h-16 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                                     </svg>
                                                 </div>
                                             )}
                                         </div>
 
+                                        {/* Card Content */}
                                         <div className="p-5">
-                                            <h3 className="font-bold text-gray-900 text-lg mb-1">{machine.name}</h3>
-                                            <p className="text-sm text-gray-600 mb-3">{machine.category || 'General'}</p>
-
-                                            <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium border mb-4 ${getStatusBadgeClass(machine.status)}`}>
-                                                {machine.status.charAt(0).toUpperCase() + machine.status.slice(1).replace('-', ' ')}
-                                            </span>
-
-                                            {/* ✅ Training Badge - General Eligibility */}
-                                            <div className="mb-3">
-                                                <span className={`inline-block px-2 py-1 rounded text-[10px] font-medium ${hasTrainingForMachine(machine)
-                                                    ? 'bg-green-100 text-green-700'
-                                                    : 'bg-red-100 text-red-700'
-                                                    }`}>
-                                                    {hasTrainingForMachine(machine) ? '✅ Trained' : '🚫 Training Required'}
-                                                </span>
+                                            <div className="mb-4">
+                                                <h3 className="font-bold text-gray-900 text-lg mb-1 group-hover:text-blue-600 transition-colors">{machine.name}</h3>
+                                                <p className="text-sm text-gray-500">{machine.category || 'General Equipment'}</p>
                                             </div>
 
-                                            <button
-                                                onClick={() => handleViewDetails(machine)}
-                                                disabled={machine.status !== 'available'}
-                                                className={`w-full py-2.5 px-4 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${machine.status === 'available'
-                                                    ? 'bg-blue-600 text-white hover:bg-blue-700'
-                                                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                                    }`}
-                                            >
-                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                </svg>
-                                                {machine.status === 'available' ? 'View Details' :
-                                                    machine.status === 'in_use' ? 'In Use' : 'Maintenance'}
-                                            </button>
+                                            {/* Action Buttons */}
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <button
+                                                    onClick={() => handleBookNow(machine)}
+                                                    disabled={!hasTrainingForMachine(machine) || machine.status !== 'available'}
+                                                    className={`py-2.5 px-3 rounded-xl font-medium text-sm transition-all duration-200 flex items-center justify-center gap-1.5 shadow-sm ${hasTrainingForMachine(machine) && machine.status === 'available'
+                                                            ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:from-blue-600 hover:to-indigo-700 hover:shadow-lg transform hover:-translate-y-0.5'
+                                                            : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                                        }`}
+                                                >
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                    </svg>
+                                                    Book Now
+                                                </button>
+
+                                                <button
+                                                    onClick={() => handleViewDetails(machine)}
+                                                    className="py-2.5 px-3 rounded-xl font-medium text-sm bg-gray-50 text-gray-700 hover:bg-gray-100 transition-all duration-200 flex items-center justify-center gap-1.5 border border-gray-200 hover:border-gray-300"
+                                                >
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                                    </svg>
+                                                    Details
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                 ))}
                             </div>
 
                             {machines.length === 0 && (
-                                <div className="text-center py-12">
-                                    <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
-                                    <p className="text-gray-500 text-lg">No machines available</p>
+                                <div className="text-center py-16">
+                                    <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                        <svg className="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                    </div>
+                                    <p className="text-gray-500 text-lg font-medium">No machines available right now</p>
+                                    <p className="text-gray-400 text-sm mt-1">Check back later for new equipment!</p>
                                 </div>
                             )}
                         </>
@@ -374,21 +379,42 @@ export default function BookMachine() {
                 </main>
             </div>
 
-            {/* Machine Details Modal */}
+            {/* ✨ MACHINE DETAILS MODAL - Enhanced Design */}
             {showDetailsModal && selectedMachine && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={closeDetailsModal}>
-                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
-                        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white rounded-t-2xl z-10">
-                            <h3 className="text-xl font-bold text-gray-900">Machine Details</h3>
-                            <button onClick={closeDetailsModal} className="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100 transition-colors">
-                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                            </button>
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in" onClick={closeDetailsModal}>
+                    <div
+                        className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden animate-slide-up"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {/* Header with Gradient */}
+                        <div className="relative bg-gradient-to-r from-blue-600 to-indigo-700 px-6 py-5">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
+                                        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <h3 className="text-xl font-bold text-white">{selectedMachine.name}</h3>
+                                        <p className="text-blue-100 text-sm">{selectedMachine.category || 'General Equipment'}</p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={closeDetailsModal}
+                                    className="w-10 h-10 bg-white/20 hover:bg-white/30 rounded-xl flex items-center justify-center transition-colors backdrop-blur-sm"
+                                >
+                                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            </div>
                         </div>
 
-                        <div className="p-6 overflow-y-auto flex-1">
-                            <div className="h-64 bg-gray-100 rounded-lg mb-6 overflow-hidden">
+                        {/* Content */}
+                        <div className="p-6 overflow-y-auto flex-1 bg-gray-50">
+                            {/* Machine Image */}
+                            <div className="h-56 bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl mb-6 overflow-hidden shadow-inner">
                                 {selectedMachine.image ? (
                                     <img
                                         src={`http://127.0.0.1:8000/storage/${selectedMachine.image}`}
@@ -396,209 +422,298 @@ export default function BookMachine() {
                                         className="w-full h-full object-cover"
                                     />
                                 ) : (
-                                    <div className="h-full bg-gradient-to-br from-blue-50 to-cyan-50 flex items-center justify-center">
-                                        <svg className="w-20 h-20 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    <div className="h-full bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center">
+                                        <svg className="w-16 h-16 text-blue-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                         </svg>
                                     </div>
                                 )}
                             </div>
 
+                            {/* Info Cards Grid */}
                             <div className="grid grid-cols-2 gap-4 mb-6">
-                                <div>
-                                    <p className="text-sm text-gray-500 mb-1">Machine Name</p>
+                                <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                                        </svg>
+                                        <p className="text-xs text-gray-500 font-medium">Name</p>
+                                    </div>
                                     <p className="font-semibold text-gray-900">{selectedMachine.name}</p>
                                 </div>
-                                <div>
-                                    <p className="text-sm text-gray-500 mb-1">Machine Type</p>
+                                <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <svg className="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                                        </svg>
+                                        <p className="text-xs text-gray-500 font-medium">Type</p>
+                                    </div>
                                     <p className="font-semibold text-gray-900">{selectedMachine.type || selectedMachine.category || 'General'}</p>
                                 </div>
-                                <div>
-                                    <p className="text-sm text-gray-500 mb-1">Status</p>
-                                    <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium border ${getStatusBadgeClass(selectedMachine.status)}`}>
-                                        {selectedMachine.status.charAt(0).toUpperCase() + selectedMachine.status.slice(1).replace('-', ' ')}
+                                <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <svg className="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        <p className="text-xs text-gray-500 font-medium">Status</p>
+                                    </div>
+                                    <span className={`inline-flex px-3 py-1 rounded-full text-xs font-bold ${getStatusBadgeClass(selectedMachine.status)}`}>
+                                        {selectedMachine.status.charAt(0).toUpperCase() + selectedMachine.status.slice(1).replace('_', ' ')}
                                     </span>
                                 </div>
-                                <div>
-                                    <p className="text-sm text-gray-500 mb-1">Added On</p>
-                                    <p className="font-semibold text-gray-900">{new Date(selectedMachine.created_at).toLocaleDateString()}</p>
+                                <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <svg className="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                        </svg>
+                                        <p className="text-xs text-gray-500 font-medium">Added</p>
+                                    </div>
+                                    <p className="font-semibold text-gray-900">{new Date(selectedMachine.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
                                 </div>
                             </div>
 
-                            <div className="mb-6 pb-6 border-b border-gray-200">
-                                <p className="text-sm text-gray-500 mb-2">Description</p>
-                                <p className="text-gray-900">{selectedMachine.description || 'No description available.'}</p>
+                            {/* Description */}
+                            <div className="mb-6">
+                                <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                                    <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h7" />
+                                    </svg>
+                                    Description
+                                </h4>
+                                <p className="text-gray-600 bg-white rounded-xl p-4 border border-gray-100 leading-relaxed">
+                                    {selectedMachine.description || 'No description available for this machine.'}
+                                </p>
                             </div>
 
-                            {/* ✅ Training Requirement - General Eligibility */}
-                            <div className={`mb-6 p-4 rounded-lg border ${hasTrainingForMachine(selectedMachine)
-                                ? 'bg-green-50 border-green-200'
-                                : 'bg-red-50 border-red-200'
-                                }`}>
-                                <div className="flex items-start gap-3">
-                                    <svg className={`w-5 h-5 flex-shrink-0 mt-0.5 ${hasTrainingForMachine(selectedMachine) ? 'text-green-600' : 'text-red-600'
-                                        }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={
-                                            hasTrainingForMachine(selectedMachine)
-                                                ? "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                                                : "M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                                        } />
-                                    </svg>
-                                    <div>
-                                        <p className={`text-sm font-semibold ${hasTrainingForMachine(selectedMachine) ? 'text-green-800' : 'text-red-800'
-                                            }`}>
-                                            {hasTrainingForMachine(selectedMachine) ? '✅ Training Completed' : '🚫 Training Required'}
-                                        </p>
-                                        <p className={`text-xs mt-1 ${hasTrainingForMachine(selectedMachine) ? 'text-green-700' : 'text-red-700'
-                                            }`}>
-                                            {hasTrainingForMachine(selectedMachine)
-                                                ? 'You are eligible to book any machine.'
-                                                : 'Complete the Fab Lab training course to book machines.'}
-                                        </p>
-                                        {!hasTrainingForMachine(selectedMachine) && (
-                                            <Link to="/user/courses" className="inline-block mt-2 text-xs font-medium text-red-700 underline hover:text-red-800">
-                                                View Available Courses →
+                            {/* Training Status Cards */}
+                            {!hasTrainingForMachine(selectedMachine) ? (
+                                <div className="mb-6 p-5 bg-gradient-to-br from-red-50 via-rose-50 to-orange-50 rounded-2xl border-2 border-red-100 shadow-sm">
+                                    <div className="flex items-start gap-4">
+                                        <div className="flex-shrink-0">
+                                            <div className="w-14 h-14 bg-gradient-to-br from-red-100 to-rose-100 rounded-2xl flex items-center justify-center shadow-md">
+                                                <svg className="w-7 h-7 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                                </svg>
+                                            </div>
+                                        </div>
+                                        <div className="flex-1">
+                                            <h4 className="text-lg font-bold text-red-900 mb-2 flex items-center gap-2">
+                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                                </svg>
+                                                Training Required
+                                            </h4>
+                                            <p className="text-sm text-red-700 mb-4 leading-relaxed">
+                                                Complete the Fab Lab safety training to unlock booking privileges. This ensures safe operation of all equipment.
+                                            </p>
+                                            <Link
+                                                to="/user/courses"
+                                                className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-red-500 to-rose-600 text-white text-sm font-semibold rounded-xl hover:from-red-600 hover:to-rose-700 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                                            >
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                                                </svg>
+                                                Start Training Now
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                                                </svg>
                                             </Link>
-                                        )}
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
+                            ) : (
+                                <div className="mb-6 p-5 bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 rounded-2xl border-2 border-green-100 shadow-sm">
+                                    <div className="flex items-start gap-4">
+                                        <div className="flex-shrink-0">
+                                            <div className="w-14 h-14 bg-gradient-to-br from-green-100 to-emerald-100 rounded-2xl flex items-center justify-center shadow-md">
+                                                <svg className="w-7 h-7 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                </svg>
+                                            </div>
+                                        </div>
+                                        <div className="flex-1">
+                                            <h4 className="text-lg font-bold text-green-900 mb-2 flex items-center gap-2">
+                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                </svg>
+                                                Training Completed ✅
+                                            </h4>
+                                            <p className="text-sm text-green-700 leading-relaxed">
+                                                Excellent! You're certified to use this equipment. You can now proceed with booking for your project.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
-
-                        {selectedMachine.status === 'available' && (
-                            <div className="px-6 py-4 border-t border-gray-200 sticky bottom-0 bg-white rounded-b-2xl">
-                                <button
-                                    onClick={handleBookNow}
-                                    disabled={!hasTrainingForMachine(selectedMachine)}
-                                    className={`w-full py-3 font-semibold rounded-lg transition-colors ${hasTrainingForMachine(selectedMachine)
-                                        ? 'bg-blue-600 text-white hover:bg-blue-700'
-                                        : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                                        }`}
-                                >
-                                    {hasTrainingForMachine(selectedMachine)
-                                        ? 'Book This Machine'
-                                        : 'Complete Required Training First'}
-                                </button>
-                            </div>
-                        )}
                     </div>
                 </div>
             )}
 
-            {/* ✅ Booking Modal - Single scrollbar with calendar colors */}
+            {/* ✨ BOOKING MODAL - Enhanced Design */}
             {showBookingModal && selectedMachine && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={closeBookingModal}>
-                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
-                        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white rounded-t-2xl z-10 flex-shrink-0">
-                            <div>
-                                <h3 className="text-xl font-bold text-gray-900">Book {selectedMachine.name}</h3>
-                                <p className="text-sm text-gray-500 mt-1">Select your booking dates</p>
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-fade-in" onClick={closeBookingModal}>
+                    <div
+                        className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden animate-slide-up"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {/* Header */}
+                        <div className="relative bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-700 px-6 py-5">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                        </svg>
+                                        Book {selectedMachine.name}
+                                    </h3>
+                                    <p className="text-blue-100 text-sm mt-1">Select your preferred dates below</p>
+                                </div>
+                                <button
+                                    onClick={closeBookingModal}
+                                    className="w-10 h-10 bg-white/20 hover:bg-white/30 rounded-xl flex items-center justify-center transition-colors backdrop-blur-sm"
+                                >
+                                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
                             </div>
-                            <button onClick={closeBookingModal} className="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100 transition-colors">
-                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                            </button>
                         </div>
 
                         <form onSubmit={handleBookingSubmit} className="flex flex-col flex-1 overflow-hidden">
-                            <div className="p-6 space-y-6 overflow-y-auto flex-1">
-                                <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                                    <p className="text-sm font-medium text-blue-900">{selectedMachine.name}</p>
-                                    <p className="text-xs text-blue-700 mt-1">{selectedMachine.location || 'Main Lab'}</p>
+                            <div className="p-6 space-y-6 overflow-y-auto flex-1 bg-gray-50">
+                                {/* Machine Info Card */}
+                                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-5 border border-blue-100 shadow-sm">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-md">
+                                            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                                            </svg>
+                                        </div>
+                                        <div>
+                                            <p className="font-semibold text-gray-900">{selectedMachine.name}</p>
+                                            <p className="text-sm text-gray-500">{selectedMachine.location || 'Main Fab Lab'}</p>
+                                        </div>
+                                    </div>
                                 </div>
 
+                                {/* Messages */}
                                 {bookingMessage && (
-                                    <div className={`p-3 rounded-lg text-sm ${bookingMessage.includes('✅') ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                                    <div className={`p-4 rounded-xl text-sm font-medium flex items-center gap-3 ${bookingMessage.includes('✅')
+                                            ? 'bg-gradient-to-r from-green-50 to-emerald-50 text-green-800 border border-green-200'
+                                            : 'bg-gradient-to-r from-red-50 to-rose-50 text-red-800 border border-red-200'
                                         }`}>
+                                        {bookingMessage.includes('✅') ? (
+                                            <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                        ) : (
+                                            <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                            </svg>
+                                        )}
                                         {bookingMessage}
                                     </div>
                                 )}
 
+                                {/* Date Inputs */}
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">Start Date *</label>
+                                    <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+                                        <label className="block text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                                            <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                            </svg>
+                                            Start Date
+                                        </label>
                                         <input
                                             type="date"
                                             name="start_date"
                                             value={bookingData.start_date}
                                             onChange={handleBookingChange}
                                             min={new Date().toISOString().split('T')[0]}
-                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                            className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-gray-50 hover:bg-white"
                                             required
                                         />
                                     </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">End Date *</label>
+                                    <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+                                        <label className="block text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                                            <svg className="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                            </svg>
+                                            End Date
+                                        </label>
                                         <input
                                             type="date"
                                             name="end_date"
                                             value={bookingData.end_date}
                                             onChange={handleBookingChange}
                                             min={bookingData.start_date || new Date().toISOString().split('T')[0]}
-                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                            className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all bg-gray-50 hover:bg-white"
                                             required
                                         />
                                     </div>
                                 </div>
 
-                                {/* ✅ Calendar with Green (selected) and Red (booked) colors */}
-                                <div>
-                                    <div className="flex items-center justify-between mb-3">
-                                        <label className="block text-sm font-medium text-gray-700">Available Dates (Next 30 Days)</label>
+                                {/* Calendar Section */}
+                                <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <label className="block text-sm font-semibold text-gray-700 flex items-center gap-2">
+                                            <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                            </svg>
+                                            Available Dates (Next 30 Days)
+                                        </label>
                                         {(bookingData.start_date || bookingData.end_date) && (
                                             <button
                                                 type="button"
                                                 onClick={() => setBookingData({ machine_id: bookingData.machine_id, start_date: '', end_date: '' })}
-                                                className="text-xs text-red-600 hover:text-red-700 font-medium flex items-center gap-1"
+                                                className="text-xs font-medium text-red-600 hover:text-red-700 flex items-center gap-1.5 px-3 py-1.5 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
                                             >
-                                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
                                                 </svg>
-                                                Clear Selection
+                                                Clear
                                             </button>
                                         )}
                                     </div>
 
-                                    <div className="space-y-4">
+                                    {/* Calendar Grid */}
+                                    <div className="space-y-5">
                                         {generateCalendarData().map((monthData, monthIndex) => (
-                                            <div key={monthIndex} className="border border-gray-200 rounded-lg p-4">
-                                                <h4 className="text-sm font-semibold text-gray-900 mb-3">{monthData.monthName}</h4>
-                                                <div className="grid grid-cols-7 gap-2">
-                                                    {/* Day headers */}
-                                                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                                                        <div key={day} className="text-center text-xs font-medium text-gray-500 py-1">
+                                            <div key={monthIndex} className="border border-gray-100 rounded-xl p-4 bg-gray-50">
+                                                <h4 className="text-sm font-bold text-gray-900 mb-4 pb-2 border-b border-gray-200">{monthData.monthName}</h4>
+                                                <div className="grid grid-cols-7 gap-1.5">
+                                                    {/* Day Headers */}
+                                                    {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, idx) => (
+                                                        <div key={idx} className="text-center text-[10px] font-bold text-gray-400 py-2">
                                                             {day}
                                                         </div>
                                                     ))}
 
-                                                    {/* Empty cells before 1st of month */}
-                                                    {monthData.emptyDays && monthData.emptyDays.map((_, index) => (
+                                                    {/* Empty Cells */}
+                                                    {monthData.emptyDays?.map((_, index) => (
                                                         <div key={`empty-${index}`} className="p-2"></div>
                                                     ))}
 
-                                                    {/* Calendar days */}
+                                                    {/* Calendar Days */}
                                                     {monthData.days.map((dayInfo) => {
                                                         const isSelected = bookingData.start_date && bookingData.end_date &&
                                                             dayInfo.date >= bookingData.start_date &&
                                                             dayInfo.date <= bookingData.end_date;
-
                                                         const isBooked = dayInfo.isBooked;
                                                         const isStartDate = bookingData.start_date === dayInfo.date;
                                                         const isEndDate = bookingData.end_date === dayInfo.date;
 
-                                                        let dayClass = 'bg-white border-gray-200 text-gray-700 hover:bg-blue-50';
-                                                        let isDisabled = false;
+                                                        let dayClass = 'bg-white border-gray-200 text-gray-700 hover:bg-blue-50 hover:border-blue-300';
 
                                                         if (isBooked) {
-                                                            dayClass = 'bg-red-100 border-red-300 text-red-700 cursor-not-allowed';
-                                                            isDisabled = true;
+                                                            dayClass = 'bg-red-50 border-red-200 text-red-400 cursor-not-allowed line-through';
                                                         } else if (isSelected) {
                                                             if (isStartDate || isEndDate) {
-                                                                dayClass = 'bg-green-600 border-green-700 text-white font-bold ring-2 ring-green-400';
+                                                                dayClass = 'bg-gradient-to-br from-green-500 to-emerald-600 border-green-600 text-white font-bold shadow-md ring-2 ring-green-300';
                                                             } else {
-                                                                dayClass = 'bg-green-500 border-green-600 text-white';
+                                                                dayClass = 'bg-gradient-to-br from-green-400 to-emerald-500 border-green-500 text-white';
                                                             }
                                                         }
 
@@ -606,49 +721,36 @@ export default function BookMachine() {
                                                             <div
                                                                 key={dayInfo.date}
                                                                 className={`
-                                                                    p-2 text-center text-xs rounded-lg border transition-all duration-200
+                                                                    p-2.5 text-center text-xs rounded-lg border transition-all duration-200 cursor-pointer
                                                                     ${dayClass}
-                                                                    ${!isBooked ? 'cursor-pointer hover:scale-105' : ''}
+                                                                    ${!isBooked ? 'hover:scale-105 hover:shadow-md' : ''}
                                                                 `}
                                                                 onClick={() => {
                                                                     if (!isBooked) {
                                                                         if (bookingData.start_date === dayInfo.date && !bookingData.end_date) {
                                                                             setBookingData({ machine_id: bookingData.machine_id, start_date: '', end_date: '' });
                                                                         } else if (bookingData.start_date && bookingData.end_date) {
-                                                                            setBookingData(prev => ({
-                                                                                ...prev,
-                                                                                start_date: dayInfo.date,
-                                                                                end_date: ''
-                                                                            }));
+                                                                            setBookingData(prev => ({ ...prev, start_date: dayInfo.date, end_date: '' }));
                                                                         } else if (bookingData.start_date && dayInfo.date >= bookingData.start_date) {
-                                                                            setBookingData(prev => ({
-                                                                                ...prev,
-                                                                                end_date: dayInfo.date
-                                                                            }));
+                                                                            setBookingData(prev => ({ ...prev, end_date: dayInfo.date }));
                                                                         } else {
-                                                                            setBookingData(prev => ({
-                                                                                ...prev,
-                                                                                start_date: dayInfo.date,
-                                                                                end_date: ''
-                                                                            }));
+                                                                            setBookingData(prev => ({ ...prev, start_date: dayInfo.date, end_date: '' }));
                                                                         }
                                                                     }
                                                                 }}
                                                             >
-                                                                <div className="font-semibold">{dayInfo.dayNumber}</div>
-
+                                                                <div className={`font-semibold ${isSelected ? 'text-white' : ''}`}>{dayInfo.dayNumber}</div>
                                                                 {isBooked && (
-                                                                    <div className="text-[10px] mt-1 flex items-center justify-center gap-1">
-                                                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                                                    <div className="text-[9px] mt-0.5 flex items-center justify-center">
+                                                                        <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12" />
                                                                         </svg>
                                                                     </div>
                                                                 )}
-
-                                                                {isSelected && !isBooked && (
-                                                                    <div className="text-[10px] mt-1 flex items-center justify-center gap-1">
-                                                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                                                                {isSelected && !isBooked && (isStartDate || isEndDate) && (
+                                                                    <div className="text-[9px] mt-0.5 flex items-center justify-center">
+                                                                        <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
                                                                         </svg>
                                                                     </div>
                                                                 )}
@@ -661,42 +763,60 @@ export default function BookMachine() {
                                     </div>
 
                                     {/* Legend */}
-                                    <div className="flex items-center gap-4 mt-3 text-xs">
+                                    <div className="flex flex-wrap items-center gap-4 mt-5 pt-4 border-t border-gray-100">
                                         <div className="flex items-center gap-2">
-                                            <div className="w-4 h-4 bg-white border border-gray-200 rounded"></div>
-                                            <span>Available</span>
+                                            <div className="w-4 h-4 bg-white border border-gray-200 rounded-md shadow-sm"></div>
+                                            <span className="text-xs text-gray-600">Available</span>
                                         </div>
                                         <div className="flex items-center gap-2">
-                                            <div className="w-4 h-4 bg-green-500 rounded"></div>
-                                            <span>Selected</span>
+                                            <div className="w-4 h-4 bg-gradient-to-br from-green-400 to-emerald-500 rounded-md shadow-sm"></div>
+                                            <span className="text-xs text-gray-600">Selected</span>
                                         </div>
                                         <div className="flex items-center gap-2">
-                                            <div className="w-4 h-4 bg-green-600 rounded ring-2 ring-green-400"></div>
-                                            <span>Start/End</span>
+                                            <div className="w-4 h-4 bg-gradient-to-br from-green-500 to-emerald-600 rounded-md shadow-md ring-2 ring-green-300"></div>
+                                            <span className="text-xs text-gray-600">Start/End</span>
                                         </div>
                                         <div className="flex items-center gap-2">
-                                            <div className="w-4 h-4 bg-red-100 border border-red-300 rounded"></div>
-                                            <span>Booked</span>
+                                            <div className="w-4 h-4 bg-red-50 border border-red-200 rounded-md"></div>
+                                            <span className="text-xs text-gray-600">Booked</span>
                                         </div>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Fixed footer */}
-                            <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-end gap-3 flex-shrink-0">
+                            {/* Fixed Footer */}
+                            <div className="px-6 py-4 bg-white border-t border-gray-100 flex items-center justify-end gap-3 flex-shrink-0 shadow-lg">
                                 <button
                                     type="button"
                                     onClick={closeBookingModal}
-                                    className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-200 rounded-lg transition-colors"
+                                    className="px-5 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-100 rounded-xl transition-colors border border-gray-200"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     type="submit"
                                     disabled={bookingSubmitting}
-                                    className="px-6 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-400"
+                                    className={`px-7 py-2.5 text-sm font-semibold rounded-xl transition-all shadow-lg flex items-center gap-2 ${bookingSubmitting
+                                            ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                            : 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:from-blue-600 hover:to-indigo-700 hover:shadow-xl transform hover:-translate-y-0.5'
+                                        }`}
                                 >
-                                    {bookingSubmitting ? 'Booking...' : 'Confirm Booking'}
+                                    {bookingSubmitting ? (
+                                        <>
+                                            <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                            </svg>
+                                            Processing...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                                            </svg>
+                                            Confirm Booking
+                                        </>
+                                    )}
                                 </button>
                             </div>
                         </form>

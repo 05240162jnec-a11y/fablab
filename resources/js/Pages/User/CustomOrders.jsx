@@ -15,6 +15,8 @@ export default function CustomOrders() {
     // Modal States
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [showViewModal, setShowViewModal] = useState(false);
+    const [showCheckoutModal, setShowCheckoutModal] = useState(false);
+    const [showPaymentModal, setShowPaymentModal] = useState(false);
     const [showSuccessModal, setShowSuccessModal] = useState(false);
 
     // Selected Order State
@@ -33,6 +35,11 @@ export default function CustomOrders() {
 
     // Image Preview State
     const [imagePreview, setImagePreview] = useState(null);
+
+    // Checkout State
+    const [deliveryOption, setDeliveryOption] = useState('pickup'); // 'pickup' or 'shipping'
+    const [shippingAddress, setShippingAddress] = useState('');
+    const [shippingCost] = useState(150); // Fixed shipping cost
 
     // Form Loading State
     const [submitting, setSubmitting] = useState(false);
@@ -58,7 +65,7 @@ export default function CustomOrders() {
         }));
     };
 
-    // ✅ Fetch orders with proper parsing
+    // Fetch orders with proper parsing
     const fetchOrders = async () => {
         try {
             setLoading(true);
@@ -71,17 +78,10 @@ export default function CustomOrders() {
                 }
             });
 
-            console.log('📦 API Response:', response.data);
-
-            // ✅ Parse paginated Laravel response: { success: true, data: { data: [...] } }
             const ordersData = response.data?.data?.data || [];
-
-            console.log('✅ Extracted orders:', ordersData);
-            console.log('✅ Orders count:', ordersData.length);
-
             setOrders(ordersData);
 
-            // ✅ Calculate stats from orders
+            // Calculate stats from orders
             const newStats = {
                 pending: ordersData.filter(o => o.status === 'pending').length,
                 in_progress: ordersData.filter(o => o.status === 'in_progress').length,
@@ -92,7 +92,7 @@ export default function CustomOrders() {
 
             setError(null);
         } catch (err) {
-            console.error('❌ Fetch error:', err);
+            console.error('Fetch error:', err);
             setError('Failed to load custom orders.');
             setOrders([]);
         } finally {
@@ -127,6 +127,8 @@ export default function CustomOrders() {
     const closeAllModals = () => {
         setShowCreateModal(false);
         setShowViewModal(false);
+        setShowCheckoutModal(false);
+        setShowPaymentModal(false);
         setShowSuccessModal(false);
         setSelectedOrder(null);
         setFormState({
@@ -135,6 +137,8 @@ export default function CustomOrders() {
             quantity: '1',
             design_image: null,
         });
+        setDeliveryOption('pickup');
+        setShippingAddress('');
 
         // Clean up preview URL
         if (imagePreview) {
@@ -148,7 +152,6 @@ export default function CustomOrders() {
         e.preventDefault();
         setSubmitting(true);
 
-        // Validate design image
         if (!formState.design_image) {
             alert('❌ Please upload a design image');
             setSubmitting(false);
@@ -176,7 +179,7 @@ export default function CustomOrders() {
             if (response.data.success) {
                 setShowCreateModal(false);
                 setShowSuccessModal(true);
-                fetchOrders(); // Refresh list
+                fetchOrders();
             }
         } catch (err) {
             console.error('Submit order error:', err);
@@ -186,15 +189,46 @@ export default function CustomOrders() {
         }
     };
 
-    // ✅ NEW: Upload payment screenshot
-    const handleUploadPayment = async (orderId, file) => {
+    // ✅ Open Checkout Modal (Step 1 of payment)
+    const handleOpenCheckout = () => {
+        setShowViewModal(false);
+        setShowCheckoutModal(true);
+    };
+
+    // ✅ Continue to Payment (Step 2)
+    const handleContinueToPayment = () => {
+        if (deliveryOption === 'shipping' && !shippingAddress.trim()) {
+            alert('❌ Please enter shipping address');
+            return;
+        }
+        setShowCheckoutModal(false);
+        setShowPaymentModal(true);
+    };
+
+    // ✅ Upload Payment Screenshot (from Payment Modal)
+    const handleUploadPayment = async (e) => {
+        e.preventDefault();
+        const fileInput = e.target.querySelector('input[type="file"]');
+        const file = fileInput.files[0];
+
+        if (!file) {
+            alert('❌ Please select payment screenshot');
+            return;
+        }
+
+        setSubmitting(true);
+
         try {
             const token = localStorage.getItem('auth_token');
             const formData = new FormData();
             formData.append('payment_screenshot', file);
+            formData.append('delivery_option', deliveryOption);
+            if (deliveryOption === 'shipping') {
+                formData.append('shipping_address', shippingAddress);
+            }
 
             const response = await axios.post(
-                `http://127.0.0.1:8000/api/user/custom-orders/${orderId}/upload-payment`,
+                `http://127.0.0.1:8000/api/user/custom-orders/${selectedOrder.id}/upload-payment`,
                 formData,
                 {
                     headers: {
@@ -205,16 +239,19 @@ export default function CustomOrders() {
                 }
             );
 
-            alert('✅ ' + response.data.message);
-            await fetchOrders(); // Refresh list
+            setShowPaymentModal(false);
+            setShowSuccessModal(true);
+            await fetchOrders();
         } catch (err) {
             console.error('Upload payment error:', err);
             const message = err.response?.data?.message || 'Failed to upload payment';
             alert('❌ ' + message);
+        } finally {
+            setSubmitting(false);
         }
     };
 
-    // ✅ NEW: Cancel order
+    // Cancel Order
     const handleCancelOrder = async (orderId) => {
         if (!window.confirm('Are you sure you want to cancel this order?')) return;
 
@@ -232,7 +269,8 @@ export default function CustomOrders() {
             );
 
             alert('✅ ' + response.data.message);
-            await fetchOrders(); // Refresh list
+            setShowViewModal(false);
+            await fetchOrders();
         } catch (err) {
             console.error('Cancel error:', err);
             const message = err.response?.data?.message || 'Failed to cancel order';
@@ -291,7 +329,7 @@ export default function CustomOrders() {
     // Capitalize first letter
     const capitalize = (str) => str.charAt(0).toUpperCase() + str.slice(1);
 
-    // ✅ Filter orders with COMPLETE logic
+    // Filter orders
     const filteredOrders = (orders || []).filter(order => {
         if (filter === 'all') return true;
         return order.status === filter;
@@ -313,42 +351,25 @@ export default function CustomOrders() {
         });
     };
 
+    // Calculate total with shipping
+    const calculateTotal = () => {
+        const orderTotal = parseFloat(selectedOrder?.estimated_price || 0);
+        return deliveryOption === 'shipping' ? orderTotal + shippingCost : orderTotal;
+    };
+
     return (
         <div className="flex min-h-screen bg-gray-50">
-            {/* ✅ Shared Sidebar Component */}
             <UserSidebar expandedMenus={expandedMenus} toggleSubmenu={toggleSubmenu} />
 
-            {/* Main Content */}
             <div className="flex-1">
-                {/* Top Header */}
+                {/* Header */}
                 <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
-                    <div className="flex items-center justify-between px-6 py-4">
-                        <div>
-                            <h2 className="text-xl font-semibold text-gray-800">Custom Orders</h2>
-                            <p className="text-sm text-gray-600">Request custom fabrication for your unique designs and projects</p>
-                        </div>
-
-                        {/* Right Side */}
-                        <div className="flex items-center gap-4">
-                            {/* Notifications */}
-                            <button className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                                <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                                </svg>
-                                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-                            </button>
-
-                            {/* User Profile */}
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-cyan-600 rounded-full flex items-center justify-center text-white font-bold text-sm">
-                                    PS
-                                </div>
-                            </div>
-                        </div>
+                    <div className="px-6 py-4">
+                        <h2 className="text-xl font-semibold text-gray-800">Custom Orders</h2>
+                        <p className="text-sm text-gray-600">Request custom fabrication for your unique designs</p>
                     </div>
                 </header>
 
-                {/* Custom Orders Content */}
                 <main className="p-6">
                     {/* Loading State */}
                     {loading && (
@@ -368,7 +389,6 @@ export default function CustomOrders() {
                         <>
                             {/* Stats Cards */}
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-                                {/* Pending Review */}
                                 <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
                                     <div className="flex items-center gap-4">
                                         <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
@@ -383,7 +403,6 @@ export default function CustomOrders() {
                                     </div>
                                 </div>
 
-                                {/* In Progress */}
                                 <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
                                     <div className="flex items-center gap-4">
                                         <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -398,7 +417,6 @@ export default function CustomOrders() {
                                     </div>
                                 </div>
 
-                                {/* Completed */}
                                 <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
                                     <div className="flex items-center gap-4">
                                         <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
@@ -413,7 +431,6 @@ export default function CustomOrders() {
                                     </div>
                                 </div>
 
-                                {/* Rejected */}
                                 <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
                                     <div className="flex items-center gap-4">
                                         <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
@@ -432,57 +449,24 @@ export default function CustomOrders() {
                             {/* Filter Tabs & New Order Button */}
                             <div className="flex items-center justify-between mb-6">
                                 <div className="flex items-center gap-2 flex-wrap">
-                                    <button
-                                        onClick={() => setFilter('all')}
-                                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === 'all'
-                                            ? 'bg-blue-600 text-white'
-                                            : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
-                                            }`}
-                                    >
+                                    <button onClick={() => setFilter('all')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === 'all' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'}`}>
                                         All ({orders.length})
                                     </button>
-                                    <button
-                                        onClick={() => setFilter('pending')}
-                                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === 'pending'
-                                            ? 'bg-blue-600 text-white'
-                                            : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
-                                            }`}
-                                    >
+                                    <button onClick={() => setFilter('pending')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === 'pending' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'}`}>
                                         Pending ({stats.pending})
                                     </button>
-                                    <button
-                                        onClick={() => setFilter('in_progress')}
-                                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === 'in_progress'
-                                            ? 'bg-blue-600 text-white'
-                                            : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
-                                            }`}
-                                    >
+                                    <button onClick={() => setFilter('in_progress')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === 'in_progress' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'}`}>
                                         In Progress ({stats.in_progress})
                                     </button>
-                                    <button
-                                        onClick={() => setFilter('completed')}
-                                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === 'completed'
-                                            ? 'bg-blue-600 text-white'
-                                            : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
-                                            }`}
-                                    >
+                                    <button onClick={() => setFilter('completed')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === 'completed' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'}`}>
                                         Completed ({stats.completed})
                                     </button>
-                                    <button
-                                        onClick={() => setFilter('rejected')}
-                                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === 'rejected'
-                                            ? 'bg-blue-600 text-white'
-                                            : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
-                                            }`}
-                                    >
+                                    <button onClick={() => setFilter('rejected')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === 'rejected' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'}`}>
                                         Rejected ({stats.rejected})
                                     </button>
                                 </div>
 
-                                <button
-                                    onClick={handleCreateOrder}
-                                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
-                                >
+                                <button onClick={handleCreateOrder} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium">
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                                     </svg>
@@ -490,116 +474,32 @@ export default function CustomOrders() {
                                 </button>
                             </div>
 
-                            {/* Orders Grid */}
+                            {/* Orders Grid - SIMPLIFIED CARDS */}
                             {filteredOrders.length === 0 ? (
                                 <div className="text-center py-12 bg-white rounded-xl border border-gray-100">
                                     <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                     </svg>
                                     <p className="text-gray-500 text-lg font-medium">No orders found</p>
-                                    <p className="text-gray-400 text-sm mt-1">
-                                        {filter === 'all'
-                                            ? 'Click "New Custom Order" to get started'
-                                            : `No ${filter.replace('_', ' ')} orders`}
-                                    </p>
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                     {filteredOrders.map((order) => (
                                         <div
                                             key={order.id}
-                                            className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow"
+                                            onClick={() => handleViewOrder(order)}
+                                            className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow cursor-pointer"
                                         >
-                                            {/* Header */}
-                                            <div className="flex items-center justify-between mb-4">
-                                                <h3 className="text-lg font-bold text-gray-900 truncate" onClick={() => handleViewOrder(order)}>
-                                                    {order.title}
-                                                </h3>
-                                                <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(order.status)}`}>
+                                            <div className="flex items-center justify-between mb-3">
+                                                <h3 className="text-lg font-bold text-gray-900 truncate flex-1">{order.title}</h3>
+                                                <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ml-2 flex-shrink-0 ${getStatusBadgeClass(order.status)}`}>
                                                     {getStatusIcon(order.status)}
                                                     {capitalize(order.status.replace('_', ' '))}
                                                 </span>
                                             </div>
 
-                                            {/* Description */}
-                                            <p className="text-sm text-gray-600 mb-4 line-clamp-2" onClick={() => handleViewOrder(order)}>
-                                                {order.description}
-                                            </p>
-
-                                            {/* Details */}
-                                            <div className="flex items-center justify-between mb-4">
-                                                <div className="text-sm text-gray-600">
-                                                    <span className="font-medium">Qty:</span> {order.quantity}
-                                                </div>
-                                                <div className="text-sm font-bold text-blue-600">
-                                                    {formatCurrency(order.estimated_price)}
-                                                </div>
-                                            </div>
-
-                                            {/* ✅ Action Buttons */}
-                                            <div className="flex gap-2 mb-4">
-                                                {/* Make Payment Button - Enabled only if price is set */}
-                                                <label
-                                                    className={`flex-1 py-2 px-3 text-sm font-medium text-center rounded-lg transition-colors cursor-pointer ${order.estimated_price && !order.payment_verified_at && order.status !== 'cancelled'
-                                                            ? 'bg-green-600 text-white hover:bg-green-700'
-                                                            : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                                                        }`}
-                                                    title={order.estimated_price ? 'Upload payment screenshot' : 'Waiting for admin to set price'}
-                                                >
-                                                    Make Payment
-                                                    {/* Hidden file input - only enabled if price is set */}
-                                                    {order.estimated_price && !order.payment_verified_at && order.status !== 'cancelled' && (
-                                                        <input
-                                                            type="file"
-                                                            accept="image/*"
-                                                            className="hidden"
-                                                            onChange={(e) => {
-                                                                if (e.target.files[0]) {
-                                                                    handleUploadPayment(order.id, e.target.files[0]);
-                                                                }
-                                                            }}
-                                                        />
-                                                    )}
-                                                </label>
-
-                                                {/* Cancel Order Button - Only if not verified and not completed */}
-                                                {!order.payment_verified_at && order.status !== 'completed' && order.status !== 'cancelled' && (
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            handleCancelOrder(order.id);
-                                                        }}
-                                                        className="py-2 px-3 text-sm font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
-                                                        title="Cancel Order"
-                                                    >
-                                                        Cancel
-                                                    </button>
-                                                )}
-                                            </div>
-
-                                            {/* Payment Status Note */}
-                                            {order.payment_screenshot && !order.payment_verified_at && (
-                                                <p className="text-xs text-indigo-600 bg-indigo-50 px-3 py-2 rounded mb-3">
-                                                    📤 Payment uploaded - awaiting verification
-                                                </p>
-                                            )}
-                                            {order.payment_verified_at && (
-                                                <p className="text-xs text-teal-600 bg-teal-50 px-3 py-2 rounded mb-3">
-                                                    ✅ Payment verified - order in progress
-                                                </p>
-                                            )}
-
-                                            {/* Footer */}
-                                            <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                                                <div className="text-xs text-gray-500">
-                                                    Submitted: {formatDate(order.created_at)}
-                                                </div>
-                                                <button
-                                                    onClick={() => handleViewOrder(order)}
-                                                    className="text-sm text-blue-600 hover:text-blue-700 font-medium"
-                                                >
-                                                    View Details →
-                                                </button>
+                                            <div className="text-sm text-gray-600">
+                                                <span className="font-medium">Qty:</span> {order.quantity}
                                             </div>
                                         </div>
                                     ))}
@@ -614,11 +514,10 @@ export default function CustomOrders() {
             {showCreateModal && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={closeAllModals}>
                     <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
-                        {/* Modal Header */}
                         <div className="flex items-center justify-between p-6 border-b border-gray-100 flex-shrink-0">
                             <div>
                                 <h3 className="text-xl font-bold text-gray-900">Request Custom Order</h3>
-                                <p className="text-sm text-gray-500 mt-1">Fill in the details of your custom fabrication request.</p>
+                                <p className="text-sm text-gray-500 mt-1">Fill in your custom fabrication request</p>
                             </div>
                             <button onClick={closeAllModals} className="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100">
                                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -627,115 +526,49 @@ export default function CustomOrders() {
                             </button>
                         </div>
 
-                        {/* Form */}
                         <form onSubmit={handleSubmitOrder} className="flex flex-col flex-1 overflow-hidden">
-                            {/* Scrollable Content */}
                             <div className="overflow-y-auto flex-1 p-6 space-y-4">
-                                {/* Project Title */}
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-2">Project Title *</label>
-                                    <input
-                                        type="text"
-                                        placeholder="e.g., Custom Trophy Stand"
-                                        value={formState.title}
-                                        onChange={(e) => setFormState({ ...formState, title: e.target.value })}
-                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                                        required
-                                    />
+                                    <input type="text" placeholder="e.g., Custom Trophy Stand" value={formState.title} onChange={(e) => setFormState({ ...formState, title: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" required />
                                 </div>
-
-                                {/* Description */}
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-2">Description *</label>
-                                    <textarea
-                                        placeholder="Describe your project in detail..."
-                                        rows="4"
-                                        value={formState.description}
-                                        onChange={(e) => setFormState({ ...formState, description: e.target.value })}
-                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 resize-none"
-                                        required
-                                    />
+                                    <textarea placeholder="Describe your project..." rows="4" value={formState.description} onChange={(e) => setFormState({ ...formState, description: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 resize-none" required />
                                 </div>
-
-                                {/* Quantity */}
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-2">Quantity *</label>
-                                    <input
-                                        type="number"
-                                        min="1"
-                                        value={formState.quantity}
-                                        onChange={(e) => setFormState({ ...formState, quantity: e.target.value })}
-                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                                        required
-                                    />
+                                    <input type="number" min="1" value={formState.quantity} onChange={(e) => setFormState({ ...formState, quantity: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" required />
                                 </div>
-
-                                {/* Design Image Upload */}
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Design Image <span className="text-red-500">*</span>
-                                    </label>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Design Image <span className="text-red-500">*</span></label>
                                     <div className="border-2 border-dashed border-gray-300 rounded-lg overflow-hidden">
-                                        <input
-                                            type="file"
-                                            accept="image/*"
-                                            onChange={(e) => {
-                                                const file = e.target.files[0];
-                                                setFormState({ ...formState, design_image: file });
-                                                if (file) {
-                                                    const previewUrl = URL.createObjectURL(file);
-                                                    setImagePreview(previewUrl);
-                                                }
-                                            }}
-                                            className="hidden"
-                                            id="design-image-upload"
-                                            required
-                                        />
+                                        <input type="file" accept="image/*" onChange={(e) => { const file = e.target.files[0]; setFormState({ ...formState, design_image: file }); if (file) { setImagePreview(URL.createObjectURL(file)); } }} className="hidden" id="design-image-upload" required />
                                         <label htmlFor="design-image-upload" className="cursor-pointer block">
                                             {imagePreview ? (
-                                                <div className="relative">
-                                                    <div className="w-full h-64">
-                                                        <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
-                                                    </div>
-                                                    <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white px-4 py-2">
-                                                        <p className="text-sm font-medium truncate">✅ {formState.design_image?.name}</p>
-                                                        <p className="text-xs text-gray-300">Click to change</p>
-                                                    </div>
-                                                </div>
+                                                <div className="relative"><div className="w-full h-64"><img src={imagePreview} alt="Preview" className="w-full h-full object-cover" /></div><div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white px-4 py-2"><p className="text-sm font-medium truncate">✅ {formState.design_image?.name}</p></div></div>
                                             ) : (
-                                                <div className="p-8 text-center">
-                                                    <svg className="w-12 h-12 text-gray-400 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                                    </svg>
-                                                    <p className="text-sm text-gray-600 font-medium">Click to upload design image <span className="text-red-500">*</span></p>
-                                                    <p className="text-xs text-gray-400 mt-1">PNG, JPG up to 5MB</p>
-                                                </div>
+                                                <div className="p-8 text-center"><svg className="w-12 h-12 text-gray-400 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg><p className="text-sm text-gray-600 font-medium">Click to upload <span className="text-red-500">*</span></p></div>
                                             )}
                                         </label>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Footer */}
                             <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-100 flex-shrink-0">
-                                <button type="button" onClick={closeAllModals} className="px-4 py-2 border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50">
-                                    Cancel
-                                </button>
-                                <button type="submit" disabled={submitting} className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400">
-                                    {submitting ? 'Submitting...' : 'Submit Request'}
-                                </button>
+                                <button type="button" onClick={closeAllModals} className="px-4 py-2 border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50">Cancel</button>
+                                <button type="submit" disabled={submitting} className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400">{submitting ? 'Submitting...' : 'Submit Request'}</button>
                             </div>
                         </form>
                     </div>
                 </div>
             )}
 
-            {/* ===== VIEW ORDER MODAL ===== */}
+            {/* ===== ORDER DETAILS MODAL ===== */}
             {showViewModal && selectedOrder && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={closeAllModals}>
-                    <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full" onClick={(e) => e.stopPropagation()}>
-                        {/* Header */}
-                        <div className="flex items-center justify-between p-6 border-b border-gray-100">
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-between p-6 border-b border-gray-100 flex-shrink-0">
                             <div className="flex items-center gap-3">
                                 <h3 className="text-xl font-bold text-gray-900">{selectedOrder.title}</h3>
                                 <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(selectedOrder.status)}`}>
@@ -750,36 +583,19 @@ export default function CustomOrders() {
                             </button>
                         </div>
 
-                        {/* Body */}
-                        <div className="p-6">
-                            {/* Design Image - ✅ Fixed: use design_image */}
-                            {selectedOrder.design_image ? (
-                                <div className="w-full h-48 bg-gray-100 rounded-lg mb-4 overflow-hidden">
-                                    <img
-                                        src={`http://127.0.0.1:8000/storage/${selectedOrder.design_image}`}
-                                        alt={selectedOrder.title}
-                                        className="w-full h-full object-cover"
-                                        onError={(e) => {
-                                            e.target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect fill="%23f0f0f0" width="100" height="100"/><text fill="%23999" x="50%" y="50%" text-anchor="middle" dy=".3em">Image not found</text></svg>';
-                                        }}
-                                    />
-                                </div>
-                            ) : (
-                                <div className="w-full h-48 bg-gray-100 rounded-lg mb-4 flex items-center justify-center">
-                                    <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                    </svg>
+                        <div className="overflow-y-auto flex-1 p-6 space-y-4">
+                            {selectedOrder.design_image && (
+                                <div className="w-full h-48 bg-gray-100 rounded-lg overflow-hidden">
+                                    <img src={`http://127.0.0.1:8000/storage/${selectedOrder.design_image}`} alt={selectedOrder.title} className="w-full h-full object-cover" />
                                 </div>
                             )}
 
-                            {/* Description */}
-                            <div className="mb-4">
+                            <div>
                                 <h4 className="text-sm font-semibold text-gray-700 mb-2">Description</h4>
-                                <p className="text-gray-600 text-sm">{selectedOrder.description}</p>
+                                <p className="text-gray-600 text-sm bg-gray-50 p-3 rounded-lg">{selectedOrder.description}</p>
                             </div>
 
-                            {/* Details Grid */}
-                            <div className="grid grid-cols-2 gap-4 mb-4">
+                            <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <p className="text-xs text-gray-500 mb-1">Quantity</p>
                                     <p className="font-semibold text-gray-900">{selectedOrder.quantity}</p>
@@ -790,11 +606,21 @@ export default function CustomOrders() {
                                 </div>
                                 <div className="col-span-2">
                                     <p className="text-xs text-gray-500 mb-1">Estimated Price</p>
-                                    <p className="font-bold text-blue-600">{formatCurrency(selectedOrder.estimated_price)}</p>
+                                    <p className="font-bold text-blue-600 text-lg">{formatCurrency(selectedOrder.estimated_price)}</p>
                                 </div>
                             </div>
 
-                            {/* Rejection Reason */}
+                            {selectedOrder.payment_screenshot && !selectedOrder.payment_verified_at && (
+                                <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+                                    <p className="text-sm text-indigo-700">📤 Payment uploaded - awaiting verification</p>
+                                </div>
+                            )}
+                            {selectedOrder.payment_verified_at && (
+                                <div className="p-3 bg-teal-50 border border-teal-200 rounded-lg">
+                                    <p className="text-sm text-teal-700">✅ Payment verified - order in progress</p>
+                                </div>
+                            )}
+
                             {selectedOrder.status === 'rejected' && selectedOrder.rejection_reason && (
                                 <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
                                     <p className="text-sm font-semibold text-red-800 mb-1">Rejection Reason:</p>
@@ -803,13 +629,330 @@ export default function CustomOrders() {
                             )}
                         </div>
 
+                        <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-100 flex-shrink-0 bg-gray-50">
+                            {!selectedOrder.payment_verified_at && selectedOrder.status !== 'completed' && selectedOrder.status !== 'cancelled' && (
+                                <button onClick={() => handleCancelOrder(selectedOrder.id)} className="px-4 py-2 text-sm font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors">
+                                    Cancel Order
+                                </button>
+                            )}
+
+                            {selectedOrder.estimated_price && !selectedOrder.payment_verified_at && selectedOrder.status !== 'cancelled' && (
+                                <button onClick={handleOpenCheckout} className="px-6 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors">
+                                    Make Payment
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ===== CHECKOUT MODAL (Step 1) ===== */}
+            {showCheckoutModal && selectedOrder && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={closeAllModals}>
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full" onClick={(e) => e.stopPropagation()}>
+                        {/* Header */}
+                        <div className="flex items-center justify-between p-6 border-b border-gray-100">
+                            <div>
+                                <h3 className="text-xl font-bold text-gray-900">Checkout</h3>
+                                <p className="text-sm text-gray-500 mt-1">Select delivery option</p>
+                            </div>
+                            <button onClick={closeAllModals} className="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100">
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        {/* Progress Bar */}
+                        <div className="px-6 pt-6">
+                            <div className="flex items-center justify-center">
+                                <div className="flex items-center w-full max-w-md">
+                                    <div className="flex items-center justify-center w-10 h-10 bg-blue-600 text-white rounded-full font-semibold">1</div>
+                                    <div className="flex-1 h-1 bg-blue-600 mx-2"></div>
+                                    <div className="flex items-center justify-center w-10 h-10 bg-gray-300 text-gray-600 rounded-full font-semibold">2</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Content */}
+                        <div className="p-6">
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                {/* Left: Delivery Options */}
+                                <div className="lg:col-span-2 space-y-4">
+                                    <h4 className="font-semibold text-gray-900 mb-3">Delivery Option</h4>
+
+                                    {/* Self Pick Up */}
+                                    <div
+                                        className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${deliveryOption === 'pickup' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}
+                                        onClick={() => setDeliveryOption('pickup')}
+                                    >
+                                        <div className="flex items-start gap-3">
+                                            <input
+                                                type="radio"
+                                                name="delivery"
+                                                checked={deliveryOption === 'pickup'}
+                                                onChange={() => { }}
+                                                className="w-4 h-4 text-blue-600 mt-1"
+                                            />
+                                            <div className="flex-1">
+                                                <div className="flex items-center gap-2">
+                                                    <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                    </svg>
+                                                    <p className="font-medium text-gray-900">Self Pick Up</p>
+                                                </div>
+                                                <p className="text-sm text-gray-600 mt-1 ml-7">Pick up your order from JNEC Fab Lab during working hours (9 AM - 5 PM)</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Ship to Address */}
+                                    <div
+                                        className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${deliveryOption === 'shipping' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}
+                                        onClick={() => setDeliveryOption('shipping')}
+                                    >
+                                        <div className="flex items-start gap-3">
+                                            <input
+                                                type="radio"
+                                                name="delivery"
+                                                checked={deliveryOption === 'shipping'}
+                                                onChange={() => { }}
+                                                className="w-4 h-4 text-blue-600 mt-1"
+                                            />
+                                            <div className="flex-1">
+                                                <div className="flex items-center gap-2">
+                                                    <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
+                                                    </svg>
+                                                    <p className="font-medium text-gray-900">Ship to Address</p>
+                                                </div>
+                                                <p className="text-sm text-gray-600 mt-1 ml-7">We will ship your order to your provided address. Shipping cost must be bare by you</p>
+                                                <p className="text-sm font-medium text-purple-600 mt-2 ml-7">Shipping Cost: Nu. {shippingCost.toFixed(2)}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Shipping Address Input */}
+                                    {deliveryOption === 'shipping' && (
+                                        <div className="mt-4">
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">Shipping Address *</label>
+                                            <textarea
+                                                value={shippingAddress}
+                                                onChange={(e) => setShippingAddress(e.target.value)}
+                                                rows="3"
+                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 resize-none"
+                                                placeholder="Enter your complete address..."
+                                                required
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Right: Order Summary */}
+                                <div className="lg:col-span-1">
+                                    <div className="bg-gray-50 rounded-lg p-4">
+                                        <h4 className="font-semibold text-gray-900 mb-3">Order Summary</h4>
+
+                                        <div className="flex items-center gap-3 mb-3 pb-3 border-b border-gray-200">
+                                            {selectedOrder.design_image ? (
+                                                <img
+                                                    src={`http://127.0.0.1:8000/storage/${selectedOrder.design_image}`}
+                                                    alt={selectedOrder.title}
+                                                    className="w-12 h-12 rounded object-cover"
+                                                />
+                                            ) : (
+                                                <div className="w-12 h-12 bg-gray-200 rounded flex items-center justify-center">
+                                                    <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                    </svg>
+                                                </div>
+                                            )}
+                                            <div className="flex-1">
+                                                <p className="text-sm font-medium text-gray-900 truncate">{selectedOrder.title}</p>
+                                                <p className="text-xs text-gray-500">Qty: {selectedOrder.quantity}</p>
+                                            </div>
+                                            <p className="text-sm font-medium text-gray-900">{formatCurrency(selectedOrder.estimated_price)}</p>
+                                        </div>
+
+                                        <div className="space-y-2 text-sm">
+                                            <div className="flex justify-between">
+                                                <span className="text-gray-600">Items Total:</span>
+                                                <span className="font-medium">{formatCurrency(selectedOrder.estimated_price)}</span>
+                                            </div>
+                                            {deliveryOption === 'shipping' && (
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-600">Shipping Cost:</span>
+                                                    <span className="font-medium text-purple-600">Nu. {shippingCost.toFixed(2)}</span>
+                                                </div>
+                                            )}
+                                            <div className="border-t border-gray-300 pt-2 flex justify-between">
+                                                <span className="font-semibold text-gray-900">Total:</span>
+                                                <span className="font-bold text-blue-600 text-lg">
+                                                    Nu. {calculateTotal().toFixed(2)}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         {/* Footer */}
-                        <div className="flex items-center justify-end p-6 border-t border-gray-100">
-                            <button onClick={closeAllModals} className="px-4 py-2 border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50">
-                                Close
+                        <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-100">
+                            <button onClick={closeAllModals} className="px-6 py-2 border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50">Back</button>
+                            <button
+                                onClick={handleContinueToPayment}
+                                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+                            >
+                                Continue to Payment
                             </button>
                         </div>
                     </div>
+                </div>
+            )}
+
+            {/* ===== PAYMENT MODAL (Step 2) ===== */}
+            {showPaymentModal && selectedOrder && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={closeAllModals}>
+                    <form onSubmit={handleUploadPayment} className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+                        {/* Header */}
+                        <div className="flex items-center justify-between p-6 border-b border-gray-100 flex-shrink-0">
+                            <div>
+                                <h3 className="text-xl font-bold text-gray-900">Payment</h3>
+                                <p className="text-sm text-gray-500 mt-1">Upload payment screenshot</p>
+                            </div>
+                            <button type="button" onClick={closeAllModals} className="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100">
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        {/* Progress Bar */}
+                        <div className="px-6 pt-6 flex-shrink-0">
+                            <div className="flex items-center justify-center">
+                                <div className="flex items-center w-full max-w-md">
+                                    <div className="flex items-center justify-center w-10 h-10 bg-blue-600 text-white rounded-full font-semibold">1</div>
+                                    <div className="flex-1 h-1 bg-blue-600 mx-2"></div>
+                                    <div className="flex items-center justify-center w-10 h-10 bg-blue-600 text-white rounded-full font-semibold">2</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Scrollable Content */}
+                        <div className="overflow-y-auto flex-1 p-6">
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                {/* Left: Bank Details & Upload */}
+                                <div className="lg:col-span-2 space-y-6">
+                                    {/* Bank Details */}
+                                    <div className="bg-gray-50 rounded-lg p-4">
+                                        <h4 className="font-semibold text-gray-900 mb-3">Bank Transfer Details</h4>
+                                        <div className="space-y-2 text-sm">
+                                            <div className="flex justify-between">
+                                                <span className="text-gray-600">Bank Name:</span>
+                                                <span className="font-medium">BOB Bank</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span className="text-gray-600">Account Name:</span>
+                                                <span className="font-medium">JNEC Fab Lab</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span className="text-gray-600">Account Number:</span>
+                                                <span className="font-medium">200123456789</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Upload Screenshot - Perfect Fit */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">Upload Payment Screenshot *</label>
+                                        <div className="border-2 border-dashed border-blue-300 rounded-lg p-8 text-center hover:border-blue-400 transition-colors bg-blue-50">
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                className="hidden"
+                                                id="payment-screenshot-upload"
+                                                required
+                                            />
+                                            <label htmlFor="payment-screenshot-upload" className="cursor-pointer block">
+                                                <svg className="w-16 h-16 text-blue-400 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                                </svg>
+                                                <p className="text-sm font-medium text-gray-700">Click to upload screenshot</p>
+                                                <p className="text-xs text-gray-500 mt-1">PNG, JPG up to 5MB</p>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Right: Order Summary */}
+                                <div className="lg:col-span-1">
+                                    <div className="bg-gray-50 rounded-lg p-4">
+                                        <h4 className="font-semibold text-gray-900 mb-3">Order Summary</h4>
+
+                                        <div className="flex items-center gap-3 mb-3 pb-3 border-b border-gray-200">
+                                            {selectedOrder.design_image ? (
+                                                <img
+                                                    src={`http://127.0.0.1:8000/storage/${selectedOrder.design_image}`}
+                                                    alt={selectedOrder.title}
+                                                    className="w-12 h-12 rounded object-cover"
+                                                />
+                                            ) : (
+                                                <div className="w-12 h-12 bg-gray-200 rounded flex items-center justify-center">
+                                                    <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                    </svg>
+                                                </div>
+                                            )}
+                                            <div className="flex-1">
+                                                <p className="text-sm font-medium text-gray-900 truncate">{selectedOrder.title}</p>
+                                                <p className="text-xs text-gray-500">Qty: {selectedOrder.quantity}</p>
+                                            </div>
+                                            <p className="text-sm font-medium text-gray-900">{formatCurrency(selectedOrder.estimated_price)}</p>
+                                        </div>
+
+                                        <div className="space-y-2 text-sm">
+                                            <div className="flex justify-between">
+                                                <span className="text-gray-600">Items Total:</span>
+                                                <span className="font-medium">{formatCurrency(selectedOrder.estimated_price)}</span>
+                                            </div>
+                                            {deliveryOption === 'shipping' && (
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-600">Shipping:</span>
+                                                    <span className="font-medium text-purple-600">Nu. {shippingCost.toFixed(2)}</span>
+                                                </div>
+                                            )}
+                                            <div className="border-t border-gray-300 pt-2 flex justify-between">
+                                                <span className="font-semibold text-gray-900">Total:</span>
+                                                <span className="font-bold text-blue-600 text-lg">
+                                                    Nu. {calculateTotal().toFixed(2)}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Footer */}
+                        <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-100 flex-shrink-0 bg-gray-50">
+                            <button
+                                type="button"
+                                onClick={() => { setShowPaymentModal(false); setShowCheckoutModal(true); }}
+                                className="px-6 py-2 border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50"
+                            >
+                                Back
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={submitting}
+                                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 font-medium"
+                            >
+                                {submitting ? 'Submitting...' : 'Submit Order'}
+                            </button>
+                        </div>
+                    </form>
                 </div>
             )}
 
@@ -822,13 +965,9 @@ export default function CustomOrders() {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
                             </svg>
                         </div>
-                        <h3 className="text-xl font-bold text-gray-900 mb-2">Order Submitted Successfully!</h3>
-                        <p className="text-gray-600 text-sm mb-6">
-                            Your custom order request has been submitted. Our team will review it and get back to you within 24-48 hours.
-                        </p>
-                        <button onClick={closeAllModals} className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                            Close
-                        </button>
+                        <h3 className="text-xl font-bold text-gray-900 mb-2">Success!</h3>
+                        <p className="text-gray-600 text-sm mb-6">Your payment has been submitted. We will verify it shortly.</p>
+                        <button onClick={closeAllModals} className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Close</button>
                     </div>
                 </div>
             )}

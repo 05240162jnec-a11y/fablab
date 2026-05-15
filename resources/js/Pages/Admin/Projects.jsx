@@ -1,15 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
-import AdminSidebar from '../../Components/AdminSidebar';
 
 export default function Projects() {
-    const [expandedMenus, setExpandedMenus] = useState({
-        userManagement: false,
-        operations: false,
-        resources: true,
-        contentMedia: false,
-    });
+    
 
     // Modal States
     const [showViewModal, setShowViewModal] = useState(false);
@@ -50,12 +44,7 @@ export default function Projects() {
         }
     };
 
-    const toggleSubmenu = (menu) => {
-        setExpandedMenus(prev => ({
-            ...prev,
-            [menu]: !prev[menu]
-        }));
-    };
+   
 
     // Get statistics
     const totalProjects = projects.length;
@@ -187,8 +176,7 @@ export default function Projects() {
 
     return (
         <div className="flex min-h-screen bg-gray-50">
-            {/* Sidebar */}
-            <AdminSidebar expandedMenus={expandedMenus} toggleSubmenu={toggleSubmenu} />
+            
 
             {/* Main Content */}
             <div className="flex-1">

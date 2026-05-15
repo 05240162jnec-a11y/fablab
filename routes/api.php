@@ -32,6 +32,7 @@ Route::prefix('admin')->group(function () {
             ->only(['index']);
         Route::post('bookings/{id}/update-status', [\App\Http\Controllers\Api\Admin\BookingController::class, 'updateStatus']);
 
+
         // ✅ FIXED: Product Orders (Admin Management)
         Route::apiResource('product-orders', \App\Http\Controllers\Api\Admin\ProductOrderController::class)
             ->only(['index', 'show', 'destroy']);
@@ -150,6 +151,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // User Bookings
     Route::post('/user/bookings', [App\Http\Controllers\Api\UserBookingController::class, 'store']);
     Route::get('/user/my-bookings', [App\Http\Controllers\Api\UserBookingController::class, 'myBookings']);
+    Route::post('/user/bookings/{id}/cancel', [App\Http\Controllers\Api\UserBookingController::class, 'cancel']);
     
     // ✅ Custom Orders (User) - UPDATED
     Route::get('/user/custom-orders', [\App\Http\Controllers\Api\User\CustomOrderController::class, 'index']);

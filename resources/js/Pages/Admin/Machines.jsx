@@ -92,10 +92,10 @@ export default function Machines() {
             const token = localStorage.getItem('admin_token');
             const data = new FormData();
             data.append('name', formData.name);
-            data.append('type', 'General'); // ✅ Send default value
+            data.append('type', 'General');
             data.append('status', formData.status);
             data.append('description', formData.description);
-            data.append('specifications', ''); // ✅ Send empty string
+            data.append('specifications', '');
             if (formData.image) {
                 data.append('image', formData.image);
             }
@@ -116,7 +116,7 @@ export default function Machines() {
             }
         } catch (err) {
             console.error('Add machine error:', err);
-            console.error('Response:', err.response?.data); // ✅ Log detailed error
+            console.error('Response:', err.response?.data);
             alert('Failed to add machine: ' + (err.response?.data?.message || err.message));
         } finally {
             setLoading(false);
@@ -146,10 +146,10 @@ export default function Machines() {
             const token = localStorage.getItem('admin_token');
             const data = new FormData();
             data.append('name', formData.name);
-            data.append('type', 'General'); // ✅ Send default value
+            data.append('type', 'General');
             data.append('status', formData.status);
             data.append('description', formData.description);
-            data.append('specifications', ''); // ✅ Send empty string
+            data.append('specifications', '');
             if (formData.image) {
                 data.append('image', formData.image);
             }
@@ -172,7 +172,7 @@ export default function Machines() {
             }
         } catch (err) {
             console.error('Update machine error:', err);
-            console.error('Response:', err.response?.data); // ✅ Log detailed error
+            console.error('Response:', err.response?.data);
             alert('Failed to update machine: ' + (err.response?.data?.message || err.message));
         } finally {
             setLoading(false);
@@ -212,11 +212,10 @@ export default function Machines() {
         }
     };
 
-    // ✅ Toggle Maintenance Status with Email Notification
+    // Toggle Maintenance Status with Email Notification
     const toggleMaintenance = async (machine) => {
         const newStatus = machine.status === 'maintenance' ? 'available' : 'maintenance';
 
-        // Confirm before setting to maintenance
         if (newStatus === 'maintenance') {
             const confirmed = window.confirm(
                 `⚠️ Warning: Setting "${machine.name}" to maintenance mode.\n\n` +
@@ -230,12 +229,11 @@ export default function Machines() {
         try {
             const token = localStorage.getItem('admin_token');
 
-            // ✅ CHANGE: Use POST instead of PUT
             const response = await axios.post(
                 `http://127.0.0.1:8000/api/admin/machines/${machine.id}/toggle-maintenance`,
                 {
                     status: newStatus,
-                    notify_users: newStatus === 'maintenance' // Only notify when going to maintenance
+                    notify_users: newStatus === 'maintenance'
                 },
                 {
                     headers: {
@@ -246,7 +244,6 @@ export default function Machines() {
             );
 
             if (response.data.success) {
-                // Update local state
                 setMachines(prevMachines =>
                     prevMachines.map(m =>
                         m.id === machine.id ? { ...m, status: newStatus } : m
@@ -259,7 +256,6 @@ export default function Machines() {
 
                 fetchMachines();
 
-                // Show success message
                 if (newStatus === 'maintenance') {
                     alert(`✅ Machine set to maintenance mode.\n📧 Email notifications sent to booked users.`);
                 } else {
@@ -272,7 +268,7 @@ export default function Machines() {
         }
     };
 
-    // Get status badge color
+    // Get status badge color for modal
     const getStatusBadgeClass = (status) => {
         switch (status) {
             case 'available':
@@ -295,7 +291,6 @@ export default function Machines() {
     };
 
     return (
-        // ✅ JUST the main content - sidebar is in AdminLayout now
         <div className="flex-1">
             <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
                 <div className="flex items-center justify-between px-6 py-4">
@@ -386,7 +381,7 @@ export default function Machines() {
                             resetForm();
                             setShowAddModal(true);
                         }}
-                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
                     >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
@@ -413,17 +408,29 @@ export default function Machines() {
                 {!fetchLoading && !error && (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {machines.map((machine) => (
-                            <div key={machine.id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
-                                {/* ✅ Machine Image with Available Badge */}
-                                <div className="relative w-full h-56 bg-gray-100 overflow-hidden">
-                                    {/* Available Badge - Top Right */}
+                            <div key={machine.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-xl transition-all duration-300 hover:-translate-y-1 flex flex-col">
+                                {/* Machine Image with Status Badge */}
+                                <div className="relative w-full h-56 bg-gray-100 overflow-hidden flex-shrink-0">
+                                    {/* ✅ COLORED GLASS BLUR Available Badge - Top Right - BLACK TEXT */}
                                     {machine.status === 'available' && (
                                         <div className="absolute top-3 right-3 z-10">
-                                            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-green-500 text-white shadow-lg">
-                                                <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                            <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-bold bg-green-100/70 backdrop-blur-md border border-green-200/60 text-gray-900 shadow-lg">
+                                                <svg className="w-3 h-3 mr-1 text-green-700" fill="currentColor" viewBox="0 0 20 20">
                                                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                                                 </svg>
                                                 Available
+                                            </span>
+                                        </div>
+                                    )}
+
+                                    {/* ✅ COLORED GLASS BLUR Maintenance Badge - Top Right - BLACK TEXT */}
+                                    {machine.status === 'maintenance' && (
+                                        <div className="absolute top-3 right-3 z-10">
+                                            <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-bold bg-red-100/70 backdrop-blur-md border border-red-200/60 text-gray-900 shadow-lg">
+                                                <svg className="w-3 h-3 mr-1 text-red-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                                </svg>
+                                                Maintenance
                                             </span>
                                         </div>
                                     )}
@@ -443,27 +450,27 @@ export default function Machines() {
                                     )}
                                 </div>
 
-                                <div className="p-5">
-                                    <div className="mb-3">
-                                        <h3 className="text-lg font-bold text-gray-900">{machine.name}</h3>
-                                    </div>
-
+                                {/* Card Content - Fixed Height */}
+                                <div className="p-5 flex flex-col flex-grow">
                                     <div className="mb-4">
-                                        <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(machine.status)}`}>
-                                            {formatStatus(machine.status)}
-                                        </span>
+                                        <h3 className="text-lg font-bold text-gray-900 mb-1 line-clamp-1">{machine.name}</h3>
+                                        <p className="text-sm text-gray-500 line-clamp-2">{machine.description || 'No description available'}</p>
                                     </div>
 
-                                    <button
-                                        onClick={() => handleViewClick(machine)}
-                                        className="w-full py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
-                                    >
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                        </svg>
-                                        View Details
-                                    </button>
+                                    {/* Push button to bottom */}
+                                    <div className="mt-auto">
+                                        {/* ✅ OLD STYLE BUTTON - Simple Blue */}
+                                        <button
+                                            onClick={() => handleViewClick(machine)}
+                                            className="w-full py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 font-medium"
+                                        >
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                            </svg>
+                                            View Details
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         ))}
@@ -503,7 +510,7 @@ export default function Machines() {
                                 <textarea name="description" value={formData.description} onChange={handleInputChange} rows="3" className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
                             </div>
 
-                            {/* Machine Image Upload - Perfect Fit Preview */}
+                            {/* Machine Image Upload */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">Machine Image</label>
                                 <div className="border-2 border-dashed border-gray-300 rounded-lg overflow-hidden">
@@ -649,7 +656,7 @@ export default function Machines() {
                                 <input type="text" name="name" value={formData.name} onChange={handleInputChange} required className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
                             </div>
 
-                            {/* Status Dropdown - Only in Edit */}
+                            {/* Status Dropdown */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
                                 <select name="status" value={formData.status} onChange={handleInputChange} className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
@@ -664,7 +671,7 @@ export default function Machines() {
                                 <textarea name="description" value={formData.description} onChange={handleInputChange} rows="3" className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
                             </div>
 
-                            {/* Machine Image Upload - Perfect Fit Preview */}
+                            {/* Machine Image Upload */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">Machine Image</label>
                                 <div className="border-2 border-dashed border-gray-300 rounded-lg overflow-hidden">

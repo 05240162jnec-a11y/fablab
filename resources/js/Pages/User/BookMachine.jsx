@@ -237,19 +237,12 @@ export default function BookMachine() {
             <UserSidebar expandedMenus={expandedMenus} toggleSubmenu={toggleSubmenu} />
 
             <div className="flex-1">
-                {/* Header */}
+                {/* Header - Logo Removed */}
                 <header className="bg-white/80 backdrop-blur-md border-b border-gray-200 sticky top-0 z-30 shadow-sm">
                     <div className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
-                                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
-                                </svg>
-                            </div>
-                            <div>
-                                <h1 className="text-2xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">Book a Machine</h1>
-                                <p className="text-sm text-gray-500">Reserve equipment for your creative projects</p>
-                            </div>
+                        <div>
+                            <h1 className="text-2xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">Book a Machine</h1>
+                            <p className="text-sm text-gray-500">Reserve equipment for your creative projects</p>
                         </div>
                     </div>
                 </header>
@@ -297,16 +290,6 @@ export default function BookMachine() {
                                                 )}
                                             </div>
 
-                                            {/* Training Badge */}
-                                            <div className="absolute top-3 right-3 z-10">
-                                                <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-bold shadow-md ${hasTrainingForMachine(machine)
-                                                        ? 'bg-gradient-to-r from-green-100 to-emerald-100 text-green-700 border border-green-200'
-                                                        : 'bg-gradient-to-r from-red-100 to-rose-100 text-red-700 border border-red-200'
-                                                    }`}>
-                                                    {hasTrainingForMachine(machine) ? '✅' : '🚫'} {hasTrainingForMachine(machine) ? 'Trained' : 'Training'}
-                                                </span>
-                                            </div>
-
                                             {/* Machine Image */}
                                             {machine.image ? (
                                                 <img
@@ -337,8 +320,8 @@ export default function BookMachine() {
                                                     onClick={() => handleBookNow(machine)}
                                                     disabled={!hasTrainingForMachine(machine) || machine.status !== 'available'}
                                                     className={`py-2.5 px-3 rounded-xl font-medium text-sm transition-all duration-200 flex items-center justify-center gap-1.5 shadow-sm ${hasTrainingForMachine(machine) && machine.status === 'available'
-                                                            ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:from-blue-600 hover:to-indigo-700 hover:shadow-lg transform hover:-translate-y-0.5'
-                                                            : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                                        ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:from-blue-600 hover:to-indigo-700 hover:shadow-lg transform hover:-translate-y-0.5'
+                                                        : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                                                         }`}
                                                 >
                                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -347,15 +330,16 @@ export default function BookMachine() {
                                                     Book Now
                                                 </button>
 
+                                                {/* ✅ SOLID BLUE BUTTON */}
                                                 <button
                                                     onClick={() => handleViewDetails(machine)}
-                                                    className="py-2.5 px-3 rounded-xl font-medium text-sm bg-gray-50 text-gray-700 hover:bg-gray-100 transition-all duration-200 flex items-center justify-center gap-1.5 border border-gray-200 hover:border-gray-300"
+                                                    className="py-2.5 px-3 rounded-xl font-medium text-sm bg-blue-600 text-white hover:bg-blue-700 transition-all duration-200 flex items-center justify-center gap-1.5 shadow-sm hover:shadow-md"
                                                 >
                                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                                     </svg>
-                                                    Details
+                                                    View Details
                                                 </button>
                                             </div>
                                         </div>
@@ -379,32 +363,25 @@ export default function BookMachine() {
                 </main>
             </div>
 
-            {/* ✨ MACHINE DETAILS MODAL - Enhanced Design */}
+            {/* ✨ MACHINE DETAILS MODAL - White Header */}
             {showDetailsModal && selectedMachine && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in" onClick={closeDetailsModal}>
                     <div
                         className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden animate-slide-up"
                         onClick={(e) => e.stopPropagation()}
                     >
-                        {/* Header with Gradient */}
-                        <div className="relative bg-gradient-to-r from-blue-600 to-indigo-700 px-6 py-5">
+                        {/* ✅ WHITE HEADER */}
+                        <div className="relative bg-white px-6 py-5 border-b border-gray-100">
                             <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
-                                        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
-                                        </svg>
-                                    </div>
-                                    <div>
-                                        <h3 className="text-xl font-bold text-white">{selectedMachine.name}</h3>
-                                        <p className="text-blue-100 text-sm">{selectedMachine.category || 'General Equipment'}</p>
-                                    </div>
+                                <div>
+                                    <h3 className="text-xl font-bold text-gray-900">Machine Details</h3>
+                                    <p className="text-sm text-gray-500 mt-1">{selectedMachine.category || 'General Equipment'}</p>
                                 </div>
                                 <button
                                     onClick={closeDetailsModal}
-                                    className="w-10 h-10 bg-white/20 hover:bg-white/30 rounded-xl flex items-center justify-center transition-colors backdrop-blur-sm"
+                                    className="w-10 h-10 bg-gray-100 hover:bg-gray-200 rounded-xl flex items-center justify-center transition-colors"
                                 >
-                                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
                                     </svg>
                                 </button>
@@ -431,7 +408,7 @@ export default function BookMachine() {
                                 )}
                             </div>
 
-                            {/* Info Cards Grid */}
+                            {/* Info Cards Grid - Type Field Removed */}
                             <div className="grid grid-cols-2 gap-4 mb-6">
                                 <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
                                     <div className="flex items-center gap-2 mb-2">
@@ -444,15 +421,6 @@ export default function BookMachine() {
                                 </div>
                                 <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
                                     <div className="flex items-center gap-2 mb-2">
-                                        <svg className="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
-                                        </svg>
-                                        <p className="text-xs text-gray-500 font-medium">Type</p>
-                                    </div>
-                                    <p className="font-semibold text-gray-900">{selectedMachine.type || selectedMachine.category || 'General'}</p>
-                                </div>
-                                <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-                                    <div className="flex items-center gap-2 mb-2">
                                         <svg className="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                                         </svg>
@@ -462,14 +430,19 @@ export default function BookMachine() {
                                         {selectedMachine.status.charAt(0).toUpperCase() + selectedMachine.status.slice(1).replace('_', ' ')}
                                     </span>
                                 </div>
-                                <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+                                <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 col-span-2">
                                     <div className="flex items-center gap-2 mb-2">
                                         <svg className="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                                         </svg>
-                                        <p className="text-xs text-gray-500 font-medium">Added</p>
+                                        <p className="text-xs text-gray-500 font-medium">Added On</p>
                                     </div>
-                                    <p className="font-semibold text-gray-900">{new Date(selectedMachine.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+                                    <p className="font-semibold text-gray-900">
+                                        {selectedMachine.created_at
+                                            ? new Date(selectedMachine.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                                            : 'N/A'
+                                        }
+                                    </p>
                                 </div>
                             </div>
 
@@ -551,30 +524,25 @@ export default function BookMachine() {
                 </div>
             )}
 
-            {/* ✨ BOOKING MODAL - Enhanced Design */}
+            {/* ✨ BOOKING MODAL - White Header */}
             {showBookingModal && selectedMachine && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-fade-in" onClick={closeBookingModal}>
                     <div
                         className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden animate-slide-up"
                         onClick={(e) => e.stopPropagation()}
                     >
-                        {/* Header */}
-                        <div className="relative bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-700 px-6 py-5">
+                        {/* ✅ WHITE HEADER */}
+                        <div className="relative bg-white px-6 py-5 border-b border-gray-100">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                        </svg>
-                                        Book {selectedMachine.name}
-                                    </h3>
-                                    <p className="text-blue-100 text-sm mt-1">Select your preferred dates below</p>
+                                    <h3 className="text-xl font-bold text-gray-900">Book {selectedMachine.name}</h3>
+                                    <p className="text-sm text-gray-500 mt-1">Select your preferred dates below</p>
                                 </div>
                                 <button
                                     onClick={closeBookingModal}
-                                    className="w-10 h-10 bg-white/20 hover:bg-white/30 rounded-xl flex items-center justify-center transition-colors backdrop-blur-sm"
+                                    className="w-10 h-10 bg-gray-100 hover:bg-gray-200 rounded-xl flex items-center justify-center transition-colors"
                                 >
-                                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
                                     </svg>
                                 </button>
@@ -601,8 +569,8 @@ export default function BookMachine() {
                                 {/* Messages */}
                                 {bookingMessage && (
                                     <div className={`p-4 rounded-xl text-sm font-medium flex items-center gap-3 ${bookingMessage.includes('✅')
-                                            ? 'bg-gradient-to-r from-green-50 to-emerald-50 text-green-800 border border-green-200'
-                                            : 'bg-gradient-to-r from-red-50 to-rose-50 text-red-800 border border-red-200'
+                                        ? 'bg-gradient-to-r from-green-50 to-emerald-50 text-green-800 border border-green-200'
+                                        : 'bg-gradient-to-r from-red-50 to-rose-50 text-red-800 border border-red-200'
                                         }`}>
                                         {bookingMessage.includes('✅') ? (
                                             <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -797,8 +765,8 @@ export default function BookMachine() {
                                     type="submit"
                                     disabled={bookingSubmitting}
                                     className={`px-7 py-2.5 text-sm font-semibold rounded-xl transition-all shadow-lg flex items-center gap-2 ${bookingSubmitting
-                                            ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                                            : 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:from-blue-600 hover:to-indigo-700 hover:shadow-xl transform hover:-translate-y-0.5'
+                                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                        : 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:from-blue-600 hover:to-indigo-700 hover:shadow-xl transform hover:-translate-y-0.5'
                                         }`}
                                 >
                                     {bookingSubmitting ? (

@@ -121,4 +121,38 @@ class UserBookingController extends Controller
             'bookings' => $bookings,
         ]);
     }
+
+    /**
+     * ✅ Cancel a booking
+     * 
+     * When a booking is cancelled:
+     * - Status is updated to 'cancelled'
+     * - The date becomes available for other users to book
+     * - User receives confirmation
+     */
+    public function cancel($id)
+    {
+        $user = Auth::user();
+
+        // Find booking by ID and ensure it belongs to authenticated user
+        $booking = Booking::where('user_id', $user->id)
+            ->findOrFail($id);
+
+        // Check if booking can be cancelled (only active bookings)
+        if (!in_array($booking->status, ['confirmed', 'booked', 'pending'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This booking cannot be cancelled'
+            ], 400);
+        }
+
+        // Update status to cancelled
+        $booking->status = 'cancelled';
+        $booking->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Booking cancelled successfully. The date is now available for other users.'
+        ]);
+    }
 }

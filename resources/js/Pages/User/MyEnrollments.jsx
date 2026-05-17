@@ -1,16 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import UserSidebar from './UserSidebar';
 
 export default function MyEnrollments() {
-    const [expandedMenus, setExpandedMenus] = useState({
-        shopOrders: false,
-        machines: false,
-        learning: true,
-        explore: false,
-        support: false,
-    });
-
     // Enrollment States
     const [enrollments, setEnrollments] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -21,14 +12,6 @@ export default function MyEnrollments() {
     const [filterStatus, setFilterStatus] = useState('all');
     const [searchQuery, setSearchQuery] = useState('');
 
-    // Toggle submenu
-    const toggleSubmenu = (menu) => {
-        setExpandedMenus(prev => ({
-            ...prev,
-            [menu]: !prev[menu]
-        }));
-    };
-
     // Fetch enrollments on mount
     useEffect(() => {
         fetchEnrollments();
@@ -37,124 +20,48 @@ export default function MyEnrollments() {
     const fetchEnrollments = async () => {
         try {
             setLoading(true);
-            // TODO: Replace with actual API call
-            // const response = await axios.get('http://127.0.0.1:8000/api/user/my-enrollments', {
-            //     headers: {
-            //         'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-            //     }
-            // });
-            // setEnrollments(response.data.enrollments);
+            const authToken = localStorage.getItem('auth_token');
 
-            // Sample data for now
-            setEnrollments([
-                {
-                    id: 'ENR-2026-001',
+            const response = await axios.get('http://127.0.0.1:8000/api/user/my-courses', {
+                headers: {
+                    'Accept': 'application/json',
+                    'Authorization': `Bearer ${authToken}`,
+                }
+            });
+
+            // API returns { courses: [...] }
+            const apiEnrollments = response.data.courses || [];
+
+            // Transform to match frontend expected structure
+            const transformed = apiEnrollments.map(enrollment => {
+                const course = enrollment.course || {};
+                return {
+                    id: 'ENR-' + new Date().getFullYear() + '-' + String(enrollment.id).padStart(3, '0'),
                     course: {
-                        id: 1,
-                        name: 'Introduction to 3D Printing',
-                        instructor: 'Engr. Karma Wangdi',
-                        category: '3D Printing',
-                        duration: '4 Weeks',
-                        image: null,
-                        schedule: 'Mon, Wed - 2:00 PM to 4:00 PM',
-                        location: 'Fab Lab - Training Room A'
+                        id: course.id,
+                        name: course.title,  // Map 'title' to 'name' for frontend
+                        instructor: course.instructor,
+                        category: 'General',  // Simple fallback
+                        duration: course.duration,
+                        image: course.image,
+                        schedule: course.schedule,
+                        location: 'Fab Lab',  // Simple fallback
                     },
-                    status: 'active',
-                    progress: 65,
-                    enrolled_date: '2026-04-15',
-                    start_date: '2026-04-20',
-                    end_date: '2026-05-18',
-                    attendance: 8,
-                    total_sessions: 12,
-                    certificate_available: false
-                },
-                {
-                    id: 'ENR-2026-002',
-                    course: {
-                        id: 2,
-                        name: 'Laser Cutting Fundamentals',
-                        instructor: 'Engr. Tashi Dolma',
-                        category: 'Laser Cutting',
-                        duration: '3 Weeks',
-                        image: null,
-                        schedule: 'Tue, Thu - 10:00 AM to 12:00 PM',
-                        location: 'Fab Lab - Training Room B'
-                    },
-                    status: 'completed',
-                    progress: 100,
-                    enrolled_date: '2026-03-01',
-                    start_date: '2026-03-05',
-                    end_date: '2026-03-26',
-                    attendance: 12,
-                    total_sessions: 12,
-                    certificate_available: true
-                },
-                {
-                    id: 'ENR-2026-003',
-                    course: {
-                        id: 3,
-                        name: 'CNC Machining Basics',
-                        instructor: 'Engr. Pema Tshering',
-                        category: 'CNC',
-                        duration: '5 Weeks',
-                        image: null,
-                        schedule: 'Fri - 9:00 AM to 4:00 PM',
-                        location: 'Fab Lab - Training Room C'
-                    },
-                    status: 'active',
-                    progress: 40,
-                    enrolled_date: '2026-04-25',
-                    start_date: '2026-05-01',
-                    end_date: '2026-06-05',
-                    attendance: 2,
-                    total_sessions: 5,
-                    certificate_available: false
-                },
-                {
-                    id: 'ENR-2026-004',
-                    course: {
-                        id: 4,
-                        name: 'PCB Design & Fabrication',
-                        instructor: 'Engr. Sonam Choden',
-                        category: 'Electronics',
-                        duration: '6 Weeks',
-                        image: null,
-                        schedule: 'Sat - 1:00 PM to 5:00 PM',
-                        location: 'Fab Lab - Training Room A'
-                    },
-                    status: 'not_started',
-                    progress: 0,
-                    enrolled_date: '2026-05-05',
-                    start_date: '2026-05-15',
-                    end_date: '2026-06-26',
+                    status: enrollment.status,  // 'enrolled', 'completed', 'not_started'
+                    progress: enrollment.status === 'completed' ? 100 : (enrollment.status === 'enrolled' ? 50 : 0),
+                    enrolled_date: enrollment.enrolled_at,
+                    start_date: course.start_date,
+                    end_date: course.end_date,
                     attendance: 0,
-                    total_sessions: 6,
-                    certificate_available: false
-                },
-                {
-                    id: 'ENR-2026-005',
-                    course: {
-                        id: 5,
-                        name: 'Arduino & IoT Projects',
-                        instructor: 'Engr. Kinley Dorji',
-                        category: 'Electronics',
-                        duration: '4 Weeks',
-                        image: null,
-                        schedule: 'Sun - 10:00 AM to 3:00 PM',
-                        location: 'Fab Lab - Training Room B'
-                    },
-                    status: 'completed',
-                    progress: 100,
-                    enrolled_date: '2026-02-10',
-                    start_date: '2026-02-15',
-                    end_date: '2026-03-15',
-                    attendance: 4,
-                    total_sessions: 4,
-                    certificate_available: true
-                },
-            ]);
+                    total_sessions: 1,
+                    certificate_available: enrollment.status === 'completed',
+                };
+            });
+
+            setEnrollments(transformed);
         } catch (error) {
             console.error('Error fetching enrollments:', error);
+            setEnrollments([]);
         } finally {
             setLoading(false);
         }
@@ -221,224 +128,207 @@ export default function MyEnrollments() {
     };
 
     return (
-        <div className="flex min-h-screen bg-gray-50">
-            {/* Sidebar */}
-            <UserSidebar expandedMenus={expandedMenus} toggleSubmenu={toggleSubmenu} />
-
-            {/* Main Content */}
-            <div className="flex-1">
-                {/* Top Header */}
-                <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
-                    <div className="px-6 py-4">
-                        <h1 className="text-2xl font-bold text-gray-900">My Enrollments</h1>
-                        <p className="text-sm text-gray-600 mt-1">Track your course progress and access materials</p>
-                    </div>
-                </header>
-
-                {/* Enrollments Content */}
-                <main className="p-6">
-                    {loading ? (
-                        <div className="text-center py-12">
-                            <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent"></div>
-                            <p className="mt-4 text-gray-600">Loading enrollments...</p>
+        <>
+            {loading ? (
+                <div className="text-center py-12">
+                    <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent"></div>
+                    <p className="mt-4 text-gray-600">Loading enrollments...</p>
+                </div>
+            ) : (
+                <>
+                    {/* Search & Filter */}
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+                        {/* Search */}
+                        <div className="relative flex-1 max-w-md">
+                            <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                            <input
+                                type="text"
+                                placeholder="Search by course, instructor, or category..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            />
                         </div>
-                    ) : (
-                        <>
-                            {/* Search & Filter */}
-                            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
-                                {/* Search */}
-                                <div className="relative flex-1 max-w-md">
-                                    <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                                    </svg>
-                                    <input
-                                        type="text"
-                                        placeholder="Search by course, instructor, or category..."
-                                        value={searchQuery}
-                                        onChange={(e) => setSearchQuery(e.target.value)}
-                                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                    />
-                                </div>
 
-                                {/* Status Filter Tabs */}
-                                <div className="flex items-center gap-2 overflow-x-auto">
-                                    <button
-                                        onClick={() => setFilterStatus('all')}
-                                        className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${filterStatus === 'all'
-                                                ? 'bg-blue-600 text-white'
-                                                : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
-                                            }`}
-                                    >
-                                        All ({statusCounts.all})
-                                    </button>
-                                    <button
-                                        onClick={() => setFilterStatus('active')}
-                                        className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${filterStatus === 'active'
-                                                ? 'bg-blue-500 text-white'
-                                                : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
-                                            }`}
-                                    >
-                                        Active ({statusCounts.active})
-                                    </button>
-                                    <button
-                                        onClick={() => setFilterStatus('completed')}
-                                        className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${filterStatus === 'completed'
-                                                ? 'bg-green-500 text-white'
-                                                : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
-                                            }`}
-                                    >
-                                        Completed ({statusCounts.completed})
-                                    </button>
-                                    <button
-                                        onClick={() => setFilterStatus('not_started')}
-                                        className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${filterStatus === 'not_started'
-                                                ? 'bg-gray-500 text-white'
-                                                : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
-                                            }`}
-                                    >
-                                        Not Started ({statusCounts.not_started})
-                                    </button>
-                                </div>
-                            </div>
+                        {/* Status Filter Tabs */}
+                        <div className="flex items-center gap-2 overflow-x-auto">
+                            <button
+                                onClick={() => setFilterStatus('all')}
+                                className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${filterStatus === 'all'
+                                    ? 'bg-blue-600 text-white'
+                                    : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
+                                    }`}
+                            >
+                                All ({statusCounts.all})
+                            </button>
+                            <button
+                                onClick={() => setFilterStatus('active')}
+                                className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${filterStatus === 'active'
+                                    ? 'bg-blue-500 text-white'
+                                    : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
+                                    }`}
+                            >
+                                Active ({statusCounts.active})
+                            </button>
+                            <button
+                                onClick={() => setFilterStatus('completed')}
+                                className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${filterStatus === 'completed'
+                                    ? 'bg-green-500 text-white'
+                                    : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
+                                    }`}
+                            >
+                                Completed ({statusCounts.completed})
+                            </button>
+                            <button
+                                onClick={() => setFilterStatus('not_started')}
+                                className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${filterStatus === 'not_started'
+                                    ? 'bg-gray-500 text-white'
+                                    : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
+                                    }`}
+                            >
+                                Not Started ({statusCounts.not_started})
+                            </button>
+                        </div>
+                    </div>
 
-                            {/* Quick Stats */}
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                                <div className="bg-white rounded-xl border border-gray-200 p-4">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                                            <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                                            </svg>
-                                        </div>
-                                        <div>
-                                            <p className="text-2xl font-bold text-gray-900">{statusCounts.active}</p>
-                                            <p className="text-sm text-gray-600">Active Courses</p>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="bg-white rounded-xl border border-gray-200 p-4">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                                            <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                            </svg>
-                                        </div>
-                                        <div>
-                                            <p className="text-2xl font-bold text-gray-900">{statusCounts.completed}</p>
-                                            <p className="text-sm text-gray-600">Completed</p>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="bg-white rounded-xl border border-gray-200 p-4">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
-                                            <svg className="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                            </svg>
-                                        </div>
-                                        <div>
-                                            <p className="text-2xl font-bold text-gray-900">{enrollments.filter(e => e.certificate_available).length}</p>
-                                            <p className="text-sm text-gray-600">Certificates Available</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Enrollments Grid */}
-                            {filteredEnrollments.length === 0 ? (
-                                <div className="text-center py-12 bg-white rounded-xl border border-gray-200">
-                                    <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    {/* Quick Stats */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                        <div className="bg-white rounded-xl border border-gray-200 p-4">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                                    <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                                     </svg>
-                                    <p className="text-gray-500 text-lg font-medium">No enrollments found</p>
-                                    <p className="text-gray-400 text-sm mt-1">
-                                        {searchQuery ? 'Try a different search term' : 'Enroll in a course to see your enrollments here'}
-                                    </p>
-                                    {!searchQuery && (
-                                        <Link
-                                            to="/user/courses"
-                                            className="inline-block mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                                        >
-                                            Browse Courses
-                                        </Link>
-                                    )}
                                 </div>
-                            ) : (
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                    {filteredEnrollments.map((enrollment) => (
-                                        <div
-                                            key={enrollment.id}
-                                            onClick={() => handleViewDetails(enrollment)}
-                                            className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-lg transition-shadow cursor-pointer overflow-hidden"
-                                        >
-                                            {/* Course Image */}
-                                            <div className="h-40 bg-gradient-to-br from-blue-50 to-cyan-50 flex items-center justify-center relative">
-                                                {enrollment.course.image ? (
-                                                    <img src={enrollment.course.image} alt={enrollment.course.name} className="w-full h-full object-cover" />
-                                                ) : (
-                                                    <svg className="w-16 h-16 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                                                    </svg>
-                                                )}
+                                <div>
+                                    <p className="text-2xl font-bold text-gray-900">{statusCounts.active}</p>
+                                    <p className="text-sm text-gray-600">Active Courses</p>
+                                </div>
+                            </div>
+                        </div>
 
-                                                {/* Status Badge */}
-                                                <span className={`absolute top-3 right-3 px-3 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(enrollment.status)}`}>
-                                                    {enrollment.status === 'not_started' ? 'Not Started' : enrollment.status.charAt(0).toUpperCase() + enrollment.status.slice(1)}
-                                                </span>
+                        <div className="bg-white rounded-xl border border-gray-200 p-4">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                                    <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <p className="text-2xl font-bold text-gray-900">{statusCounts.completed}</p>
+                                    <p className="text-sm text-gray-600">Completed</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-white rounded-xl border border-gray-200 p-4">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
+                                    <svg className="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <p className="text-2xl font-bold text-gray-900">{enrollments.filter(e => e.certificate_available).length}</p>
+                                    <p className="text-sm text-gray-600">Certificates Available</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Enrollments Grid */}
+                    {filteredEnrollments.length === 0 ? (
+                        <div className="text-center py-12 bg-white rounded-xl border border-gray-200">
+                            <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                            </svg>
+                            <p className="text-gray-500 text-lg font-medium">No enrollments found</p>
+                            <p className="text-gray-400 text-sm mt-1">
+                                {searchQuery ? 'Try a different search term' : 'Enroll in a course to see your enrollments here'}
+                            </p>
+                            {!searchQuery && (
+                                <Link
+                                    to="/user/courses"
+                                    className="inline-block mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                                >
+                                    Browse Courses
+                                </Link>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {filteredEnrollments.map((enrollment) => (
+                                <div
+                                    key={enrollment.id}
+                                    onClick={() => handleViewDetails(enrollment)}
+                                    className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-lg transition-shadow cursor-pointer overflow-hidden"
+                                >
+                                    {/* Course Image */}
+                                    <div className="h-40 bg-gradient-to-br from-blue-50 to-cyan-50 flex items-center justify-center relative">
+                                        {enrollment.course.image ? (
+                                            <img src={enrollment.course.image} alt={enrollment.course.name} className="w-full h-full object-cover" />
+                                        ) : (
+                                            <svg className="w-16 h-16 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                                            </svg>
+                                        )}
+
+                                        {/* Status Badge */}
+                                        <span className={`absolute top-3 right-3 px-3 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(enrollment.status)}`}>
+                                            {enrollment.status === 'not_started' ? 'Not Started' : enrollment.status.charAt(0).toUpperCase() + enrollment.status.slice(1)}
+                                        </span>
+                                    </div>
+
+                                    {/* Course Info */}
+                                    <div className="p-5">
+                                        <p className="text-xs text-blue-600 font-medium mb-2">{enrollment.course.category}</p>
+                                        <h3 className="font-bold text-gray-900 mb-2 line-clamp-2">{enrollment.course.name}</h3>
+                                        <p className="text-sm text-gray-600 mb-3">Instructor: {enrollment.course.instructor}</p>
+
+                                        {/* Progress Bar */}
+                                        <div className="mb-4">
+                                            <div className="flex justify-between text-sm mb-1">
+                                                <span className="text-gray-600">Progress</span>
+                                                <span className="font-medium text-gray-900">{enrollment.progress}%</span>
                                             </div>
-
-                                            {/* Course Info */}
-                                            <div className="p-5">
-                                                <p className="text-xs text-blue-600 font-medium mb-2">{enrollment.course.category}</p>
-                                                <h3 className="font-bold text-gray-900 mb-2 line-clamp-2">{enrollment.course.name}</h3>
-                                                <p className="text-sm text-gray-600 mb-3">Instructor: {enrollment.course.instructor}</p>
-
-                                                {/* Progress Bar */}
-                                                <div className="mb-4">
-                                                    <div className="flex justify-between text-sm mb-1">
-                                                        <span className="text-gray-600">Progress</span>
-                                                        <span className="font-medium text-gray-900">{enrollment.progress}%</span>
-                                                    </div>
-                                                    <div className="w-full bg-gray-200 rounded-full h-2">
-                                                        <div
-                                                            className={`h-2 rounded-full transition-all ${getProgressColor(enrollment.progress)}`}
-                                                            style={{ width: `${enrollment.progress}%` }}
-                                                        ></div>
-                                                    </div>
-                                                </div>
-
-                                                {/* Schedule */}
-                                                <div className="flex items-center gap-2 text-sm text-gray-500 mb-4">
-                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                                    </svg>
-                                                    <span className="line-clamp-1">{enrollment.course.schedule}</span>
-                                                </div>
-
-                                                {/* Attendance */}
-                                                <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                                                    <div className="text-sm text-gray-600">
-                                                        <span className="font-medium">{enrollment.attendance}</span>/{enrollment.total_sessions} sessions
-                                                    </div>
-                                                    <button className="text-blue-600 hover:text-blue-700 font-medium text-sm">
-                                                        View Details →
-                                                    </button>
-                                                </div>
+                                            <div className="w-full bg-gray-200 rounded-full h-2">
+                                                <div
+                                                    className={`h-2 rounded-full transition-all ${getProgressColor(enrollment.progress)}`}
+                                                    style={{ width: `${enrollment.progress}%` }}
+                                                ></div>
                                             </div>
                                         </div>
-                                    ))}
+
+                                        {/* Schedule */}
+                                        <div className="flex items-center gap-2 text-sm text-gray-500 mb-4">
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                            </svg>
+                                            <span className="line-clamp-1">{enrollment.course.schedule}</span>
+                                        </div>
+
+                                        {/* Attendance */}
+                                        <div className="flex items-center justify-between pt-4 border-t border-gray-100">
+                                            <div className="text-sm text-gray-600">
+                                                <span className="font-medium">{enrollment.attendance}</span>/{enrollment.total_sessions} sessions
+                                            </div>
+                                            <button className="text-blue-600 hover:text-blue-700 font-medium text-sm">
+                                                View Details →
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
-                            )}
-                        </>
+                            ))}
+                        </div>
                     )}
-                </main>
-            </div>
+                </>
+            )}
 
             {/* Enrollment Details Modal */}
             {showDetailsModal && selectedEnrollment && (
-                <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
                     <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
                         {/* Modal Header */}
                         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 sticky top-0 bg-white">
@@ -572,6 +462,6 @@ export default function MyEnrollments() {
                     </div>
                 </div>
             )}
-        </div>
+        </>
     );
 }

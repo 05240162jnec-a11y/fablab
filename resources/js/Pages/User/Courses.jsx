@@ -1,17 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
-import UserSidebar from './UserSidebar';
 
 export default function Courses() {
-    const [expandedMenus, setExpandedMenus] = useState({
-        shopOrders: false,
-        machines: false,
-        learning: false,
-        explore: false,
-        support: false,
-    });
-
     // API Data States
     const [courses, setCourses] = useState([]);
     const [selectedCourse, setSelectedCourse] = useState(null);
@@ -34,14 +25,6 @@ export default function Courses() {
     });
     const [enrollSubmitting, setEnrollSubmitting] = useState(false);
     const [enrollMessage, setEnrollMessage] = useState('');
-
-    // Toggle submenu
-    const toggleSubmenu = (menu) => {
-        setExpandedMenus(prev => ({
-            ...prev,
-            [menu]: !prev[menu]
-        }));
-    };
 
     // Fetch courses and user data on mount
     useEffect(() => {
@@ -117,10 +100,10 @@ export default function Courses() {
                 headers: {
                     'Accept': 'application/json',
                     'Authorization': `Bearer ${authToken}`,
-                },
+                }
             });
 
-            // Get list of enrolled course IDs
+            // Get list of enrolled course IDs (filter by status)
             const enrolledIds = response.data.courses
                 .filter(enrollment => enrollment.status === 'enrolled')
                 .map(enrollment => enrollment.course_id);
@@ -258,148 +241,131 @@ export default function Courses() {
     const isStudent = userData?.role === 'student';
 
     return (
-        <div className="flex min-h-screen bg-gray-50">
-            {/* ✅ Shared Sidebar Component */}
-            <UserSidebar expandedMenus={expandedMenus} toggleSubmenu={toggleSubmenu} />
+        <>
+            {/* Loading State */}
+            {loading && (
+                <div className="text-center py-12">
+                    <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent"></div>
+                    <p className="mt-4 text-gray-600">Loading courses...</p>
+                </div>
+            )}
 
-            {/* Main Content */}
-            <div className="flex-1">
-                {/* Top Header */}
-                <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
-                    <div className="px-6 py-4">
-                        <h1 className="text-2xl font-bold text-gray-900">Course Registration</h1>
-                        <p className="text-sm text-gray-600 mt-1">Enroll in training courses to unlock machines</p>
+            {/* Error State */}
+            {error && !loading && (
+                <div className="text-center py-12">
+                    <div className="inline-block p-4 bg-red-100 border border-red-300 rounded-lg text-red-700">
+                        <p className="font-medium">⚠️ {error}</p>
+                        <button
+                            onClick={() => fetchCourses()}
+                            className="mt-2 text-sm text-red-600 hover:text-red-800 underline"
+                        >
+                            Try again
+                        </button>
                     </div>
-                </header>
+                </div>
+            )}
 
-                {/* Page Content */}
-                <main className="p-6">
-                    {/* Loading State */}
-                    {loading && (
-                        <div className="text-center py-12">
-                            <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent"></div>
-                            <p className="mt-4 text-gray-600">Loading courses...</p>
-                        </div>
-                    )}
-
-                    {/* Error State */}
-                    {error && !loading && (
-                        <div className="text-center py-12">
-                            <div className="inline-block p-4 bg-red-100 border border-red-300 rounded-lg text-red-700">
-                                <p className="font-medium">⚠️ {error}</p>
-                                <button
-                                    onClick={() => fetchCourses()}
-                                    className="mt-2 text-sm text-red-600 hover:text-red-800 underline"
-                                >
-                                    Try again
-                                </button>
-                            </div>
-                        </div>
-                    )}
-
-                    {!loading && !error && (
-                        <>
-                            {/* Courses Grid */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                {courses.map((course) => (
-                                    <div key={course.id} className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-lg transition-shadow overflow-hidden">
-                                        {/* Course Image Placeholder */}
-                                        <div className="h-40 bg-gradient-to-br from-blue-50 to-cyan-50 flex items-center justify-center">
-                                            <svg className="w-16 h-16 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 14l9-5-9-5-9 5 9 5z" />
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
-                                            </svg>
-                                        </div>
-
-                                        {/* Course Info */}
-                                        <div className="p-5">
-                                            <h3 className="font-bold text-gray-900 text-lg mb-3">{course.title}</h3>
-
-                                            {/* Seats */}
-                                            <div className="mb-4">
-                                                {/* Calculate enrolled seats */}
-                                                {(() => {
-                                                    const enrolled = course.seat_limit - course.available_seats;
-                                                    const percentage = (enrolled / course.seat_limit) * 100;
-
-                                                    return (
-                                                        <>
-                                                            <div className="flex items-center justify-between text-sm mb-2">
-                                                                <span className="text-gray-600">Enrolled</span>
-                                                                <span className={`font-bold ${enrolled >= course.seat_limit ? 'text-red-600' : 'text-green-600'}`}>
-                                                                    {enrolled} / {course.seat_limit}
-                                                                </span>
-                                                            </div>
-                                                            <div className="w-full bg-gray-200 rounded-full h-2">
-                                                                <div
-                                                                    className={`h-2 rounded-full transition-all duration-300 ${enrolled >= course.seat_limit ? 'bg-red-500' :
-                                                                        percentage >= 70 ? 'bg-yellow-500' :
-                                                                            'bg-green-500'
-                                                                        }`}
-                                                                    style={{ width: `${percentage}%` }}
-                                                                ></div>
-                                                            </div>
-                                                            <p className="text-xs text-gray-500 mt-1">
-                                                                {enrolled >= course.seat_limit ? 'Course full' :
-                                                                    percentage >= 70 ? 'Filling up fast!' :
-                                                                        'Seats available'}
-                                                            </p>
-                                                        </>
-                                                    );
-                                                })()}
-                                            </div>
-
-                                            {/* Enroll/Unenroll Button */}
-                                            <button
-                                                onClick={() => {
-                                                    // Only allow action if registration is open AND course has seats
-                                                    if (!course.registration_open || course.available_seats === 0) return;
-
-                                                    if (isEnrolled(course.id)) {
-                                                        handleUnenrollClick(course);
-                                                    } else {
-                                                        handleEnrollClick(course);
-                                                    }
-                                                }}
-                                                // Disable if course full OR registration closed
-                                                disabled={!course.registration_open || course.available_seats === 0}
-                                                className={`w-full py-2.5 px-4 rounded-lg font-medium transition-colors ${!course.registration_open || course.available_seats === 0
-                                                    ? 'bg-gray-200 text-gray-500 cursor-not-allowed'  // Disabled state
-                                                    : isEnrolled(course.id)
-                                                        ? 'bg-red-600 text-white hover:bg-red-700'    // Unenroll (enabled)
-                                                        : 'bg-blue-600 text-white hover:bg-blue-700'  // Enroll (enabled)
-                                                    }`}
-                                            >
-                                                {/* Button text logic */}
-                                                {!course.registration_open && !isEnrolled(course.id)
-                                                    ? 'Registration Closed'
-                                                    : course.available_seats === 0
-                                                        ? 'Course Full'
-                                                        : !course.registration_open && isEnrolled(course.id)
-                                                            ? 'Unenroll (Closed)'
-                                                            : isEnrolled(course.id)
-                                                                ? 'Unenroll'
-                                                                : 'Enroll Now'}
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-
-                            {/* Empty State */}
-                            {courses.length === 0 && !error && (
-                                <div className="text-center py-12">
-                                    <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            {!loading && !error && (
+                <>
+                    {/* Courses Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {courses.map((course) => (
+                            <div key={course.id} className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-lg transition-shadow overflow-hidden">
+                                {/* Course Image Placeholder */}
+                                <div className="h-40 bg-gradient-to-br from-blue-50 to-cyan-50 flex items-center justify-center">
+                                    <svg className="w-16 h-16 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 14l9-5-9-5-9 5 9 5z" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
                                     </svg>
-                                    <p className="text-gray-500 text-lg">No courses available</p>
-                                    <p className="text-gray-400 text-sm mt-2">Check back later for new training sessions</p>
                                 </div>
-                            )}
-                        </>
+
+                                {/* Course Info */}
+                                <div className="p-5">
+                                    <h3 className="font-bold text-gray-900 text-lg mb-3">{course.title}</h3>
+
+                                    {/* Seats */}
+                                    <div className="mb-4">
+                                        {/* Calculate enrolled seats */}
+                                        {(() => {
+                                            const enrolled = course.seat_limit - course.available_seats;
+                                            const percentage = (enrolled / course.seat_limit) * 100;
+
+                                            return (
+                                                <>
+                                                    <div className="flex items-center justify-between text-sm mb-2">
+                                                        <span className="text-gray-600">Enrolled</span>
+                                                        <span className={`font-bold ${enrolled >= course.seat_limit ? 'text-red-600' : 'text-green-600'}`}>
+                                                            {enrolled} / {course.seat_limit}
+                                                        </span>
+                                                    </div>
+                                                    <div className="w-full bg-gray-200 rounded-full h-2">
+                                                        <div
+                                                            className={`h-2 rounded-full transition-all duration-300 ${enrolled >= course.seat_limit ? 'bg-red-500' :
+                                                                percentage >= 70 ? 'bg-yellow-500' :
+                                                                    'bg-green-500'
+                                                                }`}
+                                                            style={{ width: `${percentage}%` }}
+                                                        ></div>
+                                                    </div>
+                                                    <p className="text-xs text-gray-500 mt-1">
+                                                        {enrolled >= course.seat_limit ? 'Course full' :
+                                                            percentage >= 70 ? 'Filling up fast!' :
+                                                                'Seats available'}
+                                                    </p>
+                                                </>
+                                            );
+                                        })()}
+                                    </div>
+
+                                    {/* Enroll/Unenroll Button */}
+                                    <button
+                                        onClick={() => {
+                                            // Only allow action if registration is open AND course has seats
+                                            if (!course.registration_open || course.available_seats === 0) return;
+
+                                            if (isEnrolled(course.id)) {
+                                                handleUnenrollClick(course);
+                                            } else {
+                                                handleEnrollClick(course);
+                                            }
+                                        }}
+                                        // Disable if course full OR registration closed
+                                        disabled={!course.registration_open || course.available_seats === 0}
+                                        className={`w-full py-2.5 px-4 rounded-lg font-medium transition-colors ${!course.registration_open || course.available_seats === 0
+                                            ? 'bg-gray-200 text-gray-500 cursor-not-allowed'  // Disabled state
+                                            : isEnrolled(course.id)
+                                                ? 'bg-red-600 text-white hover:bg-red-700'    // Unenroll (enabled)
+                                                : 'bg-blue-600 text-white hover:bg-blue-700'  // Enroll (enabled)
+                                            }`}
+                                    >
+                                        {/* Button text logic */}
+                                        {!course.registration_open && !isEnrolled(course.id)
+                                            ? 'Registration Closed'
+                                            : course.available_seats === 0
+                                                ? 'Course Full'
+                                                : !course.registration_open && isEnrolled(course.id)
+                                                    ? 'Unenroll (Closed)'
+                                                    : isEnrolled(course.id)
+                                                        ? 'Unenroll'
+                                                        : 'Enroll Now'}
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Empty State */}
+                    {courses.length === 0 && !error && (
+                        <div className="text-center py-12">
+                            <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <p className="text-gray-500 text-lg">No courses available</p>
+                            <p className="text-gray-400 text-sm mt-2">Check back later for new training sessions</p>
+                        </div>
                     )}
-                </main>
-            </div>
+                </>
+            )}
 
             {/* Enrollment Modal */}
             {showEnrollModal && selectedCourse && (
@@ -583,6 +549,6 @@ export default function Courses() {
                     </div>
                 </div>
             )}
-        </div>
+        </>
     );
 }

@@ -5,18 +5,13 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Booking;
 use App\Models\Machine;
-use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Carbon\Carbon;
 
 class UserBookingController extends Controller
 {
     /**
      * Create a new machine booking
-     * 
-     * ✅ TRAINING LOGIC: User must complete ANY course (general eligibility)
-     * Not machine-specific - Fab Lab has ONE general training course
      */
     public function store(Request $request)
     {
@@ -37,12 +32,9 @@ class UserBookingController extends Controller
             ], 422);
         }
 
-        // ✅ NEW LOGIC: Check if user has completed ANY course (general eligibility)
-        // Not machine-specific - if user completed any course, they can book any machine
-        // Only 'completed' status counts (not 'enrolled' or 'dropped')
-        // Admin controls this by deleting non-attendees from enrollments
+        // ✅ YOUR ORIGINAL LOGIC: Check if user has completed ANY course
         $hasTraining = $user->courses()
-            ->whereIn('status', ['completed'])  // Only 'completed' counts
+            ->wherePivot('status', 'completed')
             ->exists();
 
         if (!$hasTraining) {
@@ -71,15 +63,15 @@ class UserBookingController extends Controller
             ], 422);
         }
 
-        // ✅ Create booking with ALL required database fields
+        // Create booking
         $booking = Booking::create([
             'user_id' => $user->id,
             'machine_id' => $machine->id,
             'start_date' => $request->start_date,
             'end_date' => $request->end_date,
-            'booking_date' => $request->start_date,  // Required by database
-            'start_time' => '09:00:00',              // Required by database (default: 9 AM)
-            'end_time' => '17:00:00',                // Required by database (default: 5 PM)
+            'booking_date' => $request->start_date,
+            'start_time' => '09:00:00',
+            'end_time' => '17:00:00',
             'status' => 'confirmed',
         ]);
 
@@ -123,12 +115,7 @@ class UserBookingController extends Controller
     }
 
     /**
-     * ✅ Cancel a booking
-     * 
-     * When a booking is cancelled:
-     * - Status is updated to 'cancelled'
-     * - The date becomes available for other users to book
-     * - User receives confirmation
+     * Cancel a booking
      */
     public function cancel($id)
     {

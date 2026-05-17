@@ -1,17 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
-import UserSidebar from './UserSidebar';
 
 export default function BookMachine() {
-    const [expandedMenus, setExpandedMenus] = useState({
-        shopOrders: false,
-        machines: false,
-        learning: false,
-        explore: false,
-        support: false,
-    });
-
     // API Data States
     const [machines, setMachines] = useState([]);
     const [selectedMachine, setSelectedMachine] = useState(null);
@@ -28,14 +19,6 @@ export default function BookMachine() {
     });
     const [bookingSubmitting, setBookingSubmitting] = useState(false);
     const [bookingMessage, setBookingMessage] = useState('');
-
-    // Toggle submenu
-    const toggleSubmenu = (menu) => {
-        setExpandedMenus(prev => ({
-            ...prev,
-            [menu]: !prev[menu]
-        }));
-    };
 
     // Fetch machines on component mount
     useEffect(() => {
@@ -63,8 +46,16 @@ export default function BookMachine() {
         }
     };
 
-    const hasTrainingForMachine = (machine) => {
-        return machine.has_required_training === true;
+    // ✅ FIXED: Check if user CAN book this machine
+    const canBookMachine = (machine) => {
+        // Machine must be available
+        if (machine.status !== 'available') return false;
+
+        // If machine doesn't require training, allow booking
+        if (!machine.has_required_training) return true;
+
+        // If machine requires training, user must have completed it
+        return machine.has_training === true;
     };
 
     const handleViewDetails = (machine) => {
@@ -125,8 +116,9 @@ export default function BookMachine() {
         setBookingSubmitting(true);
         setBookingMessage('');
 
-        if (selectedMachine && !hasTrainingForMachine(selectedMachine)) {
-            setBookingMessage('❌ You must complete the Fab Lab training course before booking machines.');
+        // ✅ Use corrected logic
+        if (selectedMachine && !canBookMachine(selectedMachine)) {
+            setBookingMessage('❌ You must complete the required training course before booking this machine.');
             setBookingSubmitting(false);
             return;
         }
@@ -233,135 +225,119 @@ export default function BookMachine() {
     };
 
     return (
-        <div className="flex min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-            <UserSidebar expandedMenus={expandedMenus} toggleSubmenu={toggleSubmenu} />
-
-            <div className="flex-1">
-                {/* Header - Logo Removed */}
-                <header className="bg-white/80 backdrop-blur-md border-b border-gray-200 sticky top-0 z-30 shadow-sm">
-                    <div className="px-6 py-4">
-                        <div>
-                            <h1 className="text-2xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">Book a Machine</h1>
-                            <p className="text-sm text-gray-500">Reserve equipment for your creative projects</p>
+        <>
+            {loading && (
+                <div className="flex flex-col items-center justify-center py-20">
+                    <div className="relative">
+                        <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+                        <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="w-8 h-8 bg-blue-600 rounded-full animate-pulse"></div>
                         </div>
                     </div>
-                </header>
+                    <p className="mt-6 text-gray-600 font-medium">Loading machines...</p>
+                </div>
+            )}
 
-                <main className="p-6">
-                    {loading && (
-                        <div className="flex flex-col items-center justify-center py-20">
-                            <div className="relative">
-                                <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
-                                <div className="absolute inset-0 flex items-center justify-center">
-                                    <div className="w-8 h-8 bg-blue-600 rounded-full animate-pulse"></div>
+            {!loading && (
+                <>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {machines.map((machine) => (
+                            <div
+                                key={machine.id}
+                                className="group bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden hover:-translate-y-1"
+                            >
+                                {/* Machine Image with Badges */}
+                                <div className="relative h-56 bg-gradient-to-br from-gray-100 to-gray-200 overflow-hidden">
+                                    {/* Status Badges */}
+                                    <div className="absolute top-3 left-3 z-10 flex gap-2">
+                                        {machine.status === 'available' && (
+                                            <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-bold bg-gradient-to-r from-green-400 to-emerald-500 text-white shadow-lg animate-pulse">
+                                                <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                                </svg>
+                                                Available
+                                            </span>
+                                        )}
+                                        {machine.status === 'maintenance' && (
+                                            <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-bold bg-gradient-to-r from-amber-400 to-orange-500 text-white shadow-lg">
+                                                <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                                </svg>
+                                                Maintenance
+                                            </span>
+                                        )}
+                                    </div>
+
+                                    {/* Machine Image */}
+                                    {machine.image ? (
+                                        <img
+                                            src={`http://127.0.0.1:8000/storage/${machine.image}`}
+                                            alt={machine.name}
+                                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                        />
+                                    ) : (
+                                        <div className="h-full bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center">
+                                            <svg className="w-16 h-16 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                            </svg>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Card Content */}
+                                <div className="p-5">
+                                    <div className="mb-4">
+                                        <h3 className="font-bold text-gray-900 text-lg mb-1 group-hover:text-blue-600 transition-colors">{machine.name}</h3>
+                                        <p className="text-sm text-gray-500">{machine.category || 'General Equipment'}</p>
+                                    </div>
+
+                                    {/* Action Buttons */}
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <button
+                                            onClick={() => handleBookNow(machine)}
+                                            // ✅ FIXED: Use canBookMachine logic
+                                            disabled={!canBookMachine(machine)}
+                                            className={`py-2.5 px-3 rounded-xl font-medium text-sm transition-all duration-200 flex items-center justify-center gap-1.5 shadow-sm ${canBookMachine(machine)
+                                                ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:from-blue-600 hover:to-indigo-700 hover:shadow-lg transform hover:-translate-y-0.5'
+                                                : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                                }`}
+                                        >
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                            </svg>
+                                            Book Now
+                                        </button>
+
+                                        <button
+                                            onClick={() => handleViewDetails(machine)}
+                                            className="py-2.5 px-3 rounded-xl font-medium text-sm bg-blue-600 text-white hover:bg-blue-700 transition-all duration-200 flex items-center justify-center gap-1.5 shadow-sm hover:shadow-md"
+                                        >
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                            </svg>
+                                            View Details
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
-                            <p className="mt-6 text-gray-600 font-medium">Loading machines...</p>
+                        ))}
+                    </div>
+
+                    {machines.length === 0 && (
+                        <div className="text-center py-16">
+                            <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <svg className="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                            </div>
+                            <p className="text-gray-500 text-lg font-medium">No machines available right now</p>
+                            <p className="text-gray-400 text-sm mt-1">Check back later for new equipment!</p>
                         </div>
                     )}
-
-                    {!loading && (
-                        <>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                {machines.map((machine) => (
-                                    <div
-                                        key={machine.id}
-                                        className="group bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden hover:-translate-y-1"
-                                    >
-                                        {/* Machine Image with Badges */}
-                                        <div className="relative h-56 bg-gradient-to-br from-gray-100 to-gray-200 overflow-hidden">
-                                            {/* Status Badges */}
-                                            <div className="absolute top-3 left-3 z-10 flex gap-2">
-                                                {machine.status === 'available' && (
-                                                    <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-bold bg-gradient-to-r from-green-400 to-emerald-500 text-white shadow-lg animate-pulse">
-                                                        <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                                                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                                                        </svg>
-                                                        Available
-                                                    </span>
-                                                )}
-                                                {machine.status === 'maintenance' && (
-                                                    <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-bold bg-gradient-to-r from-amber-400 to-orange-500 text-white shadow-lg">
-                                                        <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                                                        </svg>
-                                                        Maintenance
-                                                    </span>
-                                                )}
-                                            </div>
-
-                                            {/* Machine Image */}
-                                            {machine.image ? (
-                                                <img
-                                                    src={`http://127.0.0.1:8000/storage/${machine.image}`}
-                                                    alt={machine.name}
-                                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                                                />
-                                            ) : (
-                                                <div className="h-full bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center">
-                                                    <svg className="w-16 h-16 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                                    </svg>
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        {/* Card Content */}
-                                        <div className="p-5">
-                                            <div className="mb-4">
-                                                <h3 className="font-bold text-gray-900 text-lg mb-1 group-hover:text-blue-600 transition-colors">{machine.name}</h3>
-                                                <p className="text-sm text-gray-500">{machine.category || 'General Equipment'}</p>
-                                            </div>
-
-                                            {/* Action Buttons */}
-                                            <div className="grid grid-cols-2 gap-3">
-                                                <button
-                                                    onClick={() => handleBookNow(machine)}
-                                                    disabled={!hasTrainingForMachine(machine) || machine.status !== 'available'}
-                                                    className={`py-2.5 px-3 rounded-xl font-medium text-sm transition-all duration-200 flex items-center justify-center gap-1.5 shadow-sm ${hasTrainingForMachine(machine) && machine.status === 'available'
-                                                        ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:from-blue-600 hover:to-indigo-700 hover:shadow-lg transform hover:-translate-y-0.5'
-                                                        : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                                        }`}
-                                                >
-                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                                    </svg>
-                                                    Book Now
-                                                </button>
-
-                                                {/* ✅ SOLID BLUE BUTTON */}
-                                                <button
-                                                    onClick={() => handleViewDetails(machine)}
-                                                    className="py-2.5 px-3 rounded-xl font-medium text-sm bg-blue-600 text-white hover:bg-blue-700 transition-all duration-200 flex items-center justify-center gap-1.5 shadow-sm hover:shadow-md"
-                                                >
-                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                                    </svg>
-                                                    View Details
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-
-                            {machines.length === 0 && (
-                                <div className="text-center py-16">
-                                    <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                                        <svg className="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                        </svg>
-                                    </div>
-                                    <p className="text-gray-500 text-lg font-medium">No machines available right now</p>
-                                    <p className="text-gray-400 text-sm mt-1">Check back later for new equipment!</p>
-                                </div>
-                            )}
-                        </>
-                    )}
-                </main>
-            </div>
+                </>
+            )}
 
             {/* ✨ MACHINE DETAILS MODAL - White Header */}
             {showDetailsModal && selectedMachine && (
@@ -408,7 +384,7 @@ export default function BookMachine() {
                                 )}
                             </div>
 
-                            {/* Info Cards Grid - Type Field Removed */}
+                            {/* Info Cards Grid */}
                             <div className="grid grid-cols-2 gap-4 mb-6">
                                 <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
                                     <div className="flex items-center gap-2 mb-2">
@@ -459,8 +435,8 @@ export default function BookMachine() {
                                 </p>
                             </div>
 
-                            {/* Training Status Cards */}
-                            {!hasTrainingForMachine(selectedMachine) ? (
+                            {/* ✅ FIXED: Training Status Cards - Use canBookMachine logic */}
+                            {!canBookMachine(selectedMachine) && selectedMachine.has_required_training ? (
                                 <div className="mb-6 p-5 bg-gradient-to-br from-red-50 via-rose-50 to-orange-50 rounded-2xl border-2 border-red-100 shadow-sm">
                                     <div className="flex items-start gap-4">
                                         <div className="flex-shrink-0">
@@ -478,7 +454,7 @@ export default function BookMachine() {
                                                 Training Required
                                             </h4>
                                             <p className="text-sm text-red-700 mb-4 leading-relaxed">
-                                                Complete the Fab Lab safety training to unlock booking privileges. This ensures safe operation of all equipment.
+                                                Complete the "{selectedMachine.required_course_title}" course to unlock booking privileges for this machine.
                                             </p>
                                             <Link
                                                 to="/user/courses"
@@ -510,10 +486,13 @@ export default function BookMachine() {
                                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                                                 </svg>
-                                                Training Completed ✅
+                                                {selectedMachine.has_required_training ? 'Training Completed ✅' : 'No Training Required'}
                                             </h4>
                                             <p className="text-sm text-green-700 leading-relaxed">
-                                                Excellent! You're certified to use this equipment. You can now proceed with booking for your project.
+                                                {selectedMachine.has_required_training
+                                                    ? 'Excellent! You\'re certified to use this equipment. You can now proceed with booking for your project.'
+                                                    : 'This machine doesn\'t require special training. You can book it anytime it\'s available.'
+                                                }
                                             </p>
                                         </div>
                                     </div>
@@ -791,6 +770,6 @@ export default function BookMachine() {
                     </div>
                 </div>
             )}
-        </div>
+        </>
     );
 }

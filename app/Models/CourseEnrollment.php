@@ -17,14 +17,24 @@ class CourseEnrollment extends Model
         'course_id',
         'status',
         'completed_at',
-        'enrollment_data',      // ✅ ADD THIS
-        'unenrolled_at',        // ✅ ADD THIS
+        'enrollment_data',
+        'unenrolled_at',
+        // ✅ NEW FIELDS for tracking
+        'progress',
+        'attendance',
+        'total_sessions',
+        'certificate_available',
+        'certificate_path',
     ];
 
     protected $casts = [
         'completed_at' => 'datetime',
-        'enrollment_data' => 'array',  // ✅ ADD THIS
-        'unenrolled_at' => 'datetime', // ✅ ADD THIS
+        'enrollment_data' => 'array',
+        'unenrolled_at' => 'datetime',
+        'progress' => 'integer',
+        'attendance' => 'integer',
+        'total_sessions' => 'integer',
+        'certificate_available' => 'boolean',
     ];
 
     /**
@@ -46,16 +56,30 @@ class CourseEnrollment extends Model
     /**
      * Check if enrollment is active (not unenrolled)
      */
-    public function isActive()
+    public function isActive(): bool
     {
-        return is_null($this->unenrolled_at);
+        return is_null($this->unenrolled_at) && $this->status === 'enrolled';
     }
 
     /**
      * Check if enrollment is completed
      */
-    public function isCompleted()
+    public function isCompleted(): bool
     {
-        return $this->status === 'completed';
+        return $this->status === 'completed' || $this->certificate_available === true;
+    }
+
+    /**
+     * Get enrollment status for frontend
+     */
+    public function getFrontendStatusAttribute(): string
+    {
+        if ($this->unenrolled_at) {
+            return 'not_started';
+        }
+        if ($this->status === 'completed' || $this->certificate_available) {
+            return 'completed';
+        }
+        return 'active';
     }
 }

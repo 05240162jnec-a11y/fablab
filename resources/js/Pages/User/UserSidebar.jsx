@@ -1,390 +1,176 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 
-export default function UserSidebar({ expandedMenus, toggleSubmenu, onLogout }) {
+export default function UserSidebar({ onLogout }) {
     const location = useLocation();
     const navigate = useNavigate();
 
-    // ✅ Auto-expand menus based on current route
-    useEffect(() => {
-        const currentPath = location.pathname;
-
-        // Shop & Orders menu items
-        if (currentPath.startsWith('/user/shop-products') ||
-            currentPath.startsWith('/user/my-orders') ||
-            currentPath.startsWith('/user/custom-orders')) {
-            if (!expandedMenus.shopOrders) {
-                toggleSubmenu('shopOrders');
-            }
-        }
-
-        // Machines menu items
-        if (currentPath.startsWith('/user/book-machine') ||
-            currentPath.startsWith('/user/my-bookings')) {
-            if (!expandedMenus.machines) {
-                toggleSubmenu('machines');
-            }
-        }
-
-        // Learning menu items
-        if (currentPath.startsWith('/user/courses') ||
-            currentPath.startsWith('/user/my-enrollments')) {
-            if (!expandedMenus.learning) {
-                toggleSubmenu('learning');
-            }
-        }
-
-        // Explore menu items
-        if (currentPath.startsWith('/user/projects-gallery') ||
-            currentPath.startsWith('/user/photo-gallery') ||
-            currentPath.startsWith('/user/announcements')) {
-            if (!expandedMenus.explore) {
-                toggleSubmenu('explore');
-            }
-        }
-
-        // Support menu items
-        if (currentPath.startsWith('/user/faqs') ||
-            currentPath.startsWith('/user/submit-feedback') ||
-            currentPath.startsWith('/user/help-center')) {
-            if (!expandedMenus.support) {
-                toggleSubmenu('support');
-            }
-        }
-    }, [location.pathname]); // Run when route changes
-
-    // Check if link is active
+    // Check if link is active (matches current path)
     const isActive = (path) => {
+        // For tabbed pages, check if the path starts with the base URL
+        if (path.includes('/shop-orders') || path.includes('/machines') ||
+            path.includes('/learning') || path.includes('/explore') || path.includes('/support')) {
+            return location.pathname.startsWith(path);
+        }
         return location.pathname === path;
     };
 
-    // ✅ Handle logout - clear data and redirect
+    // Handle logout
     const handleLogout = (e) => {
-        e.preventDefault(); // Prevent default Link behavior
-
-        // Clear auth token
+        e.preventDefault();
         localStorage.removeItem('auth_token');
-
-        // Clear ALL cached data
         localStorage.removeItem('dashboard_data');
         localStorage.removeItem('cart_items');
         localStorage.removeItem('user_profile');
         localStorage.removeItem('booking_data');
 
-        // Call parent's onLogout if provided (for state cleanup)
-        if (onLogout) {
-            onLogout();
-        }
-
-        // Redirect to login
+        if (onLogout) onLogout();
         navigate('/login', { replace: true });
     };
 
     return (
-        <aside className="w-64 bg-slate-900 text-white flex flex-col h-screen sticky top-0">
+        <aside className="w-64 bg-slate-900 text-white flex flex-col h-screen sticky top-0 shadow-xl">
             {/* Logo Section */}
-            <div className="flex items-center gap-3 px-6 py-5 border-b border-slate-700/50">
-                <img src="../images/logo.png" className="w-15 h-15 rounded-full object-cover" alt="Logo" />
+            <div className="flex items-center gap-3 px-6 py-5 border-b border-slate-700/50 bg-slate-900/50">
+                <img src="../images/logo.png" className="w-12 h-12 rounded-full object-cover border-2 border-blue-500/30" alt="Logo" />
                 <div>
-                    <h1 className="text-lg font-bold text-white">JNEC Fab Lab</h1>
-                    <p className="text-xs text-slate-400">User Portal</p>
+                    <h1 className="text-lg font-bold text-white tracking-wide">JNEC Fab Lab</h1>
+                    <p className="text-[10px] text-slate-400 uppercase tracking-widest">User Portal</p>
                 </div>
             </div>
 
             {/* Navigation */}
-            <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+            <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700">
+
                 {/* Dashboard */}
                 <Link
                     to="/user/dashboard"
-                    className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${isActive('/user/dashboard')
-                        ? 'bg-blue-600/20 border border-blue-500/30 text-blue-400 font-medium'
-                        : 'text-slate-300 hover:text-white hover:bg-slate-700/50'
+                    className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${isActive('/user/dashboard')
+                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
                         }`}
                 >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className={`w-5 h-5 ${isActive('/user/dashboard') ? 'text-white' : 'text-slate-500 group-hover:text-blue-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
                     </svg>
-                    Dashboard
+                    <span className="font-medium">Dashboard</span>
                 </Link>
 
-                {/* Shop & Orders */}
-                <div>
-                    <button
-                        onClick={() => toggleSubmenu('shopOrders')}
-                        className="flex items-center justify-between w-full px-4 py-3 text-slate-300 hover:text-white hover:bg-slate-700/50 rounded-lg transition-all"
-                    >
-                        <div className="flex items-center gap-3">
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                            </svg>
-                            Shop & Orders
-                        </div>
-                        <svg className={`w-4 h-4 transition-transform ${expandedMenus.shopOrders ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                        </svg>
-                    </button>
-                    {expandedMenus.shopOrders && (
-                        <div className="ml-4 mt-1 space-y-1">
-                            {/* Shop Products Link */}
-                            <Link
-                                to="/user/shop-products"
-                                className={`block px-4 py-2 text-sm rounded-lg transition-all ${isActive('/user/shop-products')
-                                    ? 'text-blue-400 bg-blue-600/20'
-                                    : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
-                                    }`}
-                            >
-                                Product List
-                            </Link>
+                {/* ✅ Shop & Orders (Tabbed Page) */}
+                <Link
+                    to="/user/shop-orders"
+                    className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${isActive('/user/shop-orders')
+                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                        }`}
+                >
+                    <svg className={`w-5 h-5 ${isActive('/user/shop-orders') ? 'text-white' : 'text-slate-500 group-hover:text-blue-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                    </svg>
+                    <span className="font-medium">Shop & Orders</span>
+                </Link>
 
-                            {/* My Orders Link */}
-                            <Link
-                                to="/user/my-orders"
-                                className={`block px-4 py-2 text-sm rounded-lg transition-all ${isActive('/user/my-orders')
-                                    ? 'text-blue-400 bg-blue-600/20'
-                                    : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
-                                    }`}
-                            >
-                                My Orders
-                            </Link>
+                {/* ✅ Machines (Tabbed Page) */}
+                <Link
+                    to="/user/machines"
+                    className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${isActive('/user/machines')
+                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                        }`}
+                >
+                    <svg className={`w-5 h-5 ${isActive('/user/machines') ? 'text-white' : 'text-slate-500 group-hover:text-blue-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    <span className="font-medium">Machines</span>
+                </Link>
 
-                            {/* Custom Orders Link */}
-                            <Link
-                                to="/user/custom-orders"
-                                className={`block px-4 py-2 text-sm rounded-lg transition-all ${isActive('/user/custom-orders')
-                                    ? 'text-blue-400 bg-blue-600/20'
-                                    : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
-                                    }`}
-                            >
-                                Custom Orders
-                            </Link>
-                        </div>
-                    )}
-                </div>
+                {/* ✅ Learning (Tabbed Page) */}
+                <Link
+                    to="/user/learning"
+                    className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${isActive('/user/learning')
+                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                        }`}
+                >
+                    <svg className={`w-5 h-5 ${isActive('/user/learning') ? 'text-white' : 'text-slate-500 group-hover:text-blue-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                    </svg>
+                    <span className="font-medium">Learning</span>
+                </Link>
 
-                {/* Machines */}
-                <div>
-                    <button
-                        onClick={() => toggleSubmenu('machines')}
-                        className="flex items-center justify-between w-full px-4 py-3 text-slate-300 hover:text-white hover:bg-slate-700/50 rounded-lg transition-all"
-                    >
-                        <div className="flex items-center gap-3">
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            </svg>
-                            Machines
-                        </div>
-                        <svg className={`w-4 h-4 transition-transform ${expandedMenus.machines ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                        </svg>
-                    </button>
-                    {expandedMenus.machines && (
-                        <div className="ml-4 mt-1 space-y-1">
-                            {/* Book a Machine Link */}
-                            <Link
-                                to="/user/book-machine"
-                                className={`block px-4 py-2 text-sm rounded-lg transition-all ${isActive('/user/book-machine')
-                                    ? 'text-blue-400 bg-blue-600/20'
-                                    : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
-                                    }`}
-                            >
-                                Book a Machine
-                            </Link>
+                {/* ✅ Explore (Tabbed Page) */}
+                <Link
+                    to="/user/explore"
+                    className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${isActive('/user/explore')
+                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                        }`}
+                >
+                    <svg className={`w-5 h-5 ${isActive('/user/explore') ? 'text-white' : 'text-slate-500 group-hover:text-blue-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                    </svg>
+                    <span className="font-medium">Explore</span>
+                </Link>
 
-                            {/* My Bookings Link */}
-                            <Link
-                                to="/user/my-bookings"
-                                className={`block px-4 py-2 text-sm rounded-lg transition-all ${isActive('/user/my-bookings')
-                                    ? 'text-blue-400 bg-blue-600/20'
-                                    : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
-                                    }`}
-                            >
-                                My Bookings
-                            </Link>
-                        </div>
-                    )}
-                </div>
+                {/* ✅ Support (Tabbed Page) */}
+                <Link
+                    to="/user/support"
+                    className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${isActive('/user/support')
+                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                        }`}
+                >
+                    <svg className={`w-5 h-5 ${isActive('/user/support') ? 'text-white' : 'text-slate-500 group-hover:text-blue-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span className="font-medium">Support</span>
+                </Link>
 
-                {/* Learning */}
-                <div>
-                    <button
-                        onClick={() => toggleSubmenu('learning')}
-                        className="flex items-center justify-between w-full px-4 py-3 text-slate-300 hover:text-white hover:bg-slate-700/50 rounded-lg transition-all"
-                    >
-                        <div className="flex items-center gap-3">
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                            </svg>
-                            Learning
-                        </div>
-                        <svg className={`w-4 h-4 transition-transform ${expandedMenus.learning ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                        </svg>
-                    </button>
-                    {expandedMenus.learning && (
-                        <div className="ml-4 mt-1 space-y-1">
-                            {/* Available Courses Link */}
-                            <Link
-                                to="/user/courses"
-                                className={`block px-4 py-2 text-sm rounded-lg transition-all ${isActive('/user/courses')
-                                    ? 'text-blue-400 bg-blue-600/20'
-                                    : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
-                                    }`}
-                            >
-                                Available Courses
-                            </Link>
-
-                            {/* My Enrollments Link */}
-                            <Link
-                                to="/user/my-enrollments"
-                                className={`block px-4 py-2 text-sm rounded-lg transition-all ${isActive('/user/my-enrollments')
-                                    ? 'text-blue-400 bg-blue-600/20'
-                                    : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
-                                    }`}
-                            >
-                                My Enrollments
-                            </Link>
-                        </div>
-                    )}
-                </div>
-
-                {/* Explore */}
-                <div>
-                    <button
-                        onClick={() => toggleSubmenu('explore')}
-                        className="flex items-center justify-between w-full px-4 py-3 text-slate-300 hover:text-white hover:bg-slate-700/50 rounded-lg transition-all"
-                    >
-                        <div className="flex items-center gap-3">
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
-                            </svg>
-                            Explore
-                        </div>
-                        <svg className={`w-4 h-4 transition-transform ${expandedMenus.explore ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                        </svg>
-                    </button>
-                    {expandedMenus.explore && (
-                        <div className="ml-4 mt-1 space-y-1">
-                            <Link
-                                to="/user/projects-gallery"
-                                className={`block px-4 py-2 text-sm rounded-lg transition-all ${isActive('/user/projects-gallery')
-                                    ? 'text-blue-400 bg-blue-600/20'
-                                    : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
-                                    }`}
-                            >
-                                Projects Gallery
-                            </Link>
-                            <Link
-                                to="/user/photo-gallery"
-                                className={`block px-4 py-2 text-sm rounded-lg transition-all ${isActive('/user/photo-gallery')
-                                    ? 'text-blue-400 bg-blue-600/20'
-                                    : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
-                                    }`}
-                            >
-                                Photo Gallery
-                            </Link>
-                            <Link
-                                to="/user/announcements"
-                                className={`block px-4 py-2 text-sm rounded-lg transition-all ${isActive('/user/announcements')
-                                    ? 'text-blue-400 bg-blue-600/20'
-                                    : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
-                                    }`}
-                            >
-                                Announcements
-                            </Link>
-                        </div>
-                    )}
-                </div>
-
-                {/* Support */}
-                <div>
-                    <button
-                        onClick={() => toggleSubmenu('support')}
-                        className="flex items-center justify-between w-full px-4 py-3 text-slate-300 hover:text-white hover:bg-slate-700/50 rounded-lg transition-all"
-                    >
-                        <div className="flex items-center gap-3">
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            Support
-                        </div>
-                        <svg className={`w-4 h-4 transition-transform ${expandedMenus.support ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                        </svg>
-                    </button>
-                    {expandedMenus.support && (
-                        <div className="ml-4 mt-1 space-y-1">
-                            <Link
-                                to="/user/faqs"
-                                className={`block px-4 py-2 text-sm rounded-lg transition-all ${isActive('/user/faqs')
-                                    ? 'text-blue-400 bg-blue-600/20'
-                                    : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
-                                    }`}
-                            >
-                                FAQs
-                            </Link>
-                            <Link
-                                to="/user/submit-feedback"
-                                className={`block px-4 py-2 text-sm rounded-lg transition-all ${isActive('/user/submit-feedback')
-                                    ? 'text-blue-400 bg-blue-600/20'
-                                    : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
-                                    }`}
-                            >
-                                Submit Feedback
-                            </Link>
-                            <Link
-                                to="/user/help-center"
-                                className={`block px-4 py-2 text-sm rounded-lg transition-all ${isActive('/user/help-center')
-                                    ? 'text-blue-400 bg-blue-600/20'
-                                    : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
-                                    }`}
-                            >
-                                Help Center
-                            </Link>
-                        </div>
-                    )}
-                </div>
+                {/* Divider */}
+                <div className="my-4 border-t border-slate-700/50"></div>
 
                 {/* My Transactions */}
                 <Link
                     to="/user/transactions"
-                    className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${isActive('/user/transactions')
-                        ? 'bg-blue-600/20 border border-blue-500/30 text-blue-400 font-medium'
-                        : 'text-slate-300 hover:text-white hover:bg-slate-700/50'
+                    className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${isActive('/user/transactions')
+                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
                         }`}
                 >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className={`w-5 h-5 ${isActive('/user/transactions') ? 'text-white' : 'text-slate-500 group-hover:text-blue-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
                     </svg>
-                    My Transactions
+                    <span className="font-medium">My Transactions</span>
                 </Link>
 
                 {/* My Profile */}
                 <Link
                     to="/user/profile"
-                    className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${isActive('/user/profile')
-                        ? 'bg-blue-600/20 border border-blue-500/30 text-blue-400 font-medium'
-                        : 'text-slate-300 hover:text-white hover:bg-slate-700/50'
+                    className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${isActive('/user/profile')
+                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
                         }`}
                 >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className={`w-5 h-5 ${isActive('/user/profile') ? 'text-white' : 'text-slate-500 group-hover:text-blue-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                     </svg>
-                    My Profile
+                    <span className="font-medium">My Profile</span>
                 </Link>
+            </nav>
 
-                {/* ✅ FIXED: Logout Button - Calls handleLogout instead of Link */}
+            {/* Footer / Logout */}
+            <div className="p-4 border-t border-slate-700/50 bg-slate-900/50">
                 <button
                     onClick={handleLogout}
-                    className="flex items-center gap-3 w-full px-4 py-3 text-white-400 hover:text-white-300 hover:bg-white-500/10 rounded-lg transition-all mt-4 border-t border-slate-700/50 pt-4 text-left"
+                    className="flex items-center gap-3 w-full px-4 py-3 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-xl transition-all text-left font-medium"
                 >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                     </svg>
                     Logout
                 </button>
-            </nav>
+            </div>
         </aside>
     );
 }

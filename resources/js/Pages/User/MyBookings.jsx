@@ -1,18 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
-import UserSidebar from './UserSidebar';
 
 export default function MyBookings() {
-    // ✅ Pass proper state to UserSidebar
-    const [expandedMenus, setExpandedMenus] = useState({
-        shopOrders: false,
-        machines: true,  // Set machines to true to keep it expanded
-        learning: false,
-        explore: false,
-        support: false,
-    });
-
     // Booking States
     const [bookings, setBookings] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -23,14 +13,6 @@ export default function MyBookings() {
     // Filter & Search States
     const [filterStatus, setFilterStatus] = useState('booked');
     const [searchQuery, setSearchQuery] = useState('');
-
-    // Toggle submenu
-    const toggleSubmenu = (menu) => {
-        setExpandedMenus(prev => ({
-            ...prev,
-            [menu]: !prev[menu]
-        }));
-    };
 
     // Fetch bookings on mount
     useEffect(() => {
@@ -53,10 +35,8 @@ export default function MyBookings() {
             setBookings(apiBookings.map((b) => ({
                 id: b.id,
                 booking_date: b.start_date || b.booking_date,
-                // ✅ Removed time fields
                 status: b.status === 'confirmed' ? 'booked' : b.status,
                 created_at: b.created_at,
-                // ✅ Removed purpose field
                 machine: {
                     id: b.machine_id,
                     name: b.machine_name,
@@ -170,169 +150,149 @@ export default function MyBookings() {
     };
 
     return (
-        <div className="flex min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-            {/* ✅ Pass expandedMenus and toggleSubmenu to UserSidebar */}
-            <UserSidebar
-                expandedMenus={expandedMenus}
-                toggleSubmenu={toggleSubmenu}
-            />
-
-            <div className="flex-1">
-                {/* ✅ Header - White/Light, No Logo */}
-                <header className="bg-white/80 backdrop-blur-md border-b border-gray-200 sticky top-0 z-30 shadow-sm">
-                    <div className="px-6 py-4">
-                        <div>
-                            <h1 className="text-2xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">My Bookings</h1>
-                            <p className="text-sm text-gray-500">View and manage your machine bookings</p>
+        <>
+            {loading ? (
+                <div className="flex flex-col items-center justify-center py-20">
+                    <div className="relative">
+                        <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+                        <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="w-8 h-8 bg-blue-600 rounded-full animate-pulse"></div>
                         </div>
                     </div>
-                </header>
+                    <p className="mt-6 text-gray-600 font-medium">Loading bookings...</p>
+                </div>
+            ) : (
+                <>
+                    {/* Search & Filter - Only 2 Tabs */}
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+                        {/* Search */}
+                        <div className="relative flex-1 max-w-md">
+                            <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                            <input
+                                type="text"
+                                placeholder="Search by booking ID or machine name..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white/80 backdrop-blur-sm"
+                            />
+                        </div>
 
-                <main className="p-6">
-                    {loading ? (
-                        <div className="flex flex-col items-center justify-center py-20">
-                            <div className="relative">
-                                <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
-                                <div className="absolute inset-0 flex items-center justify-center">
-                                    <div className="w-8 h-8 bg-blue-600 rounded-full animate-pulse"></div>
-                                </div>
+                        {/* ✅ Only 2 Filter Tabs: Booked & Cancelled */}
+                        <div className="flex items-center gap-2 overflow-x-auto">
+                            <button
+                                onClick={() => setFilterStatus('booked')}
+                                className={`px-5 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${filterStatus === 'booked'
+                                    ? 'bg-blue-600 text-white shadow-md'
+                                    : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
+                                    }`}
+                            >
+                                Booked ({statusCounts.booked})
+                            </button>
+                            <button
+                                onClick={() => setFilterStatus('cancelled')}
+                                className={`px-5 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${filterStatus === 'cancelled'
+                                    ? 'bg-red-600 text-white shadow-md'
+                                    : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
+                                    }`}
+                            >
+                                Cancelled ({statusCounts.cancelled})
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Bookings List */}
+                    {filteredBookings.length === 0 ? (
+                        <div className="text-center py-16 bg-white rounded-2xl border border-gray-100 shadow-sm">
+                            <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <svg className="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
                             </div>
-                            <p className="mt-6 text-gray-600 font-medium">Loading bookings...</p>
+                            <p className="text-gray-500 text-lg font-medium">
+                                {filterStatus === 'booked' ? 'No booked machines' : 'No cancelled bookings'}
+                            </p>
+                            <p className="text-gray-400 text-sm mt-1">
+                                {filterStatus === 'booked'
+                                    ? 'Book a machine to see your bookings here'
+                                    : 'Cancelled bookings will appear here'}
+                            </p>
+                            {filterStatus === 'booked' && (
+                                <Link
+                                    to="/user/book-machine"
+                                    className="inline-block mt-4 px-6 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all shadow-md hover:shadow-lg font-medium"
+                                >
+                                    Book a Machine
+                                </Link>
+                            )}
                         </div>
                     ) : (
-                        <>
-                            {/* Search & Filter - Only 2 Tabs */}
-                            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
-                                {/* Search */}
-                                <div className="relative flex-1 max-w-md">
-                                    <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                                    </svg>
-                                    <input
-                                        type="text"
-                                        placeholder="Search by booking ID or machine name..."
-                                        value={searchQuery}
-                                        onChange={(e) => setSearchQuery(e.target.value)}
-                                        className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white/80 backdrop-blur-sm"
-                                    />
-                                </div>
+                        <div className="space-y-4">
+                            {filteredBookings.map((booking) => (
+                                <div
+                                    key={booking.id}
+                                    onClick={() => handleViewDetails(booking)}
+                                    className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer hover:-translate-y-0.5"
+                                >
+                                    <div className="p-6">
+                                        <div className="flex items-center justify-between">
+                                            {/* Left Side - Machine & Date */}
+                                            <div className="flex items-start gap-4">
+                                                {/* Machine Image */}
+                                                <div className="w-16 h-16 bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden">
+                                                    {booking.machine.image ? (
+                                                        <img
+                                                            src={booking.machine.image}
+                                                            alt={booking.machine.name}
+                                                            className="w-full h-full object-cover"
+                                                        />
+                                                    ) : (
+                                                        <svg className="w-8 h-8 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                        </svg>
+                                                    )}
+                                                </div>
 
-                                {/* ✅ Only 2 Filter Tabs: Booked & Cancelled */}
-                                <div className="flex items-center gap-2 overflow-x-auto">
-                                    <button
-                                        onClick={() => setFilterStatus('booked')}
-                                        className={`px-5 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${filterStatus === 'booked'
-                                                ? 'bg-blue-600 text-white shadow-md'
-                                                : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
-                                            }`}
-                                    >
-                                        Booked ({statusCounts.booked})
-                                    </button>
-                                    <button
-                                        onClick={() => setFilterStatus('cancelled')}
-                                        className={`px-5 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${filterStatus === 'cancelled'
-                                                ? 'bg-red-600 text-white shadow-md'
-                                                : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
-                                            }`}
-                                    >
-                                        Cancelled ({statusCounts.cancelled})
-                                    </button>
-                                </div>
-                            </div>
+                                                {/* Booking Info - Removed Time & Purpose */}
+                                                <div>
+                                                    <h3 className="font-bold text-gray-900 text-lg mb-1">{booking.machine.name}</h3>
+                                                    <p className="text-sm text-gray-500 mb-3">{booking.machine.type} • {booking.machine.location}</p>
 
-                            {/* Bookings List */}
-                            {filteredBookings.length === 0 ? (
-                                <div className="text-center py-16 bg-white rounded-2xl border border-gray-100 shadow-sm">
-                                    <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                                        <svg className="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                        </svg>
-                                    </div>
-                                    <p className="text-gray-500 text-lg font-medium">
-                                        {filterStatus === 'booked' ? 'No booked machines' : 'No cancelled bookings'}
-                                    </p>
-                                    <p className="text-gray-400 text-sm mt-1">
-                                        {filterStatus === 'booked'
-                                            ? 'Book a machine to see your bookings here'
-                                            : 'Cancelled bookings will appear here'}
-                                    </p>
-                                    {filterStatus === 'booked' && (
-                                        <Link
-                                            to="/user/book-machine"
-                                            className="inline-block mt-4 px-6 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all shadow-md hover:shadow-lg font-medium"
-                                        >
-                                            Book a Machine
-                                        </Link>
-                                    )}
-                                </div>
-                            ) : (
-                                <div className="space-y-4">
-                                    {filteredBookings.map((booking) => (
-                                        <div
-                                            key={booking.id}
-                                            onClick={() => handleViewDetails(booking)}
-                                            className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer hover:-translate-y-0.5"
-                                        >
-                                            <div className="p-6">
-                                                <div className="flex items-center justify-between">
-                                                    {/* Left Side - Machine & Date */}
-                                                    <div className="flex items-start gap-4">
-                                                        {/* Machine Image */}
-                                                        <div className="w-16 h-16 bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden">
-                                                            {booking.machine.image ? (
-                                                                <img
-                                                                    src={booking.machine.image}
-                                                                    alt={booking.machine.name}
-                                                                    className="w-full h-full object-cover"
-                                                                />
-                                                            ) : (
-                                                                <svg className="w-8 h-8 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                                                </svg>
-                                                            )}
-                                                        </div>
-
-                                                        {/* Booking Info - Removed Time & Purpose */}
-                                                        <div>
-                                                            <h3 className="font-bold text-gray-900 text-lg mb-1">{booking.machine.name}</h3>
-                                                            <p className="text-sm text-gray-500 mb-3">{booking.machine.type} • {booking.machine.location}</p>
-
-                                                            {/* ✅ Only Date - No Time */}
-                                                            <div className="flex items-center gap-4 text-sm text-gray-600">
-                                                                <div className="flex items-center gap-1.5">
-                                                                    <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                                                    </svg>
-                                                                    <span>{formatDate(booking.booking_date)}</span>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Right Side - Status & Action */}
-                                                    <div className="flex flex-col items-end gap-3">
-                                                        <span className={`px-3 py-1.5 rounded-full text-xs font-bold ${getStatusBadgeClass(booking.status)}`}>
-                                                            {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
-                                                        </span>
-
-                                                        <button className="text-blue-600 hover:text-blue-700 font-medium text-sm flex items-center gap-1">
-                                                            View Details
-                                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                                                    {/* ✅ Only Date - No Time */}
+                                                    <div className="flex items-center gap-4 text-sm text-gray-600">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                                                             </svg>
-                                                        </button>
+                                                            <span>{formatDate(booking.booking_date)}</span>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
+
+                                            {/* Right Side - Status & Action */}
+                                            <div className="flex flex-col items-end gap-3">
+                                                <span className={`px-3 py-1.5 rounded-full text-xs font-bold ${getStatusBadgeClass(booking.status)}`}>
+                                                    {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
+                                                </span>
+
+                                                <button className="text-blue-600 hover:text-blue-700 font-medium text-sm flex items-center gap-1">
+                                                    View Details
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                                                    </svg>
+                                                </button>
+                                            </div>
                                         </div>
-                                    ))}
+                                    </div>
                                 </div>
-                            )}
-                        </>
+                            ))}
+                        </div>
                     )}
-                </main>
-            </div>
+                </>
+            )}
 
             {/* ✅ BOOKING DETAILS MODAL - No Time, No Purpose, No Status Timeline */}
             {showDetailsModal && selectedBooking && (
@@ -442,6 +402,6 @@ export default function MyBookings() {
                     </div>
                 </div>
             )}
-        </div>
+        </>
     );
 }

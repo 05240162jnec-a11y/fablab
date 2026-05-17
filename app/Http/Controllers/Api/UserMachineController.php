@@ -4,84 +4,69 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Machine;
-use App\Models\Booking;
+use App\Models\CourseEnrollment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Carbon\Carbon;
 
 class UserMachineController extends Controller
 {
-    /**
-     * Get all available machines for users
-     */
-    public function index(Request $request)
-    {
+  public function index()
+{
+    try {
         $user = Auth::user();
-        
-        $query = Machine::where('status', 'available');
 
-        // Search by name or type
-        if ($request->has('search') && $request->search) {
-            $search = $request->search;
-            $query->where(function($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('type', 'like', "%{$search}%");
+        // Get all available machines
+        $machines = \App\Models\Machine::where('status', 'available')
+            ->select('id', 'name', 'type as category', 'description', 'required_course', 'status', 'image', 'created_at')
+            ->orderBy('name', 'asc')
+            ->get()
+            ->map(function ($machine) use ($user) {
+                // Simple training check - does user have ANY completed course?
+                $hasTraining = $user->courses()
+                    ->wherePivot('status', 'completed')
+                    ->exists();
+
+                return [
+                    'id' => $machine->id,
+                    'name' => $machine->name,
+                    'category' => $machine->category ?? 'General',
+                    'description' => $machine->description,
+                    'image' => $machine->image ? asset('storage/' . $machine->image) : null,
+                    'location' => 'Fab Lab',
+                    'status' => $machine->status,
+                    'has_required_training' => !empty($machine->required_course),
+                    'required_course_title' => $machine->required_course,
+                    'has_training' => $hasTraining,
+                    'created_at' => $machine->created_at,
+                ];
             });
-        }
 
-        $machines = $query->latest()->get()->map(function($machine) use ($user) {
-            // ✅ CORRECT LOGIC: Check if user has completed ANY course
-            $hasTraining = $user->courses()
-                ->whereIn('status', ['completed'])  // Only 'completed' counts
-                ->exists();
-            
-            return [
-                'id' => $machine->id,
-                'name' => $machine->name,
-                'category' => $machine->category ?? 'General',
-                'type' => $machine->type ?? 'General',
-                'status' => $machine->status,
-                'description' => $machine->description,
-                'image' => $machine->image,
-                'location' => $machine->location ?? 'Main Lab',
-                'has_required_training' => $hasTraining,  // ✅ Based on ANY completed course
-                'required_course' => null,  // Not machine-specific
-                'required_course_names' => [],
-                'added_on' => $machine->created_at,
-            ];
-        });
-
-        return response()->json([
-            'machines' => $machines,
-        ]);
+        return response()->json(['machines' => $machines]);
+        
+    } catch (\Exception $e) {
+        \Log::error('UserMachineController index error: ' . $e->getMessage());
+        return response()->json(['machines' => [], 'error' => $e->getMessage()], 500);
     }
+}
 
     /**
-     * Get booked dates for a machine
+     * Get booked dates for a specific machine
      */
-    public function bookedDates($machineId)
+    public function bookedDates($id)
     {
-        $bookedDates = Booking::where('machine_id', $machineId)
-            ->where('status', '!=', 'cancelled')
-            ->where('start_date', '>=', now())
-            ->get()
-            ->flatMap(function ($booking) {
-                $start = Carbon::parse($booking->start_date);
-                $end = Carbon::parse($booking->end_date);
-                $dates = [];
-                
-                while ($start <= $end) {
-                    $dates[] = $start->format('Y-m-d');
-                    $start->addDay();
-                }
-                
-                return $dates;
-            })
-            ->unique()
-            ->values();
+        try {
+            // Get all confirmed bookings for this machine
+            $bookings = \App\Models\Booking::where('machine_id', $id)
+                ->where('status', 'confirmed')
+                ->where('start_date', '>=', now()->startOfDay())
+                ->pluck('start_date')
+                ->map(fn($date) => $date->format('Y-m-d'));
 
-        return response()->json([
-            'dates' => $bookedDates,
-        ]);
+            return response()->json(['dates' => $bookings]);
+            
+        } catch (\Exception $e) {
+            \Log::error('UserMachineController bookedDates error: ' . $e->getMessage());
+            return response()->json(['dates' => [], 'error' => 'Failed to load booked dates'], 200);
+        }
     }
 }

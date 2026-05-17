@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import UserSidebar from './UserSidebar';
 
-// ✅ Professional Dialog Component
+// ✅ Professional Dialog Component (kept as is)
 const Dialog = ({ type, title, message, onConfirm, onCancel, show }) => {
     if (!show) return null;
 
@@ -70,15 +69,14 @@ const Dialog = ({ type, title, message, onConfirm, onCancel, show }) => {
     );
 };
 
-export default function ShopProducts() {
-    const [expandedMenus, setExpandedMenus] = useState({
-        shopOrders: true,
-        machines: false,
-        learning: false,
-        explore: false,
-        support: false,
-    });
-
+export default function ShopProducts({
+    cart,
+    setCart,
+    cartProductIds,
+    setCartProductIds,
+    showCartDrawer,
+    setShowCartDrawer
+}) {
     // Product States
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -89,14 +87,14 @@ export default function ShopProducts() {
     // Carousel State
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
-    // Cart States
-    const [cart, setCart] = useState([]);
-    const [showCartDrawer, setShowCartDrawer] = useState(false);
+    // ✅ REMOVED: Local cart states (now passed as props from ShopOrders)
+    // const [cart, setCart] = useState([]);
+    // const [showCartDrawer, setShowCartDrawer] = useState(false);
     const [showDeliveryModal, setShowDeliveryModal] = useState(false);
     const [showPaymentModal, setShowPaymentModal] = useState(false);
 
-    // ✅ NEW: Cart Selection States
-    const [selectedCartItems, setSelectedCartItems] = useState([]); // Array of product IDs
+    // Cart Selection States
+    const [selectedCartItems, setSelectedCartItems] = useState([]);
     const [isSelectAll, setIsSelectAll] = useState(false);
 
     // Notification State
@@ -120,16 +118,8 @@ export default function ShopProducts() {
     const [submitting, setSubmitting] = useState(false);
     const [directCheckoutProduct, setDirectCheckoutProduct] = useState(null);
 
-    // Track products already in cart (for badge count)
-    const [cartProductIds, setCartProductIds] = useState([]);
-
-    // Toggle submenu
-    const toggleSubmenu = (menu) => {
-        setExpandedMenus(prev => ({
-            ...prev,
-            [menu]: !prev[menu]
-        }));
-    };
+    // ✅ REMOVED: Local cartProductIds state (now passed as props)
+    // const [cartProductIds, setCartProductIds] = useState([]);
 
     // Show professional dialog
     const showDialog = (type, title, message, onConfirm = null, onCancel = null) => {
@@ -155,7 +145,7 @@ export default function ShopProducts() {
         });
     };
 
-    // ✅ NEW: Refresh cart items with latest stock from API
+    // Refresh cart stock
     const refreshCartStock = async () => {
         if (cart.length === 0) return;
 
@@ -163,7 +153,6 @@ export default function ShopProducts() {
             const userToken = localStorage.getItem('auth_token');
             const productIds = cart.map(item => item.id);
 
-            // Fetch latest product data
             const response = await axios.get('http://127.0.0.1:8000/api/user/products', {
                 headers: {
                     'Accept': 'application/json',
@@ -174,14 +163,13 @@ export default function ShopProducts() {
             if (response.data.success) {
                 const latestProducts = response.data.products;
 
-                // Update cart with latest stock
                 const updatedCart = cart.map(cartItem => {
                     const latestProduct = latestProducts.find(p => p.id === cartItem.id);
                     if (latestProduct) {
                         return {
                             ...cartItem,
-                            stock: latestProduct.stock, // Update stock
-                            size: latestProduct.size,    // Update other fields too
+                            stock: latestProduct.stock,
+                            size: latestProduct.size,
                             price: latestProduct.price,
                         };
                     }
@@ -207,16 +195,15 @@ export default function ShopProducts() {
         }
     }, []);
 
-    // ✅ Refresh cart stock when cart drawer opens
+    // Refresh cart stock when cart drawer opens
     useEffect(() => {
         if (showCartDrawer && cart.length > 0) {
             refreshCartStock();
         }
     }, [showCartDrawer]);
 
-    // Update "Select All" checkbox when cart or selection changes
+    // Update "Select All" checkbox
     useEffect(() => {
-        // Only count in-stock items for "Select All"
         const inStockItems = cart.filter(item => item.stock > 0);
         if (inStockItems.length > 0 && selectedCartItems.length === inStockItems.length) {
             setIsSelectAll(true);
@@ -326,7 +313,7 @@ export default function ShopProducts() {
         }, 3000);
     };
 
-    // Buy Now - Direct to checkout (selects this single product)
+    // Buy Now
     const buyNow = (product, qty = 1) => {
         if (product.stock === 0) {
             showDialog('error', 'Out of Stock', 'This product is currently out of stock. Please check back later.', closeDialog);
@@ -337,15 +324,14 @@ export default function ShopProducts() {
         setShowDetailsModal(false);
         setDeliveryOption('pickup');
         setShippingAddress('');
-        setSelectedCartItems([]); // Clear selection for direct buy
+        setSelectedCartItems([]);
         setShowDeliveryModal(true);
     };
 
-    // ✅ Toggle item selection (only for in-stock items)
+    // Toggle item selection
     const toggleItemSelection = (productId) => {
         const item = cart.find(i => i.id === productId);
 
-        // Prevent selection of out-of-stock items
         if (item && item.stock === 0) {
             showDialog('warning', 'Out of Stock', 'This item is currently out of stock and cannot be selected for checkout.', closeDialog);
             return;
@@ -358,7 +344,7 @@ export default function ShopProducts() {
         }
     };
 
-    // ✅ Toggle Select All (only in-stock items)
+    // Toggle Select All
     const toggleSelectAll = () => {
         const inStockItems = cart.filter(item => item.stock > 0);
 
@@ -369,7 +355,7 @@ export default function ShopProducts() {
         }
     };
 
-    // ✅ Delete selected items
+    // Delete selected items
     const deleteSelectedItems = () => {
         if (selectedCartItems.length === 0) return;
 
@@ -410,18 +396,16 @@ export default function ShopProducts() {
         localStorage.setItem('cart', JSON.stringify(newCart));
     };
 
-    // ✅ Calculate totals for SELECTED items only
+    // Calculate totals for SELECTED items only
     const selectedItems = cart.filter(item => selectedCartItems.includes(item.id));
     const selectedItemsTotal = selectedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
     const selectedItemsCount = selectedItems.reduce((sum, item) => sum + item.quantity, 0);
 
-    // ✅ Check if any selected items are in stock
+    // Check if any selected items are in stock
     const hasInStockItems = selectedItems.some(item => item.stock > 0);
 
-    // Badge count (unique products in cart)
-    const cartItemCount = cartProductIds.length;
-
-    // ✅ Removed shipping cost calculation - shipping will be paid separately
+    // ✅ REMOVED: Local cartItemCount calculation (now from props)
+    // const cartItemCount = cartProductIds.length;
 
     // Proceed to checkout
     const handleCheckout = () => {
@@ -472,7 +456,6 @@ export default function ShopProducts() {
             const formData = new FormData();
             const userToken = localStorage.getItem('auth_token');
 
-            // Determine which items to submit (selected items or direct checkout product)
             const itemsToSubmit = directCheckoutProduct
                 ? [{
                     id: directCheckoutProduct.id,
@@ -494,7 +477,6 @@ export default function ShopProducts() {
                 formData.append(`items[${index}][quantity]`, item.quantity);
             });
 
-            // ✅ Removed shipping cost from total calculation
             const finalTotal = directCheckoutProduct
                 ? (directCheckoutProduct.price * directCheckoutProduct.quantity)
                 : selectedItemsTotal;
@@ -529,7 +511,6 @@ export default function ShopProducts() {
                     'Order Submitted!',
                     'Your order has been submitted successfully! We will review your payment and confirm shortly.',
                     () => {
-                        // Remove purchased items from cart
                         const purchasedIds = directCheckoutProduct
                             ? [directCheckoutProduct.id]
                             : selectedCartItems;
@@ -589,132 +570,102 @@ export default function ShopProducts() {
     };
 
     return (
-        <div className="flex min-h-screen bg-gray-50">
-            {/* Sidebar */}
-            <UserSidebar expandedMenus={expandedMenus} toggleSubmenu={toggleSubmenu} />
+        <>
+            {/* ✅ REMOVED: Header section - Now provided by ShopOrders.jsx */}
 
-            {/* Main Content */}
-            <div className="flex-1">
-                {/* Top Header */}
-                <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
-                    <div className="flex items-center justify-between px-6 py-4">
+            {/* Notification Toast */}
+            {showNotification && (
+                <div className="fixed top-20 right-6 z-50 animate-slide-in-right">
+                    <div className="bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-3">
+                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
                         <div>
-                            <h1 className="text-2xl font-bold text-gray-900">Shop Products</h1>
-                            <p className="text-sm text-gray-600 mt-1">Browse and order products made at the JNEC Fab Lab</p>
-                        </div>
-
-                        {/* Cart Button with Badge */}
-                        <button
-                            onClick={() => setShowCartDrawer(true)}
-                            className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors relative"
-                        >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-                            </svg>
-                            Cart
-                            {cartItemCount > 0 && (
-                                <span className="absolute -top-2 -right-2 bg-blue-600 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center shadow-lg">
-                                    {cartItemCount}
-                                </span>
-                            )}
-                        </button>
-                    </div>
-                </header>
-
-                {/* Notification Toast */}
-                {showNotification && (
-                    <div className="fixed top-20 right-6 z-50 animate-slide-in-right">
-                        <div className="bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-3">
-                            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                            </svg>
-                            <div>
-                                <p className="font-semibold">Added to cart</p>
-                                <p className="text-sm text-green-100">Product has been added to cart</p>
-                            </div>
+                            <p className="font-semibold">Added to cart</p>
+                            <p className="text-sm text-green-100">Product has been added to cart</p>
                         </div>
                     </div>
-                )}
+                </div>
+            )}
 
-                {/* Professional Dialog */}
-                <Dialog
-                    show={dialog.show}
-                    type={dialog.type}
-                    title={dialog.title}
-                    message={dialog.message}
-                    onConfirm={dialog.onConfirm}
-                    onCancel={dialog.onCancel}
-                />
+            {/* Professional Dialog */}
+            <Dialog
+                show={dialog.show}
+                type={dialog.type}
+                title={dialog.title}
+                message={dialog.message}
+                onConfirm={dialog.onConfirm}
+                onCancel={dialog.onCancel}
+            />
 
-                {/* Products Grid */}
-                <main className="p-6">
-                    {loading ? (
-                        <div className="text-center py-12">
-                            <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent"></div>
-                            <p className="mt-4 text-gray-600">Loading products...</p>
-                        </div>
-                    ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                            {products.map((product) => (
-                                <div
-                                    key={product.id}
-                                    onClick={() => handleViewDetails(product)}
-                                    className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-lg transition-shadow overflow-hidden cursor-pointer"
-                                >
-                                    <div className="h-48 bg-gray-100 flex items-center justify-center relative">
-                                        {getProductImage(product) ? (
-                                            <img
-                                                src={getProductImage(product)}
-                                                alt={product.name}
-                                                className="w-full h-full object-cover"
-                                                onError={(e) => {
-                                                    e.target.onerror = null;
-                                                    e.target.parentElement.innerHTML = `
-                                                        <svg class="w-16 h-16 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                                                        </svg>
-                                                    `;
-                                                }}
-                                            />
-                                        ) : (
-                                            <svg className="w-16 h-16 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                            </svg>
-                                        )}
+            {/* Products Grid */}
+            <main className="p-6">
+                {loading ? (
+                    <div className="text-center py-12">
+                        <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent"></div>
+                        <p className="mt-4 text-gray-600">Loading products...</p>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                        {products.map((product) => (
+                            <div
+                                key={product.id}
+                                onClick={() => handleViewDetails(product)}
+                                className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-lg transition-shadow overflow-hidden cursor-pointer"
+                            >
+                                <div className="h-48 bg-gray-100 flex items-center justify-center relative">
+                                    {getProductImage(product) ? (
+                                        <img
+                                            src={getProductImage(product)}
+                                            alt={product.name}
+                                            className="w-full h-full object-cover"
+                                            onError={(e) => {
+                                                e.target.onerror = null;
+                                                e.target.parentElement.innerHTML = `
+                                                    <svg class="w-16 h-16 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                                    </svg>
+                                                `;
+                                            }}
+                                        />
+                                    ) : (
+                                        <svg className="w-16 h-16 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                        </svg>
+                                    )}
 
-                                        {product.stock === 0 && (
-                                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                                <span className="bg-red-600 text-white px-4 py-2 rounded-full text-sm font-semibold shadow-lg">
-                                                    Out of Stock
-                                                </span>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    <div className="p-4">
-                                        <h3 className="font-semibold text-gray-900 mb-1">{product.name}</h3>
-                                        <p className="text-sm text-gray-500 mb-3">{product.size}</p>
-
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-lg font-bold text-blue-600">{formatCurrency(product.price)}</span>
-
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    addToCart(product);
-                                                }}
-                                                className="px-3 py-1.5 text-sm rounded-lg transition-colors bg-blue-600 text-white hover:bg-blue-700"
-                                            >
-                                                Add to Cart
-                                            </button>
+                                    {product.stock === 0 && (
+                                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                            <span className="bg-red-600 text-white px-4 py-2 rounded-full text-sm font-semibold shadow-lg">
+                                                Out of Stock
+                                            </span>
                                         </div>
+                                    )}
+                                </div>
+
+                                <div className="p-4">
+                                    <h3 className="font-semibold text-gray-900 mb-1">{product.name}</h3>
+                                    <p className="text-sm text-gray-500 mb-3">{product.size}</p>
+
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-lg font-bold text-blue-600">{formatCurrency(product.price)}</span>
+
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                addToCart(product);
+                                            }}
+                                            className="px-3 py-1.5 text-sm rounded-lg transition-colors bg-blue-600 text-white hover:bg-blue-700"
+                                        >
+                                            Add to Cart
+                                        </button>
                                     </div>
                                 </div>
-                            ))}
-                        </div>
-                    )}
-                </main>
-            </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </main>
 
             {/* Product Details Modal */}
             {showDetailsModal && selectedProduct && (
@@ -780,7 +731,7 @@ export default function ShopProducts() {
                                         )}
                                     </div>
 
-                                    {/* ✅ Thumbnail Navigation Strip */}
+                                    {/* Thumbnail Navigation Strip */}
                                     {selectedProduct.images && selectedProduct.images.length > 1 && (
                                         <div className="flex gap-2 overflow-x-auto pb-2">
                                             {selectedProduct.images.map((img, index) => (
@@ -872,7 +823,7 @@ export default function ShopProducts() {
                 </div>
             )}
 
-            {/* ✅ UPDATED: Cart Drawer with Disabled Out-of-Stock Items */}
+            {/* Cart Drawer */}
             {showCartDrawer && (
                 <>
                     <div
@@ -887,7 +838,7 @@ export default function ShopProducts() {
                                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
                                     </svg>
-                                    Shopping Cart ({cartItemCount})
+                                    Shopping Cart ({cartProductIds.length})
                                 </h2>
                                 <button
                                     onClick={() => setShowCartDrawer(false)}
@@ -899,7 +850,7 @@ export default function ShopProducts() {
                                 </button>
                             </div>
 
-                            {/* ✅ Selection Toolbar */}
+                            {/* Selection Toolbar */}
                             {cart.length > 0 && (
                                 <div className="px-6 py-3 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
                                     <label className="flex items-center gap-2 cursor-pointer">
@@ -952,21 +903,21 @@ export default function ShopProducts() {
                                                 <div
                                                     key={item.id}
                                                     className={`flex items-start gap-4 p-4 rounded-lg border transition-all ${isOutOfStock
-                                                            ? 'bg-gray-100 border-gray-200 opacity-60'
-                                                            : isSelected
-                                                                ? 'bg-blue-50 border-blue-200'
-                                                                : 'bg-gray-50 border-gray-200'
+                                                        ? 'bg-gray-100 border-gray-200 opacity-60'
+                                                        : isSelected
+                                                            ? 'bg-blue-50 border-blue-200'
+                                                            : 'bg-gray-50 border-gray-200'
                                                         }`}
                                                 >
-                                                    {/* ✅ Checkbox - Disabled for out-of-stock */}
+                                                    {/* Checkbox */}
                                                     <input
                                                         type="checkbox"
                                                         checked={isSelected}
                                                         onChange={() => toggleItemSelection(item.id)}
                                                         disabled={isOutOfStock}
                                                         className={`mt-1 w-5 h-5 rounded focus:ring-blue-500 ${isOutOfStock
-                                                                ? 'cursor-not-allowed text-gray-400'
-                                                                : 'text-blue-600 cursor-pointer'
+                                                            ? 'cursor-not-allowed text-gray-400'
+                                                            : 'text-blue-600 cursor-pointer'
                                                             }`}
                                                     />
 
@@ -1081,7 +1032,7 @@ export default function ShopProducts() {
                 </>
             )}
 
-            {/* ✅ UPDATED: Delivery Options Modal - Shipping text changed */}
+            {/* Delivery Options Modal */}
             {showDeliveryModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
                     <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col">
@@ -1182,7 +1133,7 @@ export default function ShopProducts() {
                                     )}
                                 </div>
 
-                                {/* ✅ Right: Order Summary - Removed shipping cost */}
+                                {/* Right: Order Summary */}
                                 <div className="lg:col-span-1">
                                     <div className="bg-gray-50 rounded-xl p-6 sticky top-0">
                                         <h3 className="text-lg font-semibold text-gray-900 mb-4">Order Summary</h3>
@@ -1220,8 +1171,6 @@ export default function ShopProducts() {
                                                     }
                                                 </span>
                                             </div>
-
-                                            {/* ✅ Removed shipping cost display */}
 
                                             <div className="border-t border-gray-200 pt-2 flex justify-between">
                                                 <span className="text-base font-semibold text-gray-900">Total:</span>
@@ -1271,7 +1220,7 @@ export default function ShopProducts() {
                 </div>
             )}
 
-            {/* ✅ UPDATED: Payment Modal - Removed shipping cost */}
+            {/* Payment Modal */}
             {showPaymentModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
                     <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col">
@@ -1379,7 +1328,7 @@ export default function ShopProducts() {
                                     </div>
                                 </div>
 
-                                {/* ✅ Right: Order Summary - Removed shipping cost */}
+                                {/* Right: Order Summary */}
                                 <div className="lg:col-span-1">
                                     <div className="bg-gray-50 rounded-xl p-6 sticky top-0">
                                         <h3 className="text-lg font-semibold text-gray-900 mb-4">Order Summary</h3>
@@ -1418,8 +1367,6 @@ export default function ShopProducts() {
                                                 </span>
                                             </div>
 
-                                            {/* ✅ Removed shipping cost */}
-
                                             <div className="border-t border-gray-200 pt-2 flex justify-between">
                                                 <span className="text-base font-semibold text-gray-900">Total:</span>
                                                 <span className="text-lg font-bold text-blue-600">
@@ -1457,6 +1404,6 @@ export default function ShopProducts() {
                     </div>
                 </div>
             )}
-        </div>
+        </>
     );
 }

@@ -3,7 +3,6 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 
-
 // Auth Pages
 import Login from './Pages/Auth/Login';
 import Register from './Pages/Auth/Register';
@@ -12,7 +11,7 @@ import ResetPassword from './Pages/Auth/ResetPassword';
 
 // Static Pages
 import Home from './Pages/Static/Home/Home';
-import Machines from './Pages/Static/Machines/Machines';
+import StaticMachines from './Pages/Static/Machines/Machines';
 import Shop from './Pages/Static/Shop/Shop';
 import Training from './Pages/Static/Training/Training';
 import Projects from './Pages/Static/Projects/Projects';
@@ -40,18 +39,22 @@ import AdminProjects from './Pages/Admin/Projects';
 import AdminGallery from './Pages/Admin/Gallery';
 import AdminFAQ from './Pages/Admin/FAQ';
 import AdminProducts from './Pages/Admin/Products';
-
 import AdminLayout from './Pages/Admin/AdminLayout';
 
 // User Pages
 import UserDashboard from './Pages/User/Dashboard';
 import BookMachine from './Pages/User/BookMachine';
 import UserCourses from './Pages/User/Courses';
-import CustomOrders from './Pages/User/CustomOrders';  
+import CustomOrders from './Pages/User/CustomOrders';
 import ShopProducts from './Pages/User/ShopProducts';
 import MyOrders from './Pages/User/MyOrders';
 import MyBookings from './Pages/User/MyBookings';
 import MyEnrollments from './Pages/User/MyEnrollments';
+import UserMachines from './Pages/User/Machines';
+
+// ✅ Tabbed Pages
+import ShopOrders from './Pages/User/ShopOrders';
+import Learning from './Pages/User/Learning'; // ✅ NEW: Import Learning tabbed page
 
 // Create root element
 const root = createRoot(document.getElementById('app'));
@@ -62,7 +65,7 @@ root.render(
         <Routes>
             {/* Static Pages */}
             <Route path="/" element={<Home />} />
-            <Route path="/machines" element={<Machines />} />
+            <Route path="/machines" element={<StaticMachines />} />
             <Route path="/shop" element={<Shop />} />
             <Route path="/training" element={<Training />} />
             <Route path="/projects" element={<Projects />} />
@@ -99,17 +102,29 @@ root.render(
                 <Route path="gallery" element={<AdminGallery />} />
                 <Route path="faq" element={<AdminFAQ />} />
             </Route>
-            
 
-            {/* User Pages */}
+            {/* User Pages - Dashboard */}
             <Route path="/user/dashboard" element={<UserDashboard />} />
+
+            {/* ✅ Tabbed Routes */}
+            <Route path="/user/shop-orders" element={<ShopOrders />} />
+            <Route path="/user/machines" element={<UserMachines />} />
+            <Route path="/user/learning" element={<Learning />} /> {/* ✅ UPDATED: Real route instead of placeholder */}
+
+            {/* 
+               ⚠️ PLACEHOLDER ROUTES for future steps.
+            */}
+            <Route path="/user/explore" element={<div className="p-10 text-center text-2xl font-bold">Explore Page (Coming Soon)</div>} />
+            <Route path="/user/support" element={<div className="p-10 text-center text-2xl font-bold">Support Page (Coming Soon)</div>} />
+
+            {/* Existing routes (Can be removed later when we fully migrate to tabs) */}
             <Route path="/user/book-machine" element={<BookMachine />} />
-            <Route path="/user/courses" element={<UserCourses />} />
+            <Route path="/user/courses" element={<UserCourses />} /> {/* Optional: Keep for direct linking */}
             <Route path="/user/custom-orders" element={<CustomOrders />} />
             <Route path="/user/shop-products" element={<ShopProducts />} />
             <Route path="/user/my-orders" element={<MyOrders />} />
             <Route path="/user/my-bookings" element={<MyBookings />} />
-            <Route path="/user/my-enrollments" element={<MyEnrollments />} />
+            <Route path="/user/my-enrollments" element={<MyEnrollments />} /> {/* Optional: Keep for direct linking */}
         </Routes>
     </BrowserRouter>
 );

@@ -1,17 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Link } from 'react-router-dom';
-import UserSidebar from './UserSidebar';
 
 export default function CustomOrders() {
-    const [expandedMenus, setExpandedMenus] = useState({
-        shopOrders: false,
-        machines: false,
-        learning: false,
-        explore: false,
-        support: false,
-    });
-
     // Modal States
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [showViewModal, setShowViewModal] = useState(false);
@@ -56,14 +46,6 @@ export default function CustomOrders() {
         completed: 0,
         rejected: 0,
     });
-
-    // Toggle submenu
-    const toggleSubmenu = (menu) => {
-        setExpandedMenus(prev => ({
-            ...prev,
-            [menu]: !prev[menu]
-        }));
-    };
 
     // Fetch orders with proper parsing
     const fetchOrders = async () => {
@@ -358,157 +340,143 @@ export default function CustomOrders() {
     };
 
     return (
-        <div className="flex min-h-screen bg-gray-50">
-            <UserSidebar expandedMenus={expandedMenus} toggleSubmenu={toggleSubmenu} />
+        <>
+            {/* Loading State */}
+            {loading && (
+                <div className="flex items-center justify-center py-20">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                </div>
+            )}
 
-            <div className="flex-1">
-                {/* Header */}
-                <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
-                    <div className="px-6 py-4">
-                        <h2 className="text-xl font-semibold text-gray-800">Custom Orders</h2>
-                        <p className="text-sm text-gray-600">Request custom fabrication for your unique designs</p>
+            {/* Error State */}
+            {error && !loading && (
+                <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg mb-6">
+                    {error}
+                </div>
+            )}
+
+            {!loading && !error && (
+                <>
+                    {/* Stats Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                            <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
+                                    <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <p className="text-2xl font-bold text-gray-900">{stats.pending}</p>
+                                    <p className="text-sm text-gray-600">Pending Review</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                            <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                                    <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <p className="text-2xl font-bold text-gray-900">{stats.in_progress}</p>
+                                    <p className="text-sm text-gray-600">In Progress</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                            <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                                    <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <p className="text-2xl font-bold text-gray-900">{stats.completed}</p>
+                                    <p className="text-sm text-gray-600">Completed</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                            <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
+                                    <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <p className="text-2xl font-bold text-gray-900">{stats.rejected}</p>
+                                    <p className="text-sm text-gray-600">Rejected</p>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                </header>
 
-                <main className="p-6">
-                    {/* Loading State */}
-                    {loading && (
-                        <div className="flex items-center justify-center py-20">
-                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                    {/* Filter Tabs & New Order Button */}
+                    <div className="flex items-center justify-between mb-6">
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <button onClick={() => setFilter('all')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === 'all' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'}`}>
+                                All ({orders.length})
+                            </button>
+                            <button onClick={() => setFilter('pending')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === 'pending' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'}`}>
+                                Pending ({stats.pending})
+                            </button>
+                            <button onClick={() => setFilter('in_progress')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === 'in_progress' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'}`}>
+                                In Progress ({stats.in_progress})
+                            </button>
+                            <button onClick={() => setFilter('completed')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === 'completed' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'}`}>
+                                Completed ({stats.completed})
+                            </button>
+                            <button onClick={() => setFilter('rejected')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === 'rejected' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'}`}>
+                                Rejected ({stats.rejected})
+                            </button>
+                        </div>
+
+                        <button onClick={handleCreateOrder} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium">
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                            </svg>
+                            New Custom Order
+                        </button>
+                    </div>
+
+                    {/* Orders Grid - SIMPLIFIED CARDS */}
+                    {filteredOrders.length === 0 ? (
+                        <div className="text-center py-12 bg-white rounded-xl border border-gray-100">
+                            <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            <p className="text-gray-500 text-lg font-medium">No orders found</p>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {filteredOrders.map((order) => (
+                                <div
+                                    key={order.id}
+                                    onClick={() => handleViewOrder(order)}
+                                    className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow cursor-pointer"
+                                >
+                                    <div className="flex items-center justify-between mb-3">
+                                        <h3 className="text-lg font-bold text-gray-900 truncate flex-1">{order.title}</h3>
+                                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ml-2 flex-shrink-0 ${getStatusBadgeClass(order.status)}`}>
+                                            {getStatusIcon(order.status)}
+                                            {capitalize(order.status.replace('_', ' '))}
+                                        </span>
+                                    </div>
+
+                                    <div className="text-sm text-gray-600">
+                                        <span className="font-medium">Qty:</span> {order.quantity}
+                                    </div>
+                                </div>
+                            ))}
                         </div>
                     )}
-
-                    {/* Error State */}
-                    {error && !loading && (
-                        <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg mb-6">
-                            {error}
-                        </div>
-                    )}
-
-                    {!loading && !error && (
-                        <>
-                            {/* Stats Cards */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-                                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
-                                            <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                            </svg>
-                                        </div>
-                                        <div>
-                                            <p className="text-2xl font-bold text-gray-900">{stats.pending}</p>
-                                            <p className="text-sm text-gray-600">Pending Review</p>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                                            <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                                            </svg>
-                                        </div>
-                                        <div>
-                                            <p className="text-2xl font-bold text-gray-900">{stats.in_progress}</p>
-                                            <p className="text-sm text-gray-600">In Progress</p>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                                            <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                            </svg>
-                                        </div>
-                                        <div>
-                                            <p className="text-2xl font-bold text-gray-900">{stats.completed}</p>
-                                            <p className="text-sm text-gray-600">Completed</p>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
-                                            <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                            </svg>
-                                        </div>
-                                        <div>
-                                            <p className="text-2xl font-bold text-gray-900">{stats.rejected}</p>
-                                            <p className="text-sm text-gray-600">Rejected</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Filter Tabs & New Order Button */}
-                            <div className="flex items-center justify-between mb-6">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                    <button onClick={() => setFilter('all')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === 'all' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'}`}>
-                                        All ({orders.length})
-                                    </button>
-                                    <button onClick={() => setFilter('pending')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === 'pending' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'}`}>
-                                        Pending ({stats.pending})
-                                    </button>
-                                    <button onClick={() => setFilter('in_progress')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === 'in_progress' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'}`}>
-                                        In Progress ({stats.in_progress})
-                                    </button>
-                                    <button onClick={() => setFilter('completed')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === 'completed' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'}`}>
-                                        Completed ({stats.completed})
-                                    </button>
-                                    <button onClick={() => setFilter('rejected')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === 'rejected' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'}`}>
-                                        Rejected ({stats.rejected})
-                                    </button>
-                                </div>
-
-                                <button onClick={handleCreateOrder} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium">
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                                    </svg>
-                                    New Custom Order
-                                </button>
-                            </div>
-
-                            {/* Orders Grid - SIMPLIFIED CARDS */}
-                            {filteredOrders.length === 0 ? (
-                                <div className="text-center py-12 bg-white rounded-xl border border-gray-100">
-                                    <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                    </svg>
-                                    <p className="text-gray-500 text-lg font-medium">No orders found</p>
-                                </div>
-                            ) : (
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                    {filteredOrders.map((order) => (
-                                        <div
-                                            key={order.id}
-                                            onClick={() => handleViewOrder(order)}
-                                            className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow cursor-pointer"
-                                        >
-                                            <div className="flex items-center justify-between mb-3">
-                                                <h3 className="text-lg font-bold text-gray-900 truncate flex-1">{order.title}</h3>
-                                                <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ml-2 flex-shrink-0 ${getStatusBadgeClass(order.status)}`}>
-                                                    {getStatusIcon(order.status)}
-                                                    {capitalize(order.status.replace('_', ' '))}
-                                                </span>
-                                            </div>
-
-                                            <div className="text-sm text-gray-600">
-                                                <span className="font-medium">Qty:</span> {order.quantity}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </>
-                    )}
-                </main>
-            </div>
+                </>
+            )}
 
             {/* ===== CREATE ORDER MODAL ===== */}
             {showCreateModal && (
@@ -971,6 +939,6 @@ export default function CustomOrders() {
                     </div>
                 </div>
             )}
-        </div>
+        </>
     );
 }

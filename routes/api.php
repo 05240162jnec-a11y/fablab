@@ -32,6 +32,8 @@ Route::prefix('admin')->group(function () {
             ->only(['index']);
         Route::post('bookings/{id}/update-status', [\App\Http\Controllers\Api\Admin\BookingController::class, 'updateStatus']);
 
+        // ✅ Terminate booking for no-show (admin only) - FIXED: removed duplicate 'admin' prefix
+        Route::post('bookings/{id}/terminate', [\App\Http\Controllers\Api\Admin\BookingController::class, 'terminateBooking']);
 
         // ✅ FIXED: Product Orders (Admin Management)
         Route::apiResource('product-orders', \App\Http\Controllers\Api\Admin\ProductOrderController::class)
@@ -67,7 +69,7 @@ Route::prefix('admin')->group(function () {
         // Courses
         Route::apiResource('courses', \App\Http\Controllers\Api\Admin\CourseController::class);
         Route::post('courses/{id}/toggle-registration', [\App\Http\Controllers\Api\Admin\CourseController::class, 'toggleRegistration']);
-        
+
         // ✅ Course Enrollments Management
         Route::get('courses/{id}/enrollments', [\App\Http\Controllers\Api\Admin\CourseController::class, 'getEnrollments']);
         Route::delete('courses/{courseId}/enrollments/{userId}', [\App\Http\Controllers\Api\Admin\CourseController::class, 'removeEnrollment']);
@@ -77,14 +79,6 @@ Route::prefix('admin')->group(function () {
 
         // Clear active enrollments
         Route::post('courses/{id}/enrollments/clear', [\App\Http\Controllers\Api\Admin\CourseController::class, 'clearActiveEnrollments']);
-
-        // Certificate template management
-        Route::post('courses/{id}/certificate-template', [\App\Http\Controllers\Api\Admin\CourseController::class, 'uploadCertificateTemplate']);
-        Route::delete('courses/{id}/certificate-template', [\App\Http\Controllers\Api\Admin\CourseController::class, 'removeCertificateTemplate']);
-
-        // Certificate generation
-        Route::get('courses/{courseId}/certificates/bulk', [\App\Http\Controllers\Api\Admin\CourseController::class, 'generateBulkCertificates']);
-        Route::get('courses/{courseId}/certificates/{userId}', [\App\Http\Controllers\Api\Admin\CourseController::class, 'generateCertificate']);
 
         // Duplicate course for new semester
         Route::post('courses/{id}/duplicate', [\App\Http\Controllers\Api\Admin\CourseController::class, 'duplicate']);

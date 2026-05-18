@@ -10,26 +10,28 @@ class Course extends Model
     use HasFactory;
 
     protected $fillable = [
-    'title',
-    'instructor',
-    'duration',
-    'start_date',
-    'end_date',
-    'schedule',
-    'seat_limit',
-    'enrollment',
-    'status',
-    'registration_open',
-    'registration_status',
-    'description',
-    'image',
-    'certificate_template_path',  
-];
+        'title',
+        'instructor',
+        // ❌ REMOVED: 'duration',
+        'start_date',
+        'end_date',
+        // ❌ REMOVED: 'schedule',
+        'seat_limit',
+        'enrollment',
+        'status',
+        'registration_open',
+        'registration_status',
+        'description',
+        'image',
+        // ❌ REMOVED: 'certificate_template_path',
+        // ❌ REMOVED: 'certificate_template_config',
+    ];
 
     protected $casts = [
-        'start_date' => 'date',           // ✅ ADD THIS
-        'end_date' => 'date',             // ✅ ADD THIS
-        'registration_open' => 'boolean', // ✅ ADD THIS
+        'start_date' => 'date',
+        'end_date' => 'date',
+        'registration_open' => 'boolean',
+        // ❌ REMOVED: 'certificate_template_config' => 'array',
     ];
 
     // Helper: Check if course is currently running

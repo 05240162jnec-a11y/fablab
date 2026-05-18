@@ -270,22 +270,24 @@ export default function Courses() {
                     {/* Courses Grid */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {courses.map((course) => (
-                            <div key={course.id} className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-lg transition-shadow overflow-hidden">
-                                {/* Course Image Placeholder */}
-                                <div className="h-40 bg-gradient-to-br from-blue-50 to-cyan-50 flex items-center justify-center">
+                            <div key={course.id} className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-lg transition-shadow overflow-hidden flex flex-col h-full">
+                                {/* Course Image Placeholder - Fixed Height */}
+                                <div className="h-48 bg-gradient-to-br from-blue-50 to-cyan-50 flex items-center justify-center flex-shrink-0">
                                     <svg className="w-16 h-16 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 14l9-5-9-5-9 5 9 5z" />
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
                                     </svg>
                                 </div>
 
-                                {/* Course Info */}
-                                <div className="p-5">
-                                    <h3 className="font-bold text-gray-900 text-lg mb-3">{course.title}</h3>
+                                {/* Course Info - Flex to fill height */}
+                                <div className="p-5 flex flex-col flex-grow">
+                                    {/* Title - Fixed height with truncation */}
+                                    <h3 className="font-bold text-gray-900 text-lg mb-3 line-clamp-2 min-h-[3.5rem]" title={course.title}>
+                                        {course.title}
+                                    </h3>
 
-                                    {/* Seats */}
-                                    <div className="mb-4">
-                                        {/* Calculate enrolled seats */}
+                                    {/* Seats - Fixed position */}
+                                    <div className="mb-4 flex-shrink-0">
                                         {(() => {
                                             const enrolled = course.seat_limit - course.available_seats;
                                             const percentage = (enrolled / course.seat_limit) * 100;
@@ -317,38 +319,38 @@ export default function Courses() {
                                         })()}
                                     </div>
 
-                                    {/* Enroll/Unenroll Button */}
-                                    <button
-                                        onClick={() => {
-                                            // Only allow action if registration is open AND course has seats
-                                            if (!course.registration_open || course.available_seats === 0) return;
+                                    {/* Push button to bottom */}
+                                    <div className="mt-auto pt-2">
+                                        {/* Enroll/Unenroll Button - Fixed position at bottom */}
+                                        <button
+                                            onClick={() => {
+                                                if (!course.registration_open || course.available_seats === 0) return;
 
-                                            if (isEnrolled(course.id)) {
-                                                handleUnenrollClick(course);
-                                            } else {
-                                                handleEnrollClick(course);
-                                            }
-                                        }}
-                                        // Disable if course full OR registration closed
-                                        disabled={!course.registration_open || course.available_seats === 0}
-                                        className={`w-full py-2.5 px-4 rounded-lg font-medium transition-colors ${!course.registration_open || course.available_seats === 0
-                                            ? 'bg-gray-200 text-gray-500 cursor-not-allowed'  // Disabled state
-                                            : isEnrolled(course.id)
-                                                ? 'bg-red-600 text-white hover:bg-red-700'    // Unenroll (enabled)
-                                                : 'bg-blue-600 text-white hover:bg-blue-700'  // Enroll (enabled)
-                                            }`}
-                                    >
-                                        {/* Button text logic */}
-                                        {!course.registration_open && !isEnrolled(course.id)
-                                            ? 'Registration Closed'
-                                            : course.available_seats === 0
-                                                ? 'Course Full'
-                                                : !course.registration_open && isEnrolled(course.id)
-                                                    ? 'Unenroll (Closed)'
-                                                    : isEnrolled(course.id)
-                                                        ? 'Unenroll'
-                                                        : 'Enroll Now'}
-                                    </button>
+                                                if (isEnrolled(course.id)) {
+                                                    handleUnenrollClick(course);
+                                                } else {
+                                                    handleEnrollClick(course);
+                                                }
+                                            }}
+                                            disabled={!course.registration_open || course.available_seats === 0}
+                                            className={`w-full py-2.5 px-4 rounded-lg font-medium transition-colors ${!course.registration_open || course.available_seats === 0
+                                                ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                                                : isEnrolled(course.id)
+                                                    ? 'bg-red-600 text-white hover:bg-red-700'
+                                                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                                                }`}
+                                        >
+                                            {!course.registration_open && !isEnrolled(course.id)
+                                                ? 'Registration Closed'
+                                                : course.available_seats === 0
+                                                    ? 'Course Full'
+                                                    : !course.registration_open && isEnrolled(course.id)
+                                                        ? 'Unenroll (Closed)'
+                                                        : isEnrolled(course.id)
+                                                            ? 'Unenroll'
+                                                            : 'Enroll Now'}
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         ))}
@@ -399,16 +401,10 @@ export default function Courses() {
                                             <p className="text-blue-900">{selectedCourse.instructor}</p>
                                         </div>
                                         <div>
-                                            <p className="text-blue-600 font-medium">Duration</p>
-                                            <p className="text-blue-900">{selectedCourse.duration}</p>
-                                        </div>
-                                        <div>
-                                            <p className="text-blue-600 font-medium">Schedule</p>
-                                            <p className="text-blue-900">{selectedCourse.schedule}</p>
-                                        </div>
-                                        <div>
                                             <p className="text-blue-600 font-medium">Dates</p>
-                                            <p className="text-blue-900">{selectedCourse.start_date} → {selectedCourse.end_date}</p>
+                                            <p className="text-blue-900">
+                                                {new Date(selectedCourse.start_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })} → {new Date(selectedCourse.end_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+                                            </p>
                                         </div>
                                     </div>
 

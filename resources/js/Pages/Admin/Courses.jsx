@@ -8,6 +8,7 @@ export default function Courses() {
     const [showViewModal, setShowViewModal] = useState(false);
     const [showEditModal, setShowEditModal] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
+
     const [selectedCourse, setSelectedCourse] = useState(null);
     const [registrationClosed, setRegistrationClosed] = useState(false);
 
@@ -17,23 +18,12 @@ export default function Courses() {
     const [enrollmentsLoading, setEnrollmentsLoading] = useState(false);
     const [enrollmentError, setEnrollmentError] = useState(null);
 
-    // ✅ Certificate Template States
-    const [certificateTemplate, setCertificateTemplate] = useState(null);
-    const [certificateUploading, setCertificateUploading] = useState(false);
-    const [certificateMessage, setCertificateMessage] = useState('');
-
-    // ✅ Certificate Generation States
-    const [generatingCertificate, setGeneratingCertificate] = useState(null);
-    const [generatingBulk, setGeneratingBulk] = useState(false);
-
     // Create/Edit Form State
     const [formState, setFormState] = useState({
         title: '',
-        instructor: '',
-        duration: '',
+        instructor: '',  // ✅ Now will be selected from dropdown
         start_date: '',
         end_date: '',
-        schedule: '',
         seatLimit: '',
         description: '',
         image: null,
@@ -45,6 +35,15 @@ export default function Courses() {
     const [courses, setCourses] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+
+    // ✅ Static Instructor Options (will be dynamic later)
+    const instructorOptions = [
+        { value: '', label: 'Select Instructor...' },
+        { value: 'Admin', label: 'Admin' },
+        { value: 'Dorji Gyeltshen', label: 'Dorji Gyeltshen' },
+        { value: 'Cimi Dem', label: 'Cimi Dem' },
+        { value: 'Other', label: 'Other (specify in description)' },
+    ];
 
     // Fetch courses from API
     const fetchCourses = async () => {
@@ -192,176 +191,6 @@ export default function Courses() {
         }
     };
 
-    // ✅ Upload certificate template
-    const handleUploadCertificateTemplate = async (e) => {
-        e.preventDefault();
-        if (!certificateTemplate) return;
-
-        setCertificateUploading(true);
-        setCertificateMessage('');
-
-        try {
-            const token = localStorage.getItem('admin_token');
-            const formData = new FormData();
-            formData.append('template', certificateTemplate);
-
-            const response = await axios.post(
-                `http://127.0.0.1:8000/api/admin/courses/${selectedCourse.id}/certificate-template`,
-                formData,
-                {
-                    headers: {
-                        'Accept': 'application/json',
-                        'Content-Type': 'multipart/form-data',
-                        'Authorization': `Bearer ${token}`,
-                    },
-                }
-            );
-
-            if (response.data.success) {
-                setCertificateMessage('✅ ' + response.data.message);
-                setSelectedCourse(prev => ({
-                    ...prev,
-                    certificate_template_path: response.data.data.path
-                }));
-                await fetchCourses();
-                setCertificateTemplate(null);
-                e.target.reset();
-            }
-        } catch (err) {
-            console.error('Upload error:', err);
-            if (err.response?.data?.message) {
-                setCertificateMessage('❌ ' + err.response.data.message);
-            } else {
-                setCertificateMessage('❌ Failed to upload template. Please try again.');
-            }
-        } finally {
-            setCertificateUploading(false);
-        }
-    };
-
-    // ✅ Remove certificate template
-    const handleRemoveCertificateTemplate = async () => {
-        if (!window.confirm('Are you sure you want to remove the certificate template?')) {
-            return;
-        }
-
-        try {
-            const token = localStorage.getItem('admin_token');
-
-            const response = await axios.delete(
-                `http://127.0.0.1:8000/api/admin/courses/${selectedCourse.id}/certificate-template`,
-                {
-                    headers: {
-                        'Accept': 'application/json',
-                        'Authorization': `Bearer ${token}`,
-                    },
-                }
-            );
-
-            if (response.data.success) {
-                alert('✅ ' + response.data.message);
-                setSelectedCourse(prev => ({
-                    ...prev,
-                    certificate_template_path: null
-                }));
-                await fetchCourses();
-            }
-        } catch (err) {
-            console.error('Remove error:', err);
-            alert('❌ Failed to remove template. Please try again.');
-        }
-    };
-
-    // ✅ Generate single certificate
-    const handleGenerateCertificate = async (userId, userName) => {
-        setGeneratingCertificate(userId);
-
-        try {
-            const token = localStorage.getItem('admin_token');
-
-            const response = await axios.get(
-                `http://127.0.0.1:8000/api/admin/courses/${selectedCourse.id}/certificates/${userId}`,
-                {
-                    headers: {
-                        'Accept': 'application/pdf',
-                        'Authorization': `Bearer ${token}`,
-                    },
-                    responseType: 'blob'
-                }
-            );
-
-            const url = window.URL.createObjectURL(new Blob([response.data]));
-            const link = document.createElement('a');
-            link.href = url;
-            link.setAttribute('download', `Certificate_${userName.replace(/\s+/g, '_')}.pdf`);
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
-            window.URL.revokeObjectURL(url);
-
-            alert(`✅ Certificate for "${userName}" is downloading!`);
-
-        } catch (err) {
-            console.error('Generate certificate error:', err);
-            if (err.response?.status === 404) {
-                alert('❌ User has not completed this course');
-            } else if (err.response?.status === 400) {
-                alert('❌ No certificate template uploaded for this course');
-            } else {
-                alert('❌ Failed to generate certificate. Please try again.');
-            }
-        } finally {
-            setGeneratingCertificate(null);
-        }
-    };
-
-    // ✅ Generate bulk certificates
-    const handleGenerateBulkCertificates = async () => {
-        if (!window.confirm(`Generate certificates for ALL completed users in "${selectedCourse.title}"?\n\nThis may take a moment for large classes.`)) {
-            return;
-        }
-
-        setGeneratingBulk(true);
-
-        try {
-            const token = localStorage.getItem('admin_token');
-
-            const response = await axios.get(
-                `http://127.0.0.1:8000/api/admin/courses/${selectedCourse.id}/certificates/bulk`,
-                {
-                    headers: {
-                        'Accept': 'application/zip',
-                        'Authorization': `Bearer ${token}`,
-                    },
-                    responseType: 'blob'
-                }
-            );
-
-            const url = window.URL.createObjectURL(new Blob([response.data]));
-            const link = document.createElement('a');
-            link.href = url;
-            link.setAttribute('download', `Certificates_${selectedCourse.title.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.zip`);
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
-            window.URL.revokeObjectURL(url);
-
-            alert(`✅ Certificates ZIP file is downloading!`);
-
-        } catch (err) {
-            console.error('Bulk generate error:', err);
-            if (err.response?.status === 404) {
-                alert('❌ No completed users found for this course');
-            } else if (err.response?.status === 400) {
-                alert('❌ No certificate template uploaded for this course');
-            } else {
-                alert('❌ Failed to generate certificates. Please try again.');
-            }
-        } finally {
-            setGeneratingBulk(false);
-        }
-    };
-
     // Fetch on mount
     useEffect(() => {
         fetchCourses();
@@ -418,10 +247,8 @@ export default function Courses() {
         setFormState({
             title: '',
             instructor: '',
-            duration: '',
             start_date: '',
             end_date: '',
-            schedule: '',
             seatLimit: '',
             description: '',
             image: null,
@@ -445,10 +272,8 @@ export default function Courses() {
         setFormState({
             title: course.title,
             instructor: course.instructor,
-            duration: course.duration,
             start_date: course.start_date ? course.start_date.split('T')[0] : '',
             end_date: course.end_date ? course.end_date.split('T')[0] : '',
-            schedule: course.schedule,
             seatLimit: course.seat_limit,
             description: course.description || '',
             image: null,
@@ -514,10 +339,9 @@ export default function Courses() {
             const formData = new FormData();
             formData.append('title', formState.title);
             formData.append('instructor', formState.instructor);
-            formData.append('duration', formState.duration);
+            // ❌ REMOVED: duration, schedule
             formData.append('start_date', formState.start_date);
             formData.append('end_date', formState.end_date);
-            formData.append('schedule', formState.schedule);
             formData.append('seat_limit', formState.seatLimit);
             formData.append('status', formState.status);
             formData.append('registration_status', formState.registrationStatus);
@@ -550,10 +374,9 @@ export default function Courses() {
             const formData = new FormData();
             formData.append('title', formState.title);
             formData.append('instructor', formState.instructor);
-            formData.append('duration', formState.duration);
+            // ❌ REMOVED: duration, schedule
             formData.append('start_date', formState.start_date);
             formData.append('end_date', formState.end_date);
-            formData.append('schedule', formState.schedule);
             formData.append('seat_limit', formState.seatLimit);
             formData.append('status', formState.status);
             formData.append('registration_status', formState.registrationStatus);
@@ -589,10 +412,6 @@ export default function Courses() {
         setSelectedCourse(null);
         setEnrollments([]);
         setEnrollmentFilter('all');
-        setCertificateTemplate(null);
-        setCertificateMessage('');
-        setGeneratingCertificate(null);
-        setGeneratingBulk(false);
     };
 
     return (
@@ -618,17 +437,6 @@ export default function Courses() {
                             </svg>
                             Create Course
                         </button>
-
-                        {/* Manage Certificates Button */}
-                        <Link
-                            to="/admin/certificates"
-                            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
-                        >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                            </svg>
-                            Manage Certificates
-                        </Link>
 
                         {/* Notifications */}
                         <button className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors">
@@ -775,14 +583,22 @@ export default function Courses() {
                             </div>
 
                             {/* Course Details Grid */}
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
                                 <div className="bg-gray-50 rounded-lg p-4">
-                                    <p className="text-xs text-gray-500 mb-1">Duration</p>
-                                    <p className="font-semibold text-gray-900">{selectedCourse.duration}</p>
+                                    <p className="text-xs text-gray-500 mb-1">Start Date</p>
+                                    <p className="font-semibold text-gray-900">
+                                        {selectedCourse.start_date
+                                            ? new Date(selectedCourse.start_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+                                            : 'N/A'}
+                                    </p>
                                 </div>
                                 <div className="bg-gray-50 rounded-lg p-4">
-                                    <p className="text-xs text-gray-500 mb-1">Schedule</p>
-                                    <p className="font-semibold text-gray-900">{selectedCourse.schedule}</p>
+                                    <p className="text-xs text-gray-500 mb-1">End Date</p>
+                                    <p className="font-semibold text-gray-900">
+                                        {selectedCourse.end_date
+                                            ? new Date(selectedCourse.end_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+                                            : 'N/A'}
+                                    </p>
                                 </div>
                                 <div className="bg-gray-50 rounded-lg p-4">
                                     <p className="text-xs text-gray-500 mb-1">Enrollment</p>
@@ -792,68 +608,6 @@ export default function Courses() {
                                     <p className="text-xs text-gray-500 mb-1">Status</p>
                                     <p className="font-semibold text-gray-900">{capitalize(selectedCourse.status)}</p>
                                 </div>
-                            </div>
-
-                            {/* ✅ CERTIFICATE TEMPLATE SECTION */}
-                            <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                                <h5 className="text-lg font-semibold text-blue-900 mb-4">📜 Certificate Template</h5>
-
-                                {/* Upload Form */}
-                                <form onSubmit={handleUploadCertificateTemplate} className="mb-4">
-                                    <div className="flex items-center gap-4">
-                                        <input
-                                            type="file"
-                                            accept="image/png,image/jpeg"
-                                            onChange={(e) => setCertificateTemplate(e.target.files[0])}
-                                            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
-                                        />
-                                        <button
-                                            type="submit"
-                                            disabled={certificateUploading || !certificateTemplate}
-                                            className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-400"
-                                        >
-                                            {certificateUploading ? 'Uploading...' : 'Upload'}
-                                        </button>
-                                    </div>
-                                    <p className="text-xs text-blue-700 mt-2">
-                                        Upload a PNG/JPG template (max 5MB). Use placeholders like [NAME], [COURSE], [DATE] for dynamic fields.
-                                    </p>
-                                </form>
-
-                                {/* Current Template Preview */}
-                                {selectedCourse.certificate_template_path && (
-                                    <div className="mt-4 p-3 bg-white rounded border border-blue-200">
-                                        <div className="flex items-center justify-between">
-                                            <div>
-                                                <p className="text-sm font-medium text-gray-900">Current Template</p>
-                                                <p className="text-xs text-gray-500">{selectedCourse.certificate_template_path}</p>
-                                            </div>
-                                            <button
-                                                onClick={handleRemoveCertificateTemplate}
-                                                className="text-red-600 hover:text-red-800 text-sm font-medium hover:underline"
-                                            >
-                                                Remove
-                                            </button>
-                                        </div>
-                                        <img
-                                            src={`http://127.0.0.1:8000/storage/${selectedCourse.certificate_template_path}`}
-                                            alt="Certificate template"
-                                            className="mt-3 w-full max-h-40 object-contain rounded border"
-                                            onError={(e) => {
-                                                console.error('Image failed to load:', e.target.src);
-                                                e.target.onerror = null;
-                                                e.target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect fill="%23f0f0f0" width="100" height="100"/><text fill="%23999" x="50%" y="50%" text-anchor="middle" dy=".3em">No Preview</text></svg>';
-                                            }}
-                                        />
-                                    </div>
-                                )}
-
-                                {/* Status Message */}
-                                {certificateMessage && (
-                                    <p className={`text-sm mt-3 ${certificateMessage.includes('✅') ? 'text-green-700' : 'text-red-700'}`}>
-                                        {certificateMessage}
-                                    </p>
-                                )}
                             </div>
 
                             {/* ✅ ENROLLED USERS SECTION */}
@@ -909,21 +663,6 @@ export default function Courses() {
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                                 </svg>
                                                 Clear
-                                            </button>
-                                        )}
-
-                                        {/* ✅ Generate Bulk Certificates Button */}
-                                        {selectedCourse.certificate_template_path && filteredEnrollments.some(u => u.status === 'completed') && (
-                                            <button
-                                                onClick={handleGenerateBulkCertificates}
-                                                disabled={generatingBulk}
-                                                className="flex items-center gap-1 px-3 py-1.5 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 transition-colors disabled:bg-gray-400"
-                                                title="Generate certificates for all completed users"
-                                            >
-                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                                </svg>
-                                                {generatingBulk ? 'Generating...' : 'Generate All'}
                                             </button>
                                         )}
                                     </div>
@@ -992,18 +731,6 @@ export default function Courses() {
                                                             </td>
                                                             <td className="px-4 py-3 text-right">
                                                                 <div className="flex items-center justify-end gap-2">
-                                                                    {/* ✅ Generate Certificate Button */}
-                                                                    {user.status === 'completed' && selectedCourse.certificate_template_path && (
-                                                                        <button
-                                                                            onClick={() => handleGenerateCertificate(user.user_id, user.name)}
-                                                                            disabled={generatingCertificate === user.user_id}
-                                                                            className="text-purple-600 hover:text-purple-800 text-xs font-medium hover:underline disabled:text-gray-400"
-                                                                            title="Generate certificate"
-                                                                        >
-                                                                            {generatingCertificate === user.user_id ? 'Generating...' : '📜 Cert'}
-                                                                        </button>
-                                                                    )}
-
                                                                     {/* Remove Button */}
                                                                     <button
                                                                         onClick={() => handleRemoveUser(selectedCourse.id, user.user_id, user.name, user.enrollment_id)}
@@ -1114,30 +841,22 @@ export default function Courses() {
                                 />
                             </div>
 
-                            {/* Instructor & Duration */}
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Instructor</label>
-                                    <input
-                                        type="text"
-                                        placeholder="Instructor name"
-                                        value={formState.instructor}
-                                        onChange={(e) => setFormState({ ...formState, instructor: e.target.value })}
-                                        className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        required
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Duration</label>
-                                    <input
-                                        type="text"
-                                        placeholder="e.g. 4 weeks"
-                                        value={formState.duration}
-                                        onChange={(e) => setFormState({ ...formState, duration: e.target.value })}
-                                        className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        required
-                                    />
-                                </div>
+                            {/* ✅ Instructor Dropdown (Static Options) */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Instructor *</label>
+                                <select
+                                    value={formState.instructor}
+                                    onChange={(e) => setFormState({ ...formState, instructor: e.target.value })}
+                                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                                    required
+                                >
+                                    {instructorOptions.map(option => (
+                                        <option key={option.value} value={option.value}>
+                                            {option.label}
+                                        </option>
+                                    ))}
+                                </select>
+                                <p className="text-xs text-gray-400 mt-1">Select from available instructors. More will be added later.</p>
                             </div>
 
                             {/* Course Dates - Required */}
@@ -1165,19 +884,6 @@ export default function Courses() {
                                         required
                                     />
                                 </div>
-                            </div>
-
-                            {/* Class Schedule - Optional Text */}
-                            <div className="mt-2">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Class Schedule (optional)</label>
-                                <input
-                                    type="text"
-                                    placeholder="e.g. Mon & Wed, 10:00-12:00"
-                                    value={formState.schedule}
-                                    onChange={(e) => setFormState({ ...formState, schedule: e.target.value })}
-                                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                />
-                                <p className="text-xs text-gray-400 mt-1">Describe class times. Start/End dates control auto-complete.</p>
                             </div>
 
                             {/* Seat Limit */}
@@ -1286,28 +992,21 @@ export default function Courses() {
                                 />
                             </div>
 
-                            {/* Instructor & Duration */}
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Instructor</label>
-                                    <input
-                                        type="text"
-                                        value={formState.instructor}
-                                        onChange={(e) => setFormState({ ...formState, instructor: e.target.value })}
-                                        className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        required
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Duration</label>
-                                    <input
-                                        type="text"
-                                        value={formState.duration}
-                                        onChange={(e) => setFormState({ ...formState, duration: e.target.value })}
-                                        className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        required
-                                    />
-                                </div>
+                            {/* ✅ Instructor Dropdown (Static Options) */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Instructor *</label>
+                                <select
+                                    value={formState.instructor}
+                                    onChange={(e) => setFormState({ ...formState, instructor: e.target.value })}
+                                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                                    required
+                                >
+                                    {instructorOptions.map(option => (
+                                        <option key={option.value} value={option.value}>
+                                            {option.label}
+                                        </option>
+                                    ))}
+                                </select>
                             </div>
 
                             {/* Course Dates - Required */}
@@ -1335,18 +1034,6 @@ export default function Courses() {
                                         required
                                     />
                                 </div>
-                            </div>
-
-                            {/* Class Schedule - Optional Text */}
-                            <div className="mt-2">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Class Schedule (optional)</label>
-                                <input
-                                    type="text"
-                                    value={formState.schedule}
-                                    onChange={(e) => setFormState({ ...formState, schedule: e.target.value })}
-                                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                />
-                                <p className="text-xs text-gray-400 mt-1">Describe class times. Start/End dates control auto-complete.</p>
                             </div>
 
                             {/* Seat Limit */}

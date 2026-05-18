@@ -10,6 +10,9 @@ export default function BookMachine() {
     const [showBookingModal, setShowBookingModal] = useState(false);
     const [loading, setLoading] = useState(true);
 
+    // ✅ NEW: User enrollment state
+    const [userEnrollments, setUserEnrollments] = useState([]);
+
     // Booking States
     const [bookedDates, setBookedDates] = useState([]);
     const [bookingData, setBookingData] = useState({
@@ -20,9 +23,10 @@ export default function BookMachine() {
     const [bookingSubmitting, setBookingSubmitting] = useState(false);
     const [bookingMessage, setBookingMessage] = useState('');
 
-    // Fetch machines on component mount
+    // Fetch machines and user enrollments on component mount
     useEffect(() => {
         fetchMachines();
+        fetchUserEnrollments();
     }, []);
 
     const fetchMachines = async () => {
@@ -46,16 +50,37 @@ export default function BookMachine() {
         }
     };
 
-    // ✅ FIXED: Check if user CAN book this machine
+    // ✅ NEW: Fetch user enrollments to check completion status
+    const fetchUserEnrollments = async () => {
+        try {
+            const authToken = localStorage.getItem('auth_token');
+            const response = await axios.get('http://127.0.0.1:8000/api/user/my-courses', {
+                headers: {
+                    'Accept': 'application/json',
+                    'Authorization': `Bearer ${authToken}`,
+                },
+            });
+
+            // Store all enrollments
+            setUserEnrollments(response.data.courses || []);
+        } catch (error) {
+            console.error('Error fetching enrollments:', error);
+            setUserEnrollments([]);
+        }
+    };
+
+    // ✅ FIXED: Check if user has completed ANY course (GLOBAL check)
+    const hasCompletedAnyCourse = () => {
+        return userEnrollments.some(enrollment => enrollment.status === 'completed');
+    };
+
+    // ✅ FIXED: Check if user CAN book machines (GLOBAL check, not machine-specific)
     const canBookMachine = (machine) => {
         // Machine must be available
         if (machine.status !== 'available') return false;
 
-        // If machine doesn't require training, allow booking
-        if (!machine.has_required_training) return true;
-
-        // If machine requires training, user must have completed it
-        return machine.has_training === true;
+        // ✅ User must have completed at least ONE course (any course)
+        return hasCompletedAnyCourse();
     };
 
     const handleViewDetails = (machine) => {
@@ -64,6 +89,12 @@ export default function BookMachine() {
     };
 
     const handleBookNow = (machine) => {
+        // ✅ Prevent booking if user hasn't completed any course
+        if (!hasCompletedAnyCourse()) {
+            alert('❌ You must complete at least one training course before booking machines. Please enroll in and complete a course first.');
+            return;
+        }
+
         setSelectedMachine(machine);
         setShowDetailsModal(false);
         setShowBookingModal(true);
@@ -116,9 +147,9 @@ export default function BookMachine() {
         setBookingSubmitting(true);
         setBookingMessage('');
 
-        // ✅ Use corrected logic
-        if (selectedMachine && !canBookMachine(selectedMachine)) {
-            setBookingMessage('❌ You must complete the required training course before booking this machine.');
+        // ✅ Use GLOBAL check (not machine-specific)
+        if (!hasCompletedAnyCourse()) {
+            setBookingMessage('❌ You must complete at least one training course before booking machines.');
             setBookingSubmitting(false);
             return;
         }
@@ -192,33 +223,51 @@ export default function BookMachine() {
     const generateCalendarData = () => {
         const calendar = [];
         const today = new Date();
+        today.setHours(0, 0, 0, 0);
         const endDate = new Date(today);
         endDate.setDate(today.getDate() + 30);
+
         let currentDate = new Date(today);
         let currentMonth = null;
         let monthData = null;
 
         while (currentDate <= endDate) {
-            const month = currentDate.toLocaleString('default', { month: 'long', year: 'numeric' });
-            if (month !== currentMonth) {
+            const monthKey = `${currentDate.getFullYear()}-${currentDate.getMonth()}`;
+
+            if (monthKey !== currentMonth) {
                 if (monthData) calendar.push(monthData);
-                currentMonth = month;
-                monthData = { monthName: month, emptyDays: [], days: [] };
-                const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-                const dayOfWeek = firstDayOfMonth.getDay();
-                if (currentDate.getDate() === 1 || monthData.days.length === 0) {
-                    for (let i = 0; i < dayOfWeek; i++) monthData.emptyDays.push(i);
+                currentMonth = monthKey;
+
+                const year = currentDate.getFullYear();
+                const month = currentDate.getMonth();
+                const firstDay = new Date(year, month, 1);
+                const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+                monthData = {
+                    monthName: firstDay.toLocaleString('default', { month: 'long', year: 'numeric' }),
+                    emptyDays: Array(firstDay.getDay()).fill(null),
+                    days: []
+                };
+
+                // Render ALL days of the month (not just from today)
+                for (let d = 1; d <= daysInMonth; d++) {
+                    const dateObj = new Date(year, month, d);
+                    const dateStr = dateObj.toISOString().split('T')[0];
+
+                    monthData.days.push({
+                        date: dateStr,
+                        dayNumber: d,
+                        isBooked: bookedDates.includes(dateStr),
+                        isPast: dateObj < today, // Mark past days
+                        isToday: dateObj.getTime() === today.getTime()
+                    });
                 }
+
+                // Move to next month
+                currentDate = new Date(year, month + 1, 1);
+            } else {
+                currentDate.setDate(currentDate.getDate() + 1);
             }
-            const dateStr = currentDate.toISOString().split('T')[0];
-            monthData.days.push({
-                date: dateStr,
-                dayName: currentDate.toLocaleDateString('en-US', { weekday: 'short' }),
-                dayNumber: currentDate.getDate(),
-                dayOfWeek: currentDate.getDay(),
-                isBooked: isDateBooked(dateStr)
-            });
-            currentDate.setDate(currentDate.getDate() + 1);
         }
         if (monthData) calendar.push(monthData);
         return calendar;
@@ -296,17 +345,18 @@ export default function BookMachine() {
                                     <div className="grid grid-cols-2 gap-3">
                                         <button
                                             onClick={() => handleBookNow(machine)}
-                                            // ✅ FIXED: Use canBookMachine logic
+                                            // ✅ FIXED: Use GLOBAL canBookMachine logic
                                             disabled={!canBookMachine(machine)}
                                             className={`py-2.5 px-3 rounded-xl font-medium text-sm transition-all duration-200 flex items-center justify-center gap-1.5 shadow-sm ${canBookMachine(machine)
                                                 ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:from-blue-600 hover:to-indigo-700 hover:shadow-lg transform hover:-translate-y-0.5'
                                                 : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                                                 }`}
+                                            title={!hasCompletedAnyCourse() ? 'Complete a course first to unlock booking' : ''}
                                         >
                                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                                             </svg>
-                                            Book Now
+                                            {hasCompletedAnyCourse() ? 'Book Now' : 'Complete Course First'}
                                         </button>
 
                                         <button
@@ -341,7 +391,7 @@ export default function BookMachine() {
 
             {/* ✨ MACHINE DETAILS MODAL - White Header */}
             {showDetailsModal && selectedMachine && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in" onClick={closeDetailsModal}>
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
                     <div
                         className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden animate-slide-up"
                         onClick={(e) => e.stopPropagation()}
@@ -435,8 +485,8 @@ export default function BookMachine() {
                                 </p>
                             </div>
 
-                            {/* ✅ FIXED: Training Status Cards - Use canBookMachine logic */}
-                            {!canBookMachine(selectedMachine) && selectedMachine.has_required_training ? (
+                            {/* ✅ FIXED: Training Status - GLOBAL check (any course completed) */}
+                            {!hasCompletedAnyCourse() ? (
                                 <div className="mb-6 p-5 bg-gradient-to-br from-red-50 via-rose-50 to-orange-50 rounded-2xl border-2 border-red-100 shadow-sm">
                                     <div className="flex items-start gap-4">
                                         <div className="flex-shrink-0">
@@ -454,7 +504,7 @@ export default function BookMachine() {
                                                 Training Required
                                             </h4>
                                             <p className="text-sm text-red-700 mb-4 leading-relaxed">
-                                                Complete the "{selectedMachine.required_course_title}" course to unlock booking privileges for this machine.
+                                                You must complete at least one training course before booking any machines. This ensures safe and proper use of Fab Lab equipment.
                                             </p>
                                             <Link
                                                 to="/user/courses"
@@ -463,7 +513,7 @@ export default function BookMachine() {
                                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                                                 </svg>
-                                                Start Training Now
+                                                Browse Available Courses
                                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
                                                 </svg>
@@ -486,13 +536,10 @@ export default function BookMachine() {
                                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                                                 </svg>
-                                                {selectedMachine.has_required_training ? 'Training Completed ✅' : 'No Training Required'}
+                                                Training Completed ✅
                                             </h4>
                                             <p className="text-sm text-green-700 leading-relaxed">
-                                                {selectedMachine.has_required_training
-                                                    ? 'Excellent! You\'re certified to use this equipment. You can now proceed with booking for your project.'
-                                                    : 'This machine doesn\'t require special training. You can book it anytime it\'s available.'
-                                                }
+                                                Great job! You've completed your training and are now certified to book any Fab Lab equipment. You can proceed with booking this machine.
                                             </p>
                                         </div>
                                     </div>
@@ -649,31 +696,43 @@ export default function BookMachine() {
                                                             dayInfo.date >= bookingData.start_date &&
                                                             dayInfo.date <= bookingData.end_date;
                                                         const isBooked = dayInfo.isBooked;
+                                                        const isPast = dayInfo.isPast;
                                                         const isStartDate = bookingData.start_date === dayInfo.date;
                                                         const isEndDate = bookingData.end_date === dayInfo.date;
 
-                                                        let dayClass = 'bg-white border-gray-200 text-gray-700 hover:bg-blue-50 hover:border-blue-300';
+                                                        let dayClass = 'bg-white border-gray-200 text-gray-700';
+                                                        let isClickable = false;
 
-                                                        if (isBooked) {
+                                                        if (isPast) {
+                                                            // Past days - grayed out
+                                                            dayClass = 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed';
+                                                        } else if (isBooked) {
+                                                            // Booked days - red
                                                             dayClass = 'bg-red-50 border-red-200 text-red-400 cursor-not-allowed line-through';
                                                         } else if (isSelected) {
+                                                            // Selected days - green
                                                             if (isStartDate || isEndDate) {
                                                                 dayClass = 'bg-gradient-to-br from-green-500 to-emerald-600 border-green-600 text-white font-bold shadow-md ring-2 ring-green-300';
                                                             } else {
                                                                 dayClass = 'bg-gradient-to-br from-green-400 to-emerald-500 border-green-500 text-white';
                                                             }
+                                                            isClickable = true;
+                                                        } else {
+                                                            // Available future days
+                                                            dayClass = 'bg-white border-gray-200 text-gray-700 hover:bg-blue-50 hover:border-blue-300';
+                                                            isClickable = true;
                                                         }
 
                                                         return (
                                                             <div
                                                                 key={dayInfo.date}
                                                                 className={`
-                                                                    p-2.5 text-center text-xs rounded-lg border transition-all duration-200 cursor-pointer
-                                                                    ${dayClass}
-                                                                    ${!isBooked ? 'hover:scale-105 hover:shadow-md' : ''}
-                                                                `}
+                p-2.5 text-center text-xs rounded-lg border transition-all duration-200
+                ${dayClass}
+                ${isClickable && !isBooked ? 'cursor-pointer hover:scale-105 hover:shadow-md' : ''}
+            `}
                                                                 onClick={() => {
-                                                                    if (!isBooked) {
+                                                                    if (isClickable && !isBooked && !isPast) {
                                                                         if (bookingData.start_date === dayInfo.date && !bookingData.end_date) {
                                                                             setBookingData({ machine_id: bookingData.machine_id, start_date: '', end_date: '' });
                                                                         } else if (bookingData.start_date && bookingData.end_date) {
@@ -685,8 +744,11 @@ export default function BookMachine() {
                                                                         }
                                                                     }
                                                                 }}
+                                                                title={isPast ? 'Past date' : isBooked ? 'Already booked' : ''}
                                                             >
-                                                                <div className={`font-semibold ${isSelected ? 'text-white' : ''}`}>{dayInfo.dayNumber}</div>
+                                                                <div className={`font-semibold ${isSelected ? 'text-white' : ''}`}>
+                                                                    {dayInfo.dayNumber}
+                                                                </div>
                                                                 {isBooked && (
                                                                     <div className="text-[9px] mt-0.5 flex items-center justify-center">
                                                                         <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Booking;
+use App\Mail\BookingTerminatedMail;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Mail;
 
 class BookingController extends Controller
 {
@@ -49,7 +51,7 @@ class BookingController extends Controller
         ]);
     }
 
-    // Update booking status
+    // Update booking status (kept for backward compatibility, but admin UI won't use it)
     public function updateStatus(Request $request, $id)
     {
         $validated = $request->validate([
@@ -65,5 +67,45 @@ class BookingController extends Controller
             'message' => 'Booking status updated',
             'data' => $booking
         ]);
+    }
+
+    // ✅ NEW: Terminate booking for no-show (admin action)
+    public function terminateBooking($id)
+    {
+        $booking = Booking::with(['user', 'machine'])->findOrFail($id);
+
+        // Only allow termination for active bookings
+        if (!in_array($booking->status, ['confirmed', 'upcoming'])) {
+            return response()->json([
+                'message' => 'This booking cannot be terminated.'
+            ], 422);
+        }
+
+        try {
+            // Send termination email to user
+            Mail::to($booking->user->email)->send(new BookingTerminatedMail($booking));
+
+            // Update booking status to 'terminated'
+            $booking->status = 'terminated';
+            $booking->save();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Booking terminated. User notified via email.',
+                'data' => $booking
+            ]);
+        } catch (\Exception $e) {
+            // Log error but still update status
+            \Log::error('Termination email failed: ' . $e->getMessage());
+            
+            $booking->status = 'terminated';
+            $booking->save();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Booking terminated (email notification failed).',
+                'data' => $booking
+            ]);
+        }
     }
 }

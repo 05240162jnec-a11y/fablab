@@ -15,29 +15,31 @@ class CustomOrder extends Model
         'title',
         'description',
         'quantity',
-        'design_image',
-        'status',
-        'estimated_price',        // ✅ Fixed: Only once
+        'design_image',        // ✅ Design file path/url
+        'status',              // 'pending', 'price_sent', 'paid', 'assigned', 'in_progress', 'completed', 'rejected'
+        'estimated_price',
         'rejection_reason',
-        'payment_screenshot',      // ✅ Added
-        'payment_verified_at',     // ✅ Added
-        'assigned_to',
+        'payment_screenshot',
+        'payment_verified_at',
+        'assigned_to',         // ID of production team member
         'assigned_at',
+        'deadline',            // ✅ Ensure this column exists in your migration
     ];
 
     protected $casts = [
         'estimated_price' => 'decimal:2',
         'quantity' => 'integer',
         'assigned_at' => 'datetime',
-        'payment_verified_at' => 'datetime',  // ✅ Added: Proper datetime handling
+        'payment_verified_at' => 'datetime',
+        'deadline' => 'date',  // ✅ Cast deadline as date
     ];
 
     /**
-     * Get the user who placed the order.
+     * Get the user who placed the order (customer).
      */
     public function user(): BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(User::class, 'user_id');
     }
 
     /**

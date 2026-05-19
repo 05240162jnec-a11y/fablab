@@ -14,11 +14,10 @@ export default function AdminSidebar({ expandedMenus, toggleSubmenu }) {
 
     const isChildOf = (paths) => paths.some((p) => location.pathname.startsWith(p));
 
-    // ✅ FIXED: Only auto-expand the menu that matches current route
+    // ✅ Auto-expand menu based on current route
     useEffect(() => {
         const currentPath = location.pathname;
 
-        // Map routes to their parent menu
         const routeToMenu = {
             '/admin/users': 'userManagement',
             '/admin/production-team': 'userManagement',
@@ -34,22 +33,32 @@ export default function AdminSidebar({ expandedMenus, toggleSubmenu }) {
             '/admin/feedback': 'contentMedia',
         };
 
-        // Find which menu this route belongs to
         const matchingMenu = Object.entries(routeToMenu).find(([route]) =>
             currentPath.startsWith(route)
         )?.[1];
 
-        // Only auto-expand the matching menu if it's not already open
         if (matchingMenu && !expandedMenus[matchingMenu]) {
             toggleSubmenu(matchingMenu);
         }
-    }, [location.pathname]); // Run when route changes
+    }, [location.pathname]);
 
-    // ✅ Handle logout - clear token and redirect
+    // ✅ FIXED: Handle logout - clear ALL tokens and redirect to unified login
     const handleLogout = () => {
+        // ✅ Clear ALL tokens and data (both user and admin)
+        localStorage.removeItem('auth_token');
         localStorage.removeItem('admin_token');
+        localStorage.removeItem('user');
+        localStorage.removeItem('admin');
         localStorage.removeItem('admin_dashboard_data');
-        navigate('/admin/login', { replace: true });
+        localStorage.removeItem('user_data');
+        localStorage.removeItem('enrollments');
+        localStorage.removeItem('courses');
+        localStorage.removeItem('bookings');
+        localStorage.removeItem('machines');
+        sessionStorage.clear();
+
+        // ✅ Redirect to unified login page (NOT old admin login)
+        navigate('/login', { replace: true });
     };
 
     return (

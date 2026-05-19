@@ -3,6 +3,8 @@ import axios from 'axios';
 import { Link, useNavigate } from 'react-router-dom';
 
 export default function AdminLogin() {
+    const navigate = useNavigate();
+
     const [formData, setFormData] = useState({
         email: '',
         password: '',
@@ -10,7 +12,6 @@ export default function AdminLogin() {
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState('');
     const [errors, setErrors] = useState({});
-    const navigate = useNavigate();
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -33,31 +34,46 @@ export default function AdminLogin() {
         setErrors({});
 
         try {
-            // ← POST to ADMIN endpoint (NOT user login!)
+            // POST to ADMIN endpoint
             const response = await axios.post('http://127.0.0.1:8000/api/admin/login', formData, {
                 headers: {
                     'Accept': 'application/json',
                     'Content-Type': 'application/json',
                 },
-            });            
-            // Save admin token
-            localStorage.setItem('admin_token', response.data.token);
-            localStorage.setItem('admin_user', JSON.stringify(response.data.admin));
-            
-            setMessage('Admin login successful!');
-            
-            // Redirect to admin dashboard (we'll create this later)
+            });
+
+            // ✅ UNIFIED TOKEN FORMAT: Clear old data first
+            localStorage.removeItem('auth_token');
+            localStorage.removeItem('admin_token');
+            localStorage.removeItem('user');
+            localStorage.removeItem('admin_user');
+            localStorage.removeItem('admin_dashboard_data');
+
+            // ✅ Save token as 'auth_token' (unified key for both user & admin)
+            localStorage.setItem('auth_token', response.data.token);
+
+            // ✅ Save user data with role: 'admin' (unified format)
+            if (response.data.admin) {
+                localStorage.setItem('user', JSON.stringify({
+                    ...response.data.admin,
+                    role: 'admin'  // Add role for unified redirect logic
+                }));
+            }
+
+            setMessage('✅ Admin login successful!');
+
+            // ✅ Redirect to admin dashboard
             setTimeout(() => {
-                navigate('/admin/dashboard');
-            }, 1500);
-            
+                navigate('/admin/dashboard', { replace: true });
+            }, 1000);
+
         } catch (error) {
             if (error.response?.status === 422) {
                 setErrors(error.response.data.errors);
             } else if (error.response?.status === 401) {
-                setMessage('Invalid admin credentials.');
+                setMessage('❌ Invalid admin credentials.');
             } else {
-                setMessage('Login failed. Please try again.');
+                setMessage('❌ Login failed. Please try again.');
             }
         } finally {
             setLoading(false);
@@ -69,9 +85,9 @@ export default function AdminLogin() {
             <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md w-full mx-4">
                 {/* Logo */}
                 <div className="text-center mb-8">
-                    <img 
-                        src="/images/logo.png" 
-                        alt="JNEC FABLAB Admin" 
+                    <img
+                        src="/images/logo.png"
+                        alt="JNEC FABLAB Admin"
                         className="w-16 h-16 mx-auto mb-4 object-contain"
                     />
                     <h2 className="text-2xl font-bold text-gray-800">Admin Login</h2>
@@ -80,11 +96,10 @@ export default function AdminLogin() {
 
                 {/* Message */}
                 {message && (
-                    <div className={`mb-4 p-3 rounded-lg text-sm ${
-                        message.includes('✅') 
-                            ? 'bg-green-100 text-green-800' 
+                    <div className={`mb-4 p-3 rounded-lg text-sm ${message.includes('✅')
+                            ? 'bg-green-100 text-green-800'
                             : 'bg-red-100 text-red-800'
-                    }`}>
+                        }`}>
                         {message}
                     </div>
                 )}
@@ -130,26 +145,25 @@ export default function AdminLogin() {
                     </div>
 
                     {/* Submit */}
-                    <button 
-                        type="submit" 
+                    <button
+                        type="submit"
                         disabled={loading}
-                        className={`w-full py-3 px-6 rounded-lg font-medium text-white transition duration-200 ${
-                            loading 
-                                ? 'bg-gray-400 cursor-not-allowed' 
+                        className={`w-full py-3 px-6 rounded-lg font-medium text-white transition duration-200 ${loading
+                                ? 'bg-gray-400 cursor-not-allowed'
                                 : 'bg-blue-600 hover:bg-blue-700'
-                        }`}
+                            }`}
                     >
                         {loading ? 'Logging in...' : 'Login as Admin'}
                     </button>
                 </form>
 
-                {/* Back to User Login */}
+                {/* Back to Unified Login */}
                 <div className="mt-6 text-center">
-                    <Link 
-                        to="/login" 
+                    <Link
+                        to="/login"
                         className="text-blue-600 hover:text-blue-700 text-sm font-medium"
                     >
-                        ← Back to User Login
+                        ← Back to Unified Login
                     </Link>
                 </div>
 

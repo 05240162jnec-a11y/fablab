@@ -3,6 +3,10 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 
+// ✅ IMPORT AND INITIALIZE AXIOS INTERCEPTORS (CRITICAL!)
+import { setupAxiosInterceptors } from './axios';
+setupAxiosInterceptors();  // ← Registers Authorization header auto-add
+
 // Auth Pages
 import Login from './Pages/Auth/Login';
 import Register from './Pages/Auth/Register';
@@ -54,7 +58,13 @@ import UserMachines from './Pages/User/Machines';
 
 // ✅ Tabbed Pages
 import ShopOrders from './Pages/User/ShopOrders';
-import Learning from './Pages/User/Learning'; // ✅ NEW: Import Learning tabbed page
+import Learning from './Pages/User/Learning';
+
+
+// ✅ Production Team Pages (NEW!)
+import ProductionTeamDashboard from './Pages/ProductionTeam/Dashboard';
+import ProductionTeamLayout from './Pages/ProductionTeam/ProductionTeamLayout';  // ← Add this!
+import AssignedOrders from './Pages/ProductionTeam/AssignedOrders';
 
 // Create root element
 const root = createRoot(document.getElementById('app'));
@@ -109,22 +119,27 @@ root.render(
             {/* ✅ Tabbed Routes */}
             <Route path="/user/shop-orders" element={<ShopOrders />} />
             <Route path="/user/machines" element={<UserMachines />} />
-            <Route path="/user/learning" element={<Learning />} /> {/* ✅ UPDATED: Real route instead of placeholder */}
+            <Route path="/user/learning" element={<Learning />} />
 
-            {/* 
-               ⚠️ PLACEHOLDER ROUTES for future steps.
-            */}
+            {/* ✅ Production Team Routes - Using Layout for sidebar */}
+            <Route path="/production-team" element={<ProductionTeamLayout />}>
+                <Route path="dashboard" element={<ProductionTeamDashboard />} />
+                <Route path="assigned-orders" element={<AssignedOrders />} />  {/* ← Added */}
+                {/* Add inventory, profile, etc. later */}
+            </Route>
+
+            {/* Placeholder routes */}
             <Route path="/user/explore" element={<div className="p-10 text-center text-2xl font-bold">Explore Page (Coming Soon)</div>} />
             <Route path="/user/support" element={<div className="p-10 text-center text-2xl font-bold">Support Page (Coming Soon)</div>} />
 
-            {/* Existing routes (Can be removed later when we fully migrate to tabs) */}
+            {/* Existing routes */}
             <Route path="/user/book-machine" element={<BookMachine />} />
-            <Route path="/user/courses" element={<UserCourses />} /> {/* Optional: Keep for direct linking */}
+            <Route path="/user/courses" element={<UserCourses />} />
             <Route path="/user/custom-orders" element={<CustomOrders />} />
             <Route path="/user/shop-products" element={<ShopProducts />} />
             <Route path="/user/my-orders" element={<MyOrders />} />
             <Route path="/user/my-bookings" element={<MyBookings />} />
-            <Route path="/user/my-enrollments" element={<MyEnrollments />} /> {/* Optional: Keep for direct linking */}
+            <Route path="/user/my-enrollments" element={<MyEnrollments />} />
         </Routes>
     </BrowserRouter>
 );

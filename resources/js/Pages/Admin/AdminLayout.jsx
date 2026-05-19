@@ -21,11 +21,23 @@ export default function AdminLayout() {
         }));
     };
 
-    // ✅ Handle logout
+    // ✅ Handle logout - redirect to unified login page
     const handleLogout = () => {
+        // ✅ Clear ALL tokens and data (both user and admin)
+        localStorage.removeItem('auth_token');
         localStorage.removeItem('admin_token');
+        localStorage.removeItem('user');
+        localStorage.removeItem('admin');
         localStorage.removeItem('admin_dashboard_data');
-        navigate('/admin/login', { replace: true });
+        localStorage.removeItem('user_data');
+        localStorage.removeItem('enrollments');
+        localStorage.removeItem('courses');
+        localStorage.removeItem('bookings');
+        localStorage.removeItem('machines');
+        sessionStorage.clear();
+
+        // ✅ Redirect to unified login page (not old admin login)
+        navigate('/login', { replace: true });
     };
 
     return (

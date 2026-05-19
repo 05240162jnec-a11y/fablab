@@ -42,7 +42,16 @@ class AuthController extends Controller
             }
         }
 
-        // 3. OUTSIDER: Cannot use @jnec@rub.edu.bt domain
+        // 3. PRODUCTION TEAM: Must be official JNEC email (like faculty)
+        if ($request->role === 'production_team') {
+            if (!preg_match('/^[a-zA-Z0-9._-]+\.jnec@rub\.edu\.bt$/', $request->email)) {
+                return response()->json([
+                    'message' => 'Invalid production team email. Please use your official JNEC email address.',
+                ], 422);
+            }
+        }
+
+        // 4. OUTSIDER: Cannot use @jnec@rub.edu.bt domain
         if ($request->role === 'outsider') {
             if (str_ends_with(strtolower($request->email), '.jnec@rub.edu.bt')) {
                 return response()->json([
@@ -98,30 +107,30 @@ class AuthController extends Controller
                 ],
                 'gender' => 'required|in:male,female,other',
                 'phone' => 'required|string|max:20',
-                'role' => 'required|in:student,faculty,outsider',
+                'role' => 'required|in:student,faculty,outsider,production_team',  // ✅ Added production_team
                 'department' => 'nullable|string|max:255',
                 'year_of_study' => 'nullable|integer|min:1|max:4',
             ]);
 
             // ← Manual phone validation based on country
-// Note: Country code comes from frontend, we validate the phone format
-$phone = $validated['phone'];
+            // Note: Country code comes from frontend, we validate the phone format
+            $phone = $validated['phone'];
 
-// For this implementation, we'll validate based on phone format
-// Bhutan: 17xxxxxx or 77xxxxxx (8 digits)
-$bhutanPattern = '/^(17|77)\d{6}$/';
+            // For this implementation, we'll validate based on phone format
+            // Bhutan: 17xxxxxx or 77xxxxxx (8 digits)
+            $bhutanPattern = '/^(17|77)\d{6}$/';
 
-// International: 7-15 digits (without + or country code)
-$internationalPattern = '/^\d{7,15}$/';
+            // International: 7-15 digits (without + or country code)
+            $internationalPattern = '/^\d{7,15}$/';
 
-if (!preg_match($bhutanPattern, $phone) && !preg_match($internationalPattern, $phone)) {
-    return response()->json([
-        'message' => 'Phone number format is invalid.',
-        'errors' => [
-            'phone' => ['Phone number must be 8 digits for Bhutan (17/77XXXXXX) or 7-15 digits for international numbers.']
-        ]
-    ], 422);
-}
+            if (!preg_match($bhutanPattern, $phone) && !preg_match($internationalPattern, $phone)) {
+                return response()->json([
+                    'message' => 'Phone number format is invalid.',
+                    'errors' => [
+                        'phone' => ['Phone number must be 8 digits for Bhutan (17/77XXXXXX) or 7-15 digits for international numbers.']
+                    ]
+                ], 422);
+            }
 
             // ← Create the user!
             $user = User::create([
@@ -192,7 +201,7 @@ if (!preg_match($bhutanPattern, $phone) && !preg_match($internationalPattern, $p
                 'id' => $user->id,
                 'name' => $user->name,
                 'email' => $user->email,
-                'role' => $user->role,
+                'role' => $user->role,  // ✅ Will now include 'production_team'
                 'email_verified' => $user->email_verified_at !== null,
             ],
             'token' => $token,

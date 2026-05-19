@@ -31,7 +31,7 @@ export default function Login() {
         }
     };
 
-    // Handle form submission
+    // Handle form submission - ✅ UNIFIED LOGIN (User + Admin + Production Team)
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
@@ -39,18 +39,69 @@ export default function Login() {
         setErrors({});
 
         try {
-            const response = await axios.post('http://127.0.0.1:8000/api/login', formData);
+            // ✅ STEP 1: Try USER login first
+            let response;
+            let loginType = 'user';
 
-            // Save token to localStorage
-            localStorage.setItem('auth_token', response.data.token);
+            try {
+                response = await axios.post('http://127.0.0.1:8000/api/login', formData);
+            } catch (userError) {
+                // ✅ STEP 2: If user login fails with "Invalid credentials", try ADMIN login
+                if (userError.response?.status === 401 ||
+                    userError.response?.data?.message?.includes('Invalid credentials')) {
 
-            // ✅ ALSO save user data if returned
-            if (response.data.user) {
-                localStorage.setItem('user', JSON.stringify(response.data.user));
+                    console.log('User login failed, trying admin login...');
+
+                    response = await axios.post('http://127.0.0.1:8000/api/admin/login', formData);
+                    loginType = 'admin';
+                } else {
+                    // Re-throw other errors (403 email verify, 422 validation, etc.)
+                    throw userError;
+                }
             }
 
-            // ✅ REDIRECT TO USER DASHBOARD
-            window.location.href = '/user/dashboard';
+            // ✅ STEP 3: Clear ALL old data BEFORE setting new token
+            localStorage.removeItem('auth_token');
+            localStorage.removeItem('admin_token');
+            localStorage.removeItem('user');
+            localStorage.removeItem('admin');
+            localStorage.removeItem('user_data');
+            localStorage.removeItem('enrollments');
+            localStorage.removeItem('courses');
+            localStorage.removeItem('bookings');
+            localStorage.removeItem('machines');
+            sessionStorage.clear();
+
+            // ✅ STEP 4: Save token (both endpoints return 'token' key)
+            localStorage.setItem('auth_token', response.data.token);
+
+            // ✅ STEP 5: Save user/admin data based on login type
+            if (loginType === 'admin') {
+                // Admin response: { admin: { id, name, email }, token, ... }
+                if (response.data.admin) {
+                    localStorage.setItem('user', JSON.stringify({
+                        ...response.data.admin,
+                        role: 'admin'  // ✅ Add role manually for admin
+                    }));
+                }
+            } else {
+                // User response: { user: { id, name, email, role }, token, ... }
+                if (response.data.user) {
+                    localStorage.setItem('user', JSON.stringify(response.data.user));
+                }
+            }
+
+            // ✅ STEP 6: Redirect based on role (handles admin, production_team, and regular users)
+            const userData = response.data.user || response.data.admin;
+            const userRole = userData?.role || (loginType === 'admin' ? 'admin' : 'student');
+
+            const redirectPath =
+                userRole === 'admin' ? '/admin/dashboard' :
+                    userRole === 'production_team' ? '/production-team/dashboard' :
+                        '/user/dashboard';
+
+            // ✅ Use window.location for full page reload (clears React cache)
+            window.location.href = redirectPath;
 
         } catch (error) {
             console.error('Login error:', error);
@@ -77,15 +128,27 @@ export default function Login() {
         }
     };
 
-    // Handle logout
+    // Handle logout - ✅ Works for both user and admin
     const handleLogout = () => {
+        // ✅ Clear ALL user/admin data on logout
         localStorage.removeItem('auth_token');
+        localStorage.removeItem('admin_token');
+        localStorage.removeItem('user');
+        localStorage.removeItem('admin');
+        localStorage.removeItem('user_data');
+        localStorage.removeItem('enrollments');
+        localStorage.removeItem('courses');
+        localStorage.removeItem('bookings');
+        localStorage.removeItem('machines');
+        sessionStorage.clear();
+
         setToken(null);
         setMessage('👋 You have been logged out.');
         setFormData({ email: '', password: '' });
-    };
 
-    
+        // ✅ Force full page reload to clear React state
+        window.location.href = '/login';
+    };
 
     // Login form view
     return (
@@ -142,8 +205,8 @@ export default function Login() {
 
                         {message && (
                             <div className={`mb-4 p-3 rounded-lg text-sm ${message.includes('✅')
-                                    ? 'bg-green-100 text-green-800'
-                                    : 'bg-red-100 text-red-800'
+                                ? 'bg-green-100 text-green-800'
+                                : 'bg-red-100 text-red-800'
                                 }`}>
                                 {message}
                             </div>
@@ -197,8 +260,8 @@ export default function Login() {
                                 type="submit"
                                 disabled={loading}
                                 className={`w-full py-3 px-6 rounded-lg font-medium text-white transition duration-200 ${loading
-                                        ? 'bg-gray-400 cursor-not-allowed'
-                                        : 'bg-blue-400 hover:bg-blue-500'
+                                    ? 'bg-gray-400 cursor-not-allowed'
+                                    : 'bg-blue-400 hover:bg-blue-500'
                                     }`}
                             >
                                 {loading ? 'Logging in...' : 'Login'}

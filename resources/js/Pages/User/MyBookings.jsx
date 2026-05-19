@@ -23,12 +23,15 @@ export default function MyBookings() {
         try {
             setLoading(true);
             const authToken = localStorage.getItem('auth_token');
-            const response = await axios.get('http://127.0.0.1:8000/api/user/my-bookings', {
+
+            // ✅ Add timestamp to prevent browser/axios caching
+            const response = await axios.get(`http://127.0.0.1:8000/api/user/my-bookings?t=${Date.now()}`, {
                 headers: {
                     'Accept': 'application/json',
                     'Authorization': `Bearer ${authToken}`,
                 },
             });
+    
 
             const apiBookings = response?.data?.bookings || [];
 

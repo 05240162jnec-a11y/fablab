@@ -14,6 +14,7 @@ export default function Machines() {
     const searchParams = new URLSearchParams(location.search);
     const urlTab = searchParams.get('tab') || 'book';
     const [activeTab, setActiveTab] = useState(urlTab);
+    
 
     // Keep state in sync with URL
     useEffect(() => {

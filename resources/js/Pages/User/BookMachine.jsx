@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 export default function BookMachine() {
+    // ✅ Initialize React Router navigate hook
+    const navigate = useNavigate();
+
     // API Data States
     const [machines, setMachines] = useState([]);
     const [selectedMachine, setSelectedMachine] = useState(null);
@@ -89,7 +92,6 @@ export default function BookMachine() {
     };
 
     const handleBookNow = (machine) => {
-        // ✅ Prevent booking if user hasn't completed any course
         if (!hasCompletedAnyCourse()) {
             alert('❌ You must complete at least one training course before booking machines. Please enroll in and complete a course first.');
             return;
@@ -104,18 +106,24 @@ export default function BookMachine() {
             end_date: '',
         });
         setBookingMessage('');
+
+        // ✅ CRITICAL: Fetch booked dates EVERY time modal opens
         fetchBookedDates(machine.id);
     };
 
     const fetchBookedDates = async (machineId) => {
         try {
             const authToken = localStorage.getItem('auth_token');
-            const response = await axios.get(`http://127.0.0.1:8000/api/user/machines/${machineId}/booked-dates`, {
+            const response = await axios.get(`http://127.0.0.1:8000/api/user/machines/${machineId}/booked-dates?t=${Date.now()}`, {
                 headers: {
                     'Accept': 'application/json',
                     'Authorization': `Bearer ${authToken}`,
                 },
             });
+
+            // ✅ DEBUG: Log the response
+            console.log('📅 Fetched booked dates for machine', machineId, ':', response.data.dates);
+
             setBookedDates(response.data.dates || []);
         } catch (error) {
             console.error('Error fetching booked dates:', error);
@@ -136,7 +144,12 @@ export default function BookMachine() {
         const start = new Date(startDate);
         const end = new Date(endDate);
         for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-            const dateStr = d.toISOString().split('T')[0];
+            // ✅ Use local date formatting (same as calendar)
+            const dateStr = [
+                d.getFullYear(),
+                String(d.getMonth() + 1).padStart(2, '0'),
+                String(d.getDate()).padStart(2, '0')
+            ].join('-');
             if (bookedDates.includes(dateStr)) return false;
         }
         return true;
@@ -181,10 +194,13 @@ export default function BookMachine() {
             );
 
             setBookingMessage('✅ ' + response.data.message);
+
+            // ✅ Close modal FIRST, then navigate using React Router
+            setShowBookingModal(false);
             setTimeout(() => {
-                setShowBookingModal(false);
-                window.location.href = '/user/my-bookings';
-            }, 1500);
+                // ✅ Use React Router navigate (client-side, no 404)
+                navigate('/user/machines?tab=bookings', { replace: true });
+            }, 300);
         } catch (error) {
             console.error('Booking error:', error);
             if (error.response?.data?.message) {
@@ -249,10 +265,14 @@ export default function BookMachine() {
                     days: []
                 };
 
-                // Render ALL days of the month (not just from today)
                 for (let d = 1; d <= daysInMonth; d++) {
                     const dateObj = new Date(year, month, d);
-                    const dateStr = dateObj.toISOString().split('T')[0];
+                    // ✅ Use local date formatting (YYYY-MM-DD in user's timezone)
+                    const dateStr = [
+                        dateObj.getFullYear(),
+                        String(dateObj.getMonth() + 1).padStart(2, '0'),
+                        String(dateObj.getDate()).padStart(2, '0')
+                    ].join('-');
 
                     monthData.days.push({
                         date: dateStr,
@@ -703,12 +723,13 @@ export default function BookMachine() {
                                                         let dayClass = 'bg-white border-gray-200 text-gray-700';
                                                         let isClickable = false;
 
-                                                        if (isPast) {
-                                                            // Past days - grayed out
+                                                        // ✅ Check booked FIRST - booked dates should always show red, even if past
+                                                        if (isBooked) {
+                                                            // Booked days - red (highest priority)
+                                                            dayClass = 'bg-red-50 border-red-200 text-red-400 cursor-not-allowed line-through font-semibold';
+                                                        } else if (isPast) {
+                                                            // Past days - grayed out (only if not booked)
                                                             dayClass = 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed';
-                                                        } else if (isBooked) {
-                                                            // Booked days - red
-                                                            dayClass = 'bg-red-50 border-red-200 text-red-400 cursor-not-allowed line-through';
                                                         } else if (isSelected) {
                                                             // Selected days - green
                                                             if (isStartDate || isEndDate) {
@@ -733,13 +754,24 @@ export default function BookMachine() {
             `}
                                                                 onClick={() => {
                                                                     if (isClickable && !isBooked && !isPast) {
-                                                                        if (bookingData.start_date === dayInfo.date && !bookingData.end_date) {
-                                                                            setBookingData({ machine_id: bookingData.machine_id, start_date: '', end_date: '' });
-                                                                        } else if (bookingData.start_date && bookingData.end_date) {
+                                                                        // ✅ Case 1: No selection yet → set as start date
+                                                                        if (!bookingData.start_date) {
                                                                             setBookingData(prev => ({ ...prev, start_date: dayInfo.date, end_date: '' }));
-                                                                        } else if (bookingData.start_date && dayInfo.date >= bookingData.start_date) {
+                                                                        }
+                                                                        // ✅ Case 2: Start date set, end date empty, clicking SAME date → single-day booking
+                                                                        else if (bookingData.start_date === dayInfo.date && !bookingData.end_date) {
+                                                                            setBookingData(prev => ({ ...prev, end_date: dayInfo.date })); // ✅ End = Start
+                                                                        }
+                                                                        // ✅ Case 3: Start date set, end date empty, clicking LATER date → set end date
+                                                                        else if (bookingData.start_date && !bookingData.end_date && dayInfo.date >= bookingData.start_date) {
                                                                             setBookingData(prev => ({ ...prev, end_date: dayInfo.date }));
-                                                                        } else {
+                                                                        }
+                                                                        // ✅ Case 4: Start date set, end date empty, clicking EARLIER date → reset start to new date
+                                                                        else if (bookingData.start_date && !bookingData.end_date && dayInfo.date < bookingData.start_date) {
+                                                                            setBookingData(prev => ({ ...prev, start_date: dayInfo.date, end_date: '' }));
+                                                                        }
+                                                                        // ✅ Case 5: Both dates set → start new selection
+                                                                        else if (bookingData.start_date && bookingData.end_date) {
                                                                             setBookingData(prev => ({ ...prev, start_date: dayInfo.date, end_date: '' }));
                                                                         }
                                                                     }

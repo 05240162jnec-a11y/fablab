@@ -24,8 +24,6 @@ Route::get('/admin/dashboard', function () {
     return view('app');
 })->name('admin.dashboard');
 
-
-
 // ← ADD THIS:
 Route::get('/admin/users', function () {
     return view('app');
@@ -98,7 +96,12 @@ Route::get('/user/contact', function () {
     return view('app');
 })->name('user.contact');
 
-
+// ==========================================
+// ✅ PRODUCTION TEAM ROUTES (NEW!)
+// ==========================================
+Route::get('/production-team/dashboard', function () {
+    return view('app');
+})->name('production-team.dashboard');
 
 // ==========================================
 // STATIC PAGES
@@ -160,3 +163,11 @@ Route::get('/forgot-password', function () {
 Route::get('/reset-password/{token}', function () {
     return view('app');
 });
+
+// ==========================================
+// ✅ CATCH-ALL FALLBACK ROUTE (Must be LAST!)
+// ==========================================
+// This ensures any React Router route works when directly accessed
+Route::get('/{any}', function () {
+    return view('app');
+})->where('any', '.*');

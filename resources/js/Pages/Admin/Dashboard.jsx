@@ -23,14 +23,11 @@ export default function Dashboard() {
     const fetchDashboardData = async () => {
         try {
             setLoading(true);
-            const adminToken = localStorage.getItem('admin_token');
 
-            const response = await axios.get('http://127.0.0.1:8000/api/admin/dashboard/stats', {
-                headers: {
-                    'Accept': 'application/json',
-                    'Authorization': `Bearer ${adminToken}`,
-                },
-            });
+            // ✅ FIXED: Use 'auth_token' (same key for both user and admin)
+            // Note: Axios interceptor will auto-add Authorization header, so we don't need to set it manually!
+
+            const response = await axios.get('/admin/dashboard/stats'); // ✅ Relative URL (axios.baseURL handles domain)
 
             setStats(response.data.stats);
             setRecentActivity(response.data.recentActivity);

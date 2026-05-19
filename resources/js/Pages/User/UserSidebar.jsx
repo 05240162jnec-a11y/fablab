@@ -18,14 +18,25 @@ export default function UserSidebar({ onLogout }) {
     // Handle logout
     const handleLogout = (e) => {
         e.preventDefault();
+
+        // ✅ Clear ALL user data (match Login.jsx)
         localStorage.removeItem('auth_token');
+        localStorage.removeItem('user');
+        localStorage.removeItem('user_data');
+        localStorage.removeItem('enrollments');
+        localStorage.removeItem('courses');
+        localStorage.removeItem('bookings');
+        localStorage.removeItem('machines');
         localStorage.removeItem('dashboard_data');
         localStorage.removeItem('cart_items');
         localStorage.removeItem('user_profile');
         localStorage.removeItem('booking_data');
+        sessionStorage.clear();
 
         if (onLogout) onLogout();
-        navigate('/login', { replace: true });
+
+        // ✅ Force full page reload to clear React state
+        window.location.href = '/login';
     };
 
     return (

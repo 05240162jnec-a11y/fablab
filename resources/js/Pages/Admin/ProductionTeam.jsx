@@ -3,7 +3,7 @@ import axios from 'axios';
 import { Link } from 'react-router-dom';
 
 export default function ProductionTeam() {
-   
+
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
 
@@ -35,28 +35,33 @@ export default function ProductionTeam() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    
-
-    // Fetch members from API
+    // ✅ Fetch members from API (using unified auth_token)
     const fetchMembers = async () => {
         try {
             setLoading(true);
-            const token = localStorage.getItem('admin_token');
+            // ✅ Use auth_token (unified token for all roles)
+            const token = localStorage.getItem('auth_token');
 
-            const response = await axios.get('http://127.0.0.1:8000/api/admin/production-team', {
+            // ✅ FIXED: Removed /api prefix - axios baseURL handles it
+            const response = await axios.get('/admin/production-team', {
                 headers: {
                     'Accept': 'application/json',
                     'Authorization': `Bearer ${token}`,
                 },
                 params: {
                     search: searchTerm || null,
-                    status: statusFilter !== 'all' ? statusFilter : null,
+                    // status filter removed - users table doesn't have status column yet
                 }
             });
 
             if (response.data.success) {
                 setMembers(response.data.data);
-                setStats(response.data.stats);
+                // ✅ Handle stats that might not include 'available'/'assigned'
+                setStats({
+                    total: response.data.stats?.total || 0,
+                    available: response.data.stats?.available || 0,
+                    assigned: response.data.stats?.assigned || 0,
+                });
                 setError(null);
             }
         } catch (err) {
@@ -70,19 +75,23 @@ export default function ProductionTeam() {
     // Fetch on mount and when filters change
     useEffect(() => {
         fetchMembers();
-    }, [searchTerm, statusFilter]);
+    }, [searchTerm]); // Removed statusFilter dependency since we don't filter by status yet
 
-    // Filter members (client-side for better UX)
+    // ✅ Safe filter members (handle missing fields)
     const filteredMembers = members.filter(member => {
-        const matchesSearch = member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            member.email.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesStatus = statusFilter === 'all' || member.status === statusFilter;
-        return matchesSearch && matchesStatus;
+        const name = member?.name || '';
+        const email = member?.email || '';
+        const matchesSearch = name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            email.toLowerCase().includes(searchTerm.toLowerCase());
+        // Skip status filter for now since users table doesn't have it
+        return matchesSearch;
     });
 
-    // Get status badge color
+    // ✅ Safe status badge class (handle missing status field)
     const getStatusBadgeClass = (status) => {
-        switch (status) {
+        // If status doesn't exist, default to 'available' style
+        const safeStatus = status || 'available';
+        switch (safeStatus) {
             case 'assigned':
                 return 'bg-blue-100 text-blue-700 border border-blue-200';
             case 'available':
@@ -92,12 +101,16 @@ export default function ProductionTeam() {
         }
     };
 
-    // Capitalize first letter
-    const capitalize = (str) => str.charAt(0).toUpperCase() + str.slice(1);
+    // ✅ SAFE capitalize function - handles undefined/null
+    const capitalize = (str) => {
+        if (!str || typeof str !== 'string') return '—';
+        return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+    };
 
-    // Get initials from name
+    // ✅ Safe get initials (handle missing name)
     const getInitials = (name) => {
-        return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+        if (!name || typeof name !== 'string') return 'PT';
+        return name.split(' ').map(n => n?.[0] || '').join('').substring(0, 2).toUpperCase();
     };
 
     // Open View Modal
@@ -125,14 +138,14 @@ export default function ProductionTeam() {
     const handleEditMember = (member) => {
         setSelectedMember(member);
         setFormState({
-            name: member.name,
-            email: member.email,
+            name: member.name || '',
+            email: member.email || '',
             phone: member.phone || '',
             gender: member.gender || 'male',
             password: '',
             confirmPassword: '',
-            status: member.status,
-            assignedTask: member.assigned_task || '',
+            status: member.status || 'available',
+            assignedTask: member.assigned_task || member.assignedTask || '',
         });
         setShowEditModal(true);
     };
@@ -146,8 +159,10 @@ export default function ProductionTeam() {
     // Confirm Delete
     const confirmDelete = async () => {
         try {
-            const token = localStorage.getItem('admin_token');
-            await axios.delete(`http://127.0.0.1:8000/api/admin/production-team/${selectedMember.id}`, {
+            // ✅ Use auth_token
+            const token = localStorage.getItem('auth_token');
+            // ✅ FIXED: Removed /api prefix
+            await axios.delete(`/admin/production-team/${selectedMember.id}`, {
                 headers: {
                     'Accept': 'application/json',
                     'Authorization': `Bearer ${token}`,
@@ -164,18 +179,19 @@ export default function ProductionTeam() {
         }
     };
 
-    // Save Add
+    // Save Add - ✅ Updated for merged User model
     const handleSaveAdd = async () => {
         try {
-            const token = localStorage.getItem('admin_token');
-            await axios.post('http://127.0.0.1:8000/api/admin/production-team', {
+            // ✅ Use auth_token
+            const token = localStorage.getItem('auth_token');
+            // ✅ FIXED: Removed /api prefix
+            await axios.post('/admin/production-team', {
                 name: formState.name,
                 email: formState.email,
                 phone: formState.phone,
                 gender: formState.gender,
-                status: formState.status,
-                assigned_task: formState.assignedTask,
-                // Password will be auto-generated by backend
+                // status and assigned_task removed - not in users table yet
+                // Backend will auto-generate password and send email
             }, {
                 headers: {
                     'Accept': 'application/json',
@@ -189,17 +205,26 @@ export default function ProductionTeam() {
             alert('✅ Team member added successfully! Credentials sent to their email.');
         } catch (err) {
             console.error('Add error:', err);
-            alert('❌ Failed to add team member');
+            // Show detailed error if available
+            const errorMsg = err.response?.data?.message || 'Failed to add team member';
+            alert('❌ ' + errorMsg);
         }
     };
 
-    // Save Edit
+    // Save Edit - ✅ Updated for merged User model
     const handleSaveEdit = async () => {
         try {
-            const token = localStorage.getItem('admin_token');
-            await axios.put(`http://127.0.0.1:8000/api/admin/production-team/${selectedMember.id}`, {
-                ...formState,
-                assigned_task: formState.assignedTask,
+            // ✅ Use auth_token
+            const token = localStorage.getItem('auth_token');
+            // ✅ FIXED: Removed /api prefix
+            await axios.put(`/admin/production-team/${selectedMember.id}`, {
+                name: formState.name,
+                email: formState.email,
+                phone: formState.phone,
+                gender: formState.gender,
+                // Only send password if user filled it in
+                ...(formState.password && { password: formState.password, password_confirmation: formState.confirmPassword }),
+                // status and assigned_task removed - not in users table yet
             }, {
                 headers: {
                     'Accept': 'application/json',
@@ -214,7 +239,8 @@ export default function ProductionTeam() {
             alert('✅ Team member updated successfully!');
         } catch (err) {
             console.error('Update error:', err);
-            alert('❌ Failed to update team member');
+            const errorMsg = err.response?.data?.message || 'Failed to update team member';
+            alert('❌ ' + errorMsg);
         }
     };
 
@@ -229,7 +255,7 @@ export default function ProductionTeam() {
 
     return (
         <div className="flex min-h-screen bg-gray-50">
-            
+
 
             {/* Main Content */}
             <div className="flex-1">
@@ -297,61 +323,8 @@ export default function ProductionTeam() {
                                     />
                                 </div>
 
-                                {/* Status Filter Dropdown */}
-                                <div className="relative">
-                                    <button
-                                        onClick={() => setShowStatusDropdown(!showStatusDropdown)}
-                                        className="w-full sm:w-40 px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white flex items-center justify-between"
-                                    >
-                                        <span className="text-sm text-gray-700">
-                                            {statusFilter === 'all' ? 'All Status' : capitalize(statusFilter)}
-                                        </span>
-                                        <svg className={`w-4 h-4 text-gray-500 transition-transform ${showStatusDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                                        </svg>
-                                    </button>
-
-                                    {showStatusDropdown && (
-                                        <div className="absolute right-0 mt-2 w-40 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
-                                            <button
-                                                onClick={() => { setStatusFilter('all'); setShowStatusDropdown(false); }}
-                                                className={`w-full px-4 py-2 text-left text-sm flex items-center justify-between ${statusFilter === 'all' ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-gray-50'
-                                                    }`}
-                                            >
-                                                All Status
-                                                {statusFilter === 'all' && (
-                                                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                                    </svg>
-                                                )}
-                                            </button>
-                                            <button
-                                                onClick={() => { setStatusFilter('available'); setShowStatusDropdown(false); }}
-                                                className={`w-full px-4 py-2 text-left text-sm flex items-center justify-between ${statusFilter === 'available' ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-gray-50'
-                                                    }`}
-                                            >
-                                                Available
-                                                {statusFilter === 'available' && (
-                                                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                                    </svg>
-                                                )}
-                                            </button>
-                                            <button
-                                                onClick={() => { setStatusFilter('assigned'); setShowStatusDropdown(false); }}
-                                                className={`w-full px-4 py-2 text-left text-sm flex items-center justify-between ${statusFilter === 'assigned' ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-gray-50'
-                                                    }`}
-                                            >
-                                                Assigned
-                                                {statusFilter === 'assigned' && (
-                                                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                                    </svg>
-                                                )}
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
+                                {/* ✅ Status Filter Removed - users table doesn't have status column yet */}
+                                {/* We can add it back later if you add a 'status' column to users table */}
                             </div>
                         </div>
 
@@ -376,8 +349,8 @@ export default function ProductionTeam() {
                                     <thead>
                                         <tr className="border-b border-gray-100">
                                             <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Team Member</th>
-                                            <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Status</th>
-                                            <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Assigned Task</th>
+                                            <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Role</th>
+                                            <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Phone</th>
                                             <th className="text-right py-3 px-4 text-sm font-semibold text-gray-700">Actions</th>
                                         </tr>
                                     </thead>
@@ -387,21 +360,22 @@ export default function ProductionTeam() {
                                                 <td className="py-4 px-4">
                                                     <div className="flex items-center gap-3">
                                                         <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-semibold text-xs flex-shrink-0">
-                                                            {getInitials(member.name)}
+                                                            {getInitials(member?.name)}
                                                         </div>
                                                         <div>
-                                                            <p className="font-semibold text-gray-900 text-sm">{member.name}</p>
-                                                            <p className="text-xs text-gray-500">{member.email}</p>
+                                                            <p className="font-semibold text-gray-900 text-sm">{member?.name || 'Unknown'}</p>
+                                                            <p className="text-xs text-gray-500">{member?.email || 'No email'}</p>
                                                         </div>
                                                     </div>
                                                 </td>
                                                 <td className="py-4 px-4">
-                                                    <span className={`inline-flex px-3 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(member.status)}`}>
-                                                        {capitalize(member.status)}
+                                                    {/* ✅ Show role instead of status */}
+                                                    <span className="inline-flex px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700 border border-purple-200">
+                                                        {capitalize(member?.role) || 'Production Team'}
                                                     </span>
                                                 </td>
                                                 <td className="py-4 px-4 text-sm text-gray-600">
-                                                    {member.assigned_task || '—'}
+                                                    {member?.phone || '—'}
                                                 </td>
                                                 <td className="py-4 px-4 text-right" onClick={(e) => e.stopPropagation()}>
                                                     <button
@@ -436,14 +410,14 @@ export default function ProductionTeam() {
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                                 </svg>
                                 <p className="text-gray-500 text-lg font-medium">No team members found</p>
-                                <p className="text-gray-400 text-sm mt-1">Try adjusting your search or filters</p>
+                                <p className="text-gray-400 text-sm mt-1">Try adjusting your search or add a new member</p>
                             </div>
                         )}
                     </div>
                 </main>
             </div>
 
-            {/* ===== ADD TEAM MEMBER MODAL - YOUR DESIGN PRESERVED ===== */}
+            {/* ===== ADD TEAM MEMBER MODAL - UPDATED FOR USER MODEL ===== */}
             {showAddModal && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
@@ -492,7 +466,7 @@ export default function ProductionTeam() {
                                     <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
                                     <input
                                         type="tel"
-                                        placeholder="+91 98765 00000"
+                                        placeholder="+975 17XXXXXX"
                                         value={formState.phone}
                                         onChange={(e) => setFormState({ ...formState, phone: e.target.value })}
                                         className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -539,7 +513,7 @@ export default function ProductionTeam() {
                 </div>
             )}
 
-            {/* ===== VIEW TEAM MEMBER MODAL - YOUR DESIGN PRESERVED ===== */}
+            {/* ===== VIEW TEAM MEMBER MODAL - UPDATED FOR USER MODEL ===== */}
             {showViewModal && selectedMember && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
@@ -561,12 +535,12 @@ export default function ProductionTeam() {
                             {/* Member Info */}
                             <div className="flex items-center gap-4 mb-6">
                                 <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-lg">
-                                    {getInitials(selectedMember.name)}
+                                    {getInitials(selectedMember?.name)}
                                 </div>
                                 <div>
-                                    <h4 className="text-lg font-bold text-gray-900">{selectedMember.name}</h4>
-                                    <span className={`inline-flex px-3 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(selectedMember.status)}`}>
-                                        {capitalize(selectedMember.status)}
+                                    <h4 className="text-lg font-bold text-gray-900">{selectedMember?.name || 'Unknown'}</h4>
+                                    <span className="inline-flex px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700 border border-purple-200">
+                                        {capitalize(selectedMember?.role) || 'Production Team'}
                                     </span>
                                 </div>
                             </div>
@@ -581,7 +555,7 @@ export default function ProductionTeam() {
                                     </svg>
                                     <div>
                                         <p className="text-sm text-gray-500">Gender</p>
-                                        <p className="text-gray-900 font-medium">{capitalize(selectedMember.gender || 'N/A')}</p>
+                                        <p className="text-gray-900 font-medium">{capitalize(selectedMember?.gender) || 'N/A'}</p>
                                     </div>
                                 </div>
 
@@ -591,7 +565,7 @@ export default function ProductionTeam() {
                                     </svg>
                                     <div>
                                         <p className="text-sm text-gray-500">Email</p>
-                                        <p className="text-gray-900 font-medium">{selectedMember.email}</p>
+                                        <p className="text-gray-900 font-medium">{selectedMember?.email || 'N/A'}</p>
                                     </div>
                                 </div>
 
@@ -601,14 +575,21 @@ export default function ProductionTeam() {
                                     </svg>
                                     <div>
                                         <p className="text-sm text-gray-500">Phone Number</p>
-                                        <p className="text-gray-900 font-medium">{selectedMember.phone || 'N/A'}</p>
+                                        <p className="text-gray-900 font-medium">{selectedMember?.phone || 'N/A'}</p>
                                     </div>
                                 </div>
 
-                                {/* Assigned Task */}
-                                <div className="bg-gray-50 rounded-lg p-4 mt-6">
-                                    <p className="text-xs text-gray-500 mb-1">Currently Assigned</p>
-                                    <p className="text-gray-900 font-medium">{selectedMember.assigned_task || 'No task assigned'}</p>
+                                {/* Email Verified Status */}
+                                <div className="flex items-start gap-3">
+                                    <svg className="w-5 h-5 text-gray-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    <div>
+                                        <p className="text-sm text-gray-500">Email Verified</p>
+                                        <p className="text-gray-900 font-medium">
+                                            {selectedMember?.email_verified_at ? '✅ Yes' : '❌ No'}
+                                        </p>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -629,7 +610,7 @@ export default function ProductionTeam() {
                 </div>
             )}
 
-            {/* ===== EDIT TEAM MEMBER MODAL - YOUR DESIGN PRESERVED ===== */}
+            {/* ===== EDIT TEAM MEMBER MODAL - UPDATED FOR USER MODEL ===== */}
             {showEditModal && selectedMember && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
@@ -695,29 +676,24 @@ export default function ProductionTeam() {
                                 </div>
                             </div>
 
-                            {/* Status & Assigned Task */}
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
-                                    <select
-                                        value={formState.status}
-                                        onChange={(e) => setFormState({ ...formState, status: e.target.value })}
-                                        className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                                    >
-                                        <option value="available">Available</option>
-                                        <option value="assigned">Assigned</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Assigned Task</label>
-                                    <input
-                                        type="text"
-                                        placeholder="Task name"
-                                        value={formState.assignedTask}
-                                        onChange={(e) => setFormState({ ...formState, assignedTask: e.target.value })}
-                                        className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    />
-                                </div>
+                            {/* Password Change (Optional) */}
+                            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                                <p className="text-sm text-yellow-800 font-medium mb-2">🔐 Change Password (Optional)</p>
+                                <input
+                                    type="password"
+                                    placeholder="New password"
+                                    value={formState.password}
+                                    onChange={(e) => setFormState({ ...formState, password: e.target.value })}
+                                    className="w-full px-3 py-2 border border-yellow-300 rounded mb-2 focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                                />
+                                <input
+                                    type="password"
+                                    placeholder="Confirm new password"
+                                    value={formState.confirmPassword}
+                                    onChange={(e) => setFormState({ ...formState, confirmPassword: e.target.value })}
+                                    className="w-full px-3 py-2 border border-yellow-300 rounded focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                                />
+                                <p className="text-xs text-yellow-600 mt-2">Leave blank to keep current password</p>
                             </div>
                         </div>
 
@@ -740,7 +716,7 @@ export default function ProductionTeam() {
                 </div>
             )}
 
-            {/* ===== DELETE CONFIRMATION MODAL - YOUR DESIGN PRESERVED ===== */}
+            {/* ===== DELETE CONFIRMATION MODAL ===== */}
             {showDeleteModal && selectedMember && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full">
@@ -753,7 +729,7 @@ export default function ProductionTeam() {
                             </div>
                             <h3 className="text-xl font-bold text-gray-900 mb-2">Delete Team Member?</h3>
                             <p className="text-gray-600">
-                                Are you sure you want to delete <span className="font-semibold">{selectedMember.name}</span>? This action cannot be undone.
+                                Are you sure you want to delete <span className="font-semibold">{selectedMember?.name || 'this member'}</span>? This action cannot be undone.
                             </p>
                         </div>
 

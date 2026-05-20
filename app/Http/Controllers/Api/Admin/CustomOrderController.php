@@ -5,12 +5,10 @@ namespace App\Http\Controllers\Api\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\CustomOrder;
 use App\Models\User;
-use App\Models\ProductionTeam;
 use App\Mail\CustomOrderPriceUpdated;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 
 class CustomOrderController extends Controller
 {
@@ -130,27 +128,38 @@ class CustomOrderController extends Controller
     }
 
     /**
-     * ✅ NEW: Assign order to production team member
+     * ✅ Assign order to production team member
      */
     public function assign(Request $request, $id)
     {
         $order = CustomOrder::findOrFail($id);
 
         $validated = $request->validate([
-            'assigned_to' => 'required|exists:users,id', // Assuming production team are users with role 'production'
+            'assigned_to' => 'required|exists:users,id',
         ]);
 
-        // Only allow assignment if payment is verified and status is in_progress
-        if (!$order->payment_verified_at || $order->status !== 'in_progress') {
+        // Verify the assignee is actually a production team member
+        $assignee = User::find($validated['assigned_to']);
+        if ($assignee->role !== 'production_team') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Can only assign to production team members.',
+            ], 422);
+        }
+
+        // Only allow assignment if payment is verified
+        if (!$order->payment_verified_at) {
             return response()->json([
                 'success' => false,
                 'message' => 'Order can only be assigned after payment is verified.',
             ], 422);
         }
 
+        // ✅ Update assignment AND ensure status is in_progress
         $order->update([
             'assigned_to' => $validated['assigned_to'],
             'assigned_at' => now(),
+            'status' => 'in_progress', // ✅ Ensure status is correct
         ]);
 
         // Load the assigned user for response
@@ -168,9 +177,9 @@ class CustomOrderController extends Controller
      */
     public function getProductionTeam()
     {
-        // Assuming production team members are users with role 'production' or 'production_team'
-        $team = User::whereIn('role', ['production', 'production_team', 'staff'])
-            ->select('id', 'name', 'email', 'department')
+        // Fetch users with production_team role
+        $team = User::where('role', 'production_team')
+            ->select('id', 'name', 'email')
             ->get();
 
         return response()->json([

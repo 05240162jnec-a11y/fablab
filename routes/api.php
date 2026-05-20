@@ -179,8 +179,10 @@ Route::middleware('auth:sanctum')->prefix('production-team')->group(function () 
     // Assigned Orders
     Route::get('/assigned-orders', [\App\Http\Controllers\Api\ProductionTeam\AssignedOrdersController::class, 'index']);
     Route::post('/assigned-orders/{id}/update-status', [\App\Http\Controllers\Api\ProductionTeam\AssignedOrdersController::class, 'updateStatus']);
-    
+    // ✅ NEW: Get all custom orders (read-only)
+    Route::get('/custom-orders', [\App\Http\Controllers\Api\ProductionTeam\AssignedOrdersController::class, 'getAllCustomOrders']);
 });
+
 // ← Email Verification Routes
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Http\Request;

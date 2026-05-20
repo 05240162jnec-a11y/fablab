@@ -39,9 +39,9 @@ export default function Home() {
     ];
 
     const services = [
-        { img: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&w=800&q=80', title: 'Custom Prototyping', desc: "From simple models to complex assemblies — we turn your sketches and CAD files into physical reality with precision." },
-        { img: 'https://images.unsplash.com/photo-1524178232363-1fb2b075b655?auto=format&fit=crop&w=800&q=80', title: 'Workshops & Training', desc: 'Expert-led, hands-on sessions covering CNC, laser cutting, 3D printing, electronics, and more.' },
-        { img: 'https://images.unsplash.com/photo-1531482615713-2afd69097998?auto=format&fit=crop&w=800&q=80', title: 'Collaborative Projects', desc: "Join interdisciplinary teams pushing the boundaries of what's possible in fabrication and design." },
+        { img: '../images/custom.jpg', title: 'Custom Prototyping', desc: "From simple models to complex assemblies — we turn your sketches and CAD files into physical reality with precision." },
+        { img: '../images/workshop.jpg', title: 'Workshops & Training', desc: 'Expert-led, hands-on sessions covering CNC, laser cutting, 3D printing, electronics, and more.' },
+        { img: '../images/collaborative.jpg', title: 'Collaborative Projects', desc: "Join interdisciplinary teams pushing the boundaries of what's possible in fabrication and design." },
     ];
 
     return (

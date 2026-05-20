@@ -38,6 +38,50 @@ class AssignedOrdersController extends Controller
     }
 
     /**
+ * Get ALL custom orders (read-only view for production team)
+ * Shows all orders regardless of status
+ */
+public function getAllCustomOrders()
+{
+    // ✅ Fetch all custom orders with relationships
+    $orders = CustomOrder::with(['user', 'assignedUser'])
+        ->orderBy('created_at', 'desc')
+        ->get();
+
+    // 📦 Format response for frontend
+    $formatted = $orders->map(function ($order) {
+        return [
+            'id' => $order->id,
+            'order_number' => $order->id, // Or use a custom order number field if you have one
+            'title' => $order->title ?? 'Untitled Order',
+            'description' => $order->description,
+            'quantity' => $order->quantity,
+            'design_image' => $order->design_image,
+            'status' => $order->status, // pending, paid, in_progress, completed
+            'estimated_price' => $order->estimated_price,
+            'user' => [
+                'id' => $order->user->id ?? null,
+                'name' => $order->user->name ?? 'Unknown User',
+                'email' => $order->user->email ?? null,
+            ],
+            'assigned_to' => $order->assigned_to,
+            'assigned_user' => $order->assignedUser ? [
+                'id' => $order->assignedUser->id,
+                'name' => $order->assignedUser->name,
+            ] : null,
+            'created_at' => $order->created_at->format('M d, Y'),
+            'updated_at' => $order->updated_at->format('M d, Y'),
+        ];
+    });
+
+    return response()->json([
+        'success' => true,
+        'data' => $formatted,
+        'total' => $formatted->count(),
+    ]);
+}
+
+    /**
      * Update order status (assigned -> in_progress -> completed)
      */
     public function updateStatus(Request $request, $id)

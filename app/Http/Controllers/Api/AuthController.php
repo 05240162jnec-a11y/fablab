@@ -185,11 +185,11 @@ class AuthController extends Controller
             ]);
         }
 
-        // ← 🔐 CRITICAL: Check if email is verified
-        if (!$user->hasVerifiedEmail()) {
+        // ← 🔐 CRITICAL: Check if email is verified (SKIP for admin & production_team)
+        if (!$user->hasVerifiedEmail() && !in_array($user->role, ['admin', 'production_team'])) {
             return response()->json([
                 'message' => 'Please verify your email first. Check your inbox for the verification link.',
-            ], 403);
+        ], 403);
         }
 
         // Create token

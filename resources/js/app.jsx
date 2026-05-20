@@ -63,6 +63,7 @@ import Learning from './Pages/User/Learning';
 
 // ✅ Production Team Pages (NEW!)
 import ProductionTeamDashboard from './Pages/ProductionTeam/Dashboard';
+import ProductionTeamCustomOrders from './Pages/ProductionTeam/CustomOrders';
 import ProductionTeamLayout from './Pages/ProductionTeam/ProductionTeamLayout';  // ← Add this!
 import AssignedOrders from './Pages/ProductionTeam/AssignedOrders';
 
@@ -124,8 +125,7 @@ root.render(
             {/* ✅ Production Team Routes - Using Layout for sidebar */}
             <Route path="/production-team" element={<ProductionTeamLayout />}>
                 <Route path="dashboard" element={<ProductionTeamDashboard />} />
-                <Route path="assigned-orders" element={<AssignedOrders />} />  {/* ← Added */}
-                {/* Add inventory, profile, etc. later */}
+                <Route path="custom-orders" element={<ProductionTeamCustomOrders />} /> {/* ← NEW */}
             </Route>
 
             {/* Placeholder routes */}

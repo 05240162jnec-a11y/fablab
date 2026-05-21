@@ -25,17 +25,19 @@ public function store(Request $request)
     $user = Auth::user();
     $machine = Machine::findOrFail($request->machine_id);
 
-    // ✅ GLOBAL TRAINING CHECK (Your intended logic):
-    // User must have completed at least ONE course to book ANY machine
-    $hasCompletedAnyCourse = $user->courses()
-        ->wherePivot('status', 'completed')
-        ->exists();
-    
-    if (!$hasCompletedAnyCourse) {
-        return response()->json([
-            'message' => 'You must complete at least one training course before booking machines. Please enroll in and complete a course first.',
-            'help' => 'Visit the Courses page to find available training sessions.',
-        ], 403); // 403 = Forbidden (not 422)
+    // ✅ UPDATED: Skip course check for production team
+    if ($user->role !== 'production_team') {
+        // Regular users must complete at least ONE course to book ANY machine
+        $hasCompletedAnyCourse = $user->courses()
+            ->wherePivot('status', 'completed')
+            ->exists();
+        
+        if (!$hasCompletedAnyCourse) {
+            return response()->json([
+                'message' => 'You must complete at least one training course before booking machines. Please enroll in and complete a course first.',
+                'help' => 'Visit the Courses page to find available training sessions.',
+            ], 403);
+        }
     }
 
     // Check if machine is available

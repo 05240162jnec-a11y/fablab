@@ -6,16 +6,12 @@ export default function AssignedOrders() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
 
-    // ✅ Fetch real orders from backend API
     useEffect(() => {
         const fetchOrders = async () => {
             try {
                 setLoading(true);
                 setError('');
-
-                // ✅ Use configured axios (interceptor adds Authorization header automatically)
                 const response = await axios.get('/production-team/assigned-orders');
-
                 setOrders(response.data.orders || []);
             } catch (err) {
                 console.error('Error fetching orders:', err);
@@ -28,7 +24,6 @@ export default function AssignedOrders() {
         fetchOrders();
     }, []);
 
-    // ✅ Update order status via API
     const handleStatusUpdate = async (orderId, newStatus) => {
         try {
             const response = await axios.post(
@@ -36,7 +31,6 @@ export default function AssignedOrders() {
                 { status: newStatus }
             );
 
-            // ✅ Update local state to reflect change immediately
             setOrders(prev => prev.map(order =>
                 order.id === orderId ? { ...order, status: newStatus } : order
             ));
@@ -71,7 +65,7 @@ export default function AssignedOrders() {
     if (loading) {
         return (
             <div className="p-6 flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
             </div>
         );
     }
@@ -92,61 +86,62 @@ export default function AssignedOrders() {
             <p className="text-sm text-gray-600 mb-6">Manage fabrication requests assigned to you by the admin.</p>
 
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                <table className="w-full text-left">
-                    <thead className="bg-gray-50 border-b border-gray-200">
-                        <tr>
-                            <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Order ID</th>
-                            <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Customer</th>
-                            <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Description</th>
-                            <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Deadline</th>
-                            <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Status</th>
-                            <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                        {orders.map(order => (
-                            <tr key={order.id} className="hover:bg-gray-50 transition">
-                                <td className="px-6 py-4 text-sm font-medium text-gray-900">#{String(order.id).padStart(3, '0')}</td>
-                                <td className="px-6 py-4 text-sm text-gray-700">{order.user_name}</td>
-                                <td className="px-6 py-4 text-sm text-gray-700 max-w-xs truncate" title={order.description}>
-                                    {order.description}
-                                </td>
-                                <td className="px-6 py-4 text-sm text-gray-700">{order.deadline || '—'}</td>
-                                <td className="px-6 py-4">{getStatusBadge(order.status)}</td>
-                                <td className="px-6 py-4">
-                                    <div className="flex gap-2">
-                                        {order.status === 'assigned' && (
-                                            <button
-                                                onClick={() => handleStatusUpdate(order.id, 'in_progress')}
-                                                className="px-3 py-1.5 text-xs font-medium text-white bg-amber-500 rounded-lg hover:bg-amber-600 transition shadow-sm"
-                                            >
-                                                ▶ Start
-                                            </button>
-                                        )}
-                                        {order.status === 'in_progress' && (
-                                            <button
-                                                onClick={() => handleStatusUpdate(order.id, 'completed')}
-                                                className="px-3 py-1.5 text-xs font-medium text-white bg-green-500 rounded-lg hover:bg-green-600 transition shadow-sm"
-                                            >
-                                                ✅ Complete
-                                            </button>
-                                        )}
-                                        {order.design_image && (
-                                            <a
-                                                href={`http://127.0.0.1:8000/storage/${order.design_image}`}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="px-3 py-1.5 text-xs font-medium text-purple-600 bg-purple-50 rounded-lg hover:bg-purple-100 transition"
-                                            >
-                                                👁 View Design
-                                            </a>
-                                        )}
-                                    </div>
-                                </td>
+                <div className="overflow-x-auto">
+                    <table className="w-full">
+                        <thead className="bg-gray-50 border-b border-gray-200">
+                            <tr>
+                                <th className="text-left py-3 px-6 text-xs font-semibold text-gray-600 uppercase tracking-wider">Order ID</th>
+                                <th className="text-left py-3 px-6 text-xs font-semibold text-gray-600 uppercase tracking-wider">Customer</th>
+                                <th className="text-left py-3 px-6 text-xs font-semibold text-gray-600 uppercase tracking-wider">Description</th>
+                                <th className="text-left py-3 px-6 text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
+                                <th className="text-center py-3 px-6 text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
                             </tr>
-                        ))}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200">
+                            {orders.map(order => (
+                                <tr key={order.id} className="hover:bg-gray-50 transition">
+                                    <td className="py-4 px-6 text-sm font-medium text-gray-900">#{String(order.id).padStart(3, '0')}</td>
+                                    <td className="py-4 px-6 text-sm text-gray-700">{order.user_name}</td>
+                                    <td className="py-4 px-6 text-sm text-gray-700 max-w-xs truncate" title={order.description}>
+                                        {order.description}
+                                    </td>
+                                    <td className="py-4 px-6">{getStatusBadge(order.status)}</td>
+                                    <td className="py-4 px-6">
+                                        <div className="flex items-center justify-center gap-2">
+                                            {order.status === 'assigned' && (
+                                                <button
+                                                    onClick={() => handleStatusUpdate(order.id, 'in_progress')}
+                                                    className="px-3 py-1.5 text-xs font-medium text-white bg-amber-500 rounded-lg hover:bg-amber-600 transition shadow-sm"
+                                                >
+                                                    ▶ Start
+                                                </button>
+                                            )}
+                                            {order.status === 'in_progress' && (
+                                                <button
+                                                    onClick={() => handleStatusUpdate(order.id, 'completed')}
+                                                    className="px-3 py-1.5 text-xs font-medium text-white bg-green-500 rounded-lg hover:bg-green-600 transition shadow-sm"
+                                                >
+                                                    ✅ Complete
+                                                </button>
+                                            )}
+                                            {order.design_image && (
+                                                <a
+                                                    href={`http://127.0.0.1:8000/storage/${order.design_image}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition"
+                                                >
+                                                    👁 View Design
+                                                </a>
+                                            )}
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+
                 {orders.length === 0 && (
                     <div className="text-center py-12 text-gray-500">
                         📭 No assigned orders yet. <br />

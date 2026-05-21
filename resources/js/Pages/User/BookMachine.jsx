@@ -12,6 +12,7 @@ export default function BookMachine() {
     const [showDetailsModal, setShowDetailsModal] = useState(false);
     const [showBookingModal, setShowBookingModal] = useState(false);
     const [loading, setLoading] = useState(true);
+    const [userRole, setUserRole] = useState(null); // ✅ Track user role
 
     // ✅ NEW: User enrollment state
     const [userEnrollments, setUserEnrollments] = useState([]);
@@ -25,6 +26,14 @@ export default function BookMachine() {
     });
     const [bookingSubmitting, setBookingSubmitting] = useState(false);
     const [bookingMessage, setBookingMessage] = useState('');
+
+    // ✅ Fetch user role on mount
+    useEffect(() => {
+        const user = JSON.parse(localStorage.getItem('user'));
+        if (user && user.role) {
+            setUserRole(user.role);
+        }
+    }, []);
 
     // Fetch machines and user enrollments on component mount
     useEffect(() => {
@@ -77,12 +86,15 @@ export default function BookMachine() {
         return userEnrollments.some(enrollment => enrollment.status === 'completed');
     };
 
-    // ✅ FIXED: Check if user CAN book machines (GLOBAL check, not machine-specific)
+    // ✅ FIXED: Check if user CAN book machines (Production team = always yes)
     const canBookMachine = (machine) => {
         // Machine must be available
         if (machine.status !== 'available') return false;
 
-        // ✅ User must have completed at least ONE course (any course)
+        // ✅ Production team can always book (no course restriction)
+        if (userRole === 'production_team') return true;
+
+        // ✅ Regular users must have completed at least ONE course
         return hasCompletedAnyCourse();
     };
 
@@ -92,7 +104,12 @@ export default function BookMachine() {
     };
 
     const handleBookNow = (machine) => {
-        if (!hasCompletedAnyCourse()) {
+        // ✅ Get user role directly from localStorage
+        const user = JSON.parse(localStorage.getItem('user'));
+        const userRole = user?.role;
+
+        // ✅ Skip course check for production team
+        if (userRole !== 'production_team' && !hasCompletedAnyCourse()) {
             alert('❌ You must complete at least one training course before booking machines. Please enroll in and complete a course first.');
             return;
         }
@@ -160,8 +177,12 @@ export default function BookMachine() {
         setBookingSubmitting(true);
         setBookingMessage('');
 
-        // ✅ Use GLOBAL check (not machine-specific)
-        if (!hasCompletedAnyCourse()) {
+        // ✅ Get user role directly from localStorage
+        const user = JSON.parse(localStorage.getItem('user'));
+        const userRole = user?.role;
+
+        // ✅ Skip course check for production team
+        if (userRole !== 'production_team' && !hasCompletedAnyCourse()) {
             setBookingMessage('❌ You must complete at least one training course before booking machines.');
             setBookingSubmitting(false);
             return;
@@ -198,8 +219,30 @@ export default function BookMachine() {
             // ✅ Close modal FIRST, then navigate using React Router
             setShowBookingModal(false);
             setTimeout(() => {
-                // ✅ Use React Router navigate (client-side, no 404)
-                navigate('/user/machines?tab=bookings', { replace: true });
+                
+                // ✅ Check if user is production team
+                const user = JSON.parse(localStorage.getItem('user'));
+                if (user?.role === 'production_team') {
+                    // Redirect to production team's booking page
+                    navigate('/production-team/book-machine?tab=my-bookings', { replace: true });
+                } else {
+                    // Regular users go to their page
+                    setBookingMessage('✅ ' + response.data.message);
+
+                    // ✅ Close modal FIRST, then navigate using React Router
+                    setShowBookingModal(false);
+                    setTimeout(() => {
+                        // ✅ Check if user is production team to redirect correctly
+                        const user = JSON.parse(localStorage.getItem('user'));
+                        if (user?.role === 'production_team') {
+                            // Redirect to production team's booking page and auto-switch to "My Bookings" tab
+                            navigate('/production-team/book-machine?tab=my-bookings', { replace: true });
+                        } else {
+                            // Regular users go to their page
+                            navigate('/user/machines?tab=bookings', { replace: true });
+                        }
+                    }, 300);
+                }
             }, 300);
         } catch (error) {
             console.error('Booking error:', error);
@@ -365,18 +408,18 @@ export default function BookMachine() {
                                     <div className="grid grid-cols-2 gap-3">
                                         <button
                                             onClick={() => handleBookNow(machine)}
-                                            // ✅ FIXED: Use GLOBAL canBookMachine logic
+                                            // ✅ FIXED: Use updated canBookMachine logic (production team = always enabled)
                                             disabled={!canBookMachine(machine)}
                                             className={`py-2.5 px-3 rounded-xl font-medium text-sm transition-all duration-200 flex items-center justify-center gap-1.5 shadow-sm ${canBookMachine(machine)
                                                 ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:from-blue-600 hover:to-indigo-700 hover:shadow-lg transform hover:-translate-y-0.5'
                                                 : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                                                 }`}
-                                            title={!hasCompletedAnyCourse() ? 'Complete a course first to unlock booking' : ''}
+                                            title={userRole === 'production_team' ? 'Production team - ready to book!' : !hasCompletedAnyCourse() ? 'Complete a course first to unlock booking' : ''}
                                         >
                                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                                             </svg>
-                                            {hasCompletedAnyCourse() ? 'Book Now' : 'Complete Course First'}
+                                            {userRole === 'production_team' ? 'Book Now' : (hasCompletedAnyCourse() ? 'Book Now' : 'Complete Course First')}
                                         </button>
 
                                         <button
@@ -505,8 +548,31 @@ export default function BookMachine() {
                                 </p>
                             </div>
 
-                            {/* ✅ FIXED: Training Status - GLOBAL check (any course completed) */}
-                            {!hasCompletedAnyCourse() ? (
+                            {/* ✅ FIXED: Training Status - Production team = always certified */}
+                            {userRole === 'production_team' ? (
+                                <div className="mb-6 p-5 bg-gradient-to-br from-purple-50 via-violet-50 to-fuchsia-50 rounded-2xl border-2 border-purple-100 shadow-sm">
+                                    <div className="flex items-start gap-4">
+                                        <div className="flex-shrink-0">
+                                            <div className="w-14 h-14 bg-gradient-to-br from-purple-100 to-violet-100 rounded-2xl flex items-center justify-center shadow-md">
+                                                <svg className="w-7 h-7 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                                                </svg>
+                                            </div>
+                                        </div>
+                                        <div className="flex-1">
+                                            <h4 className="text-lg font-bold text-purple-900 mb-2 flex items-center gap-2">
+                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                </svg>
+                                                Production Team Member ✅
+                                            </h4>
+                                            <p className="text-sm text-purple-700 leading-relaxed">
+                                                As a production team member, you're already certified to operate all Fab Lab equipment. You can book any available machine immediately.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : !hasCompletedAnyCourse() ? (
                                 <div className="mb-6 p-5 bg-gradient-to-br from-red-50 via-rose-50 to-orange-50 rounded-2xl border-2 border-red-100 shadow-sm">
                                     <div className="flex items-start gap-4">
                                         <div className="flex-shrink-0">

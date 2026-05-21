@@ -1,137 +1,473 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import Footer from '../../../Components/Footer';
 
 export default function Gallery() {
-    // Filter state
+    const [scrolled, setScrolled] = useState(false);
     const [activeFilter, setActiveFilter] = useState('All');
+    const [lightbox, setLightbox] = useState(null); // { img, title, year, idx }
 
-    // Gallery images data (placeholder - replace with actual images later)
+    useEffect(() => {
+        const onScroll = () => setScrolled(window.scrollY > 20);
+        window.addEventListener('scroll', onScroll);
+        return () => window.removeEventListener('scroll', onScroll);
+    }, []);
+
+    // Close lightbox on Escape key
+    useEffect(() => {
+        const onKey = (e) => {
+            if (e.key === 'Escape') setLightbox(null);
+            if (e.key === 'ArrowRight' && lightbox) navigateLightbox(1);
+            if (e.key === 'ArrowLeft' && lightbox) navigateLightbox(-1);
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, [lightbox]);
+
+    // Prevent body scroll when lightbox is open
+    useEffect(() => {
+        document.body.style.overflow = lightbox ? 'hidden' : '';
+        return () => { document.body.style.overflow = ''; };
+    }, [lightbox]);
+
+    // ── Gallery data — real Unsplash images ──
     const galleryImages = [
-        { id: 1, year: '2026', title: 'Gallery Image 1' },
-        { id: 2, year: '2026', title: 'Gallery Image 2' },
-        { id: 3, year: '2025', title: 'Gallery Image 3' },
-        { id: 4, year: '2025', title: 'Gallery Image 4' },
-        { id: 5, year: '2025', title: 'Gallery Image 5' },
-        { id: 6, year: '2024', title: 'Gallery Image 6' },
-        { id: 7, year: '2024', title: 'Gallery Image 7' },
-        { id: 8, year: '2024', title: 'Gallery Image 8' },
-        { id: 9, year: '2026', title: 'Gallery Image 9' },
-        { id: 10, year: '2026', title: 'Gallery Image 10' },
-        { id: 11, year: '2025', title: 'Gallery Image 11' },
-        { id: 12, year: '2024', title: 'Gallery Image 12' },
+        { id: 1, year: '2026', title: 'Workshop Session', category: 'Workshop', img: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&w=800&q=80', size: 'tall' },
+        { id: 2, year: '2026', title: '3D Printing Demo', category: 'Machines', img: 'https://images.unsplash.com/photo-1631549916768-4119b2e5f926?auto=format&fit=crop&w=800&q=80', size: 'normal' },
+        { id: 3, year: '2026', title: 'Laser Cutting Session', category: 'Machines', img: 'https://images.unsplash.com/photo-1565043589221-1a6fd9ae45c7?auto=format&fit=crop&w=800&q=80', size: 'wide' },
+        { id: 4, year: '2026', title: 'Team Collaboration', category: 'Events', img: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=800&q=80', size: 'normal' },
+        { id: 5, year: '2025', title: 'CNC Machining', category: 'Machines', img: 'https://images.unsplash.com/photo-1504328345606-18bbc8c9d7d1?auto=format&fit=crop&w=800&q=80', size: 'tall' },
+        { id: 6, year: '2025', title: 'Electronics Workstation', category: 'Workshop', img: 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=800&q=80', size: 'normal' },
+        { id: 7, year: '2025', title: 'Student Project Showcase', category: 'Events', img: 'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&w=800&q=80', size: 'wide' },
+        { id: 8, year: '2025', title: 'PCB Fabrication', category: 'Machines', img: 'https://images.unsplash.com/photo-1601524909162-ae8725290836?auto=format&fit=crop&w=800&q=80', size: 'normal' },
+        { id: 9, year: '2025', title: 'Training Day', category: 'Workshop', img: 'https://images.unsplash.com/photo-1581092160562-40aa08e78837?auto=format&fit=crop&w=800&q=80', size: 'normal' },
+        { id: 10, year: '2024', title: 'Annual Innovation Fair', category: 'Events', img: 'https://images.unsplash.com/photo-1531482615713-2afd69097998?auto=format&fit=crop&w=800&q=80', size: 'tall' },
+        { id: 11, year: '2024', title: 'Water Jet Cutting', category: 'Machines', img: 'https://images.unsplash.com/photo-1581092921461-eab62e97a782?auto=format&fit=crop&w=800&q=80', size: 'normal' },
+        { id: 12, year: '2024', title: 'Prototype Presentation', category: 'Events', img: 'https://images.unsplash.com/photo-1524178232363-1fb2b075b655?auto=format&fit=crop&w=800&q=80', size: 'wide' },
+        { id: 13, year: '2026', title: 'Design Sprint', category: 'Workshop', img: 'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&w=800&q=80', size: 'normal' },
+        { id: 14, year: '2025', title: '3D Scanner in Action', category: 'Machines', img: 'https://images.unsplash.com/photo-1617791160505-6f00504e3519?auto=format&fit=crop&w=800&q=80', size: 'normal' },
+        { id: 15, year: '2024', title: 'Open Lab Day', category: 'Events', img: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&w=800&q=80', size: 'normal' },
     ];
 
-    // Filter images based on selected year
-    const filteredImages = activeFilter === 'All' 
-        ? galleryImages 
-        : galleryImages.filter(img => img.year === activeFilter);
+    const years = ['All', '2026', '2025', '2024'];
+    const categories = ['All', 'Workshop', 'Machines', 'Events'];
+
+    const [catFilter, setCatFilter] = useState('All');
+
+    const filtered = galleryImages.filter(img => {
+        const matchYear = activeFilter === 'All' || img.year === activeFilter;
+        const matchCat = catFilter === 'All' || img.category === catFilter;
+        return matchYear && matchCat;
+    });
+
+    const navigateLightbox = (dir) => {
+        if (!lightbox) return;
+        const idx = (lightbox.idx + dir + filtered.length) % filtered.length;
+        setLightbox({ ...filtered[idx], idx });
+    };
+
+    const openLightbox = (img, idx) => setLightbox({ ...img, idx });
 
     return (
-        <div className="min-h-screen bg-gray-100">
-            {/* Navigation Bar */}
-            <nav className="bg-white shadow-sm sticky top-0 z-50">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex justify-between items-center h-20">
-                        {/* Logo */}
-                        <div className="flex items-center">
-                            <img 
-                                src="/images/logo.png" 
-                                alt="JNEC FABLAB Logo" 
-                                className="w-12 h-12 object-contain"
-                            />
-                            <div className="ml-3">
-                                <span className="block text-lg font-bold text-gray-800">JNEC Fab Lab</span>
-                                <span className="block text-xs text-gray-500">Fabrication Laboratory</span>
-                            </div>
-                        </div>
+        <div style={{ fontFamily: "'DM Sans', sans-serif", background: '#f9fafb', color: '#0d1117', overflowX: 'hidden' }}>
+            <style>{`
+                @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Playfair+Display:wght@700;800;900&display=swap');
 
-                        {/* Navigation Links */}
-                        <div className="hidden lg:flex items-center space-x-6">
-                            <a href="/" className="text-gray-600 hover:text-blue-600 transition">Home</a>
-                            <a href="/machines" className="text-gray-600 hover:text-blue-600 transition">Machines</a>
-                            <a href="/shop" className="text-gray-600 hover:text-blue-600 transition">Shop now</a>
-                            <a href="/training" className="text-gray-600 hover:text-blue-600 transition">Training</a>
-                            <a href="/projects" className="text-gray-600 hover:text-blue-600 transition">Projects</a>
-                            <a href="/about" className="text-gray-600 hover:text-blue-600 transition">About Us</a>
-                            <a href="/gallery" className="text-gray-800 font-medium hover:text-blue-600 transition">Gallery</a>
-                            <a href="/faq" className="text-gray-600 hover:text-blue-600 transition">FAQ</a>
-                        </div>
+                :root {
+                    --blue:    #0066FF;
+                    --blue-dk: #0051cc;
+                    --blue-lt: #e8f0fe;
+                    --ink:     #0d1117;
+                    --ink-2:   #1e2a3a;
+                    --muted:   #64748b;
+                    --border:  rgba(0,0,0,0.07);
+                    --card-bg: #ffffff;
+                    --offwhite:#f9fafb;
+                    --radius:  1rem;
+                    --radius-lg: 1.5rem;
+                }
+                * { box-sizing: border-box; margin: 0; padding: 0; }
 
-                        {/* Login Button */}
-                        <div>
-                            <Link 
-                                to="/login" 
-                                className="border-2 border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white font-medium py-2 px-6 rounded-lg transition duration-200"
-                            >
-                                Login
-                            </Link>
+                /* ── Nav ── */
+                .nav-root { position: fixed; top: 0; left: 0; width: 100%; z-index: 100; transition: all .35s ease; }
+                .nav-root.scrolled { background: rgba(255,255,255,0.92); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); box-shadow: 0 1px 0 rgba(0,0,0,0.06), 0 8px 32px rgba(0,0,0,0.06); }
+                .nav-root.top      { background: transparent; }
+                .nav-root.top .nav-brand-text .name { color: white; }
+                .nav-root.top .nav-brand-text .sub  { color: rgba(255,255,255,.6); }
+                .nav-root.top .nav-link             { color: rgba(255,255,255,.85); }
+                .nav-root.top .nav-link:hover       { color: white; }
+                .nav-root.top .nav-link.active      { color: white; }
+                .nav-root.top .nav-link.active::after { background: white; }
+                .nav-root.top .nav-login { background: rgba(255,255,255,.15); border-color: rgba(255,255,255,.3); color: white; }
+                .nav-root.top .nav-login:hover { background: rgba(255,255,255,.25); }
+                .nav-inner { max-width: 82rem; margin: 0 auto; padding: 0 2rem; display: flex; align-items: center; justify-content: space-between; height: 76px; }
+                .nav-logo-wrap { display: flex; align-items: center; gap: .875rem; text-decoration: none; }
+                .nav-logo-circle { width: 52px; height: 52px; border-radius: 50%; background: var(--blue); display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 18px rgba(0,102,255,0.35); overflow: hidden; flex-shrink: 0; transition: transform .3s, box-shadow .3s; }
+                .nav-logo-circle:hover { transform: scale(1.06); box-shadow: 0 6px 24px rgba(0,102,255,0.45); }
+                .nav-logo-circle img { width: 100%; height: 100%; object-fit: cover; }
+                .nav-logo-circle .logo-letter { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.5rem; color: white; }
+                .nav-brand-text .name { font-size: 1rem; font-weight: 700; color: var(--ink); display: block; line-height: 1.2; transition: color .3s; }
+                .nav-brand-text .sub  { font-size: .65rem; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: .1em; display: block; transition: color .3s; }
+                .nav-links { display: flex; gap: 1.75rem; align-items: center; }
+                .nav-link { font-size: .875rem; font-weight: 500; color: var(--ink-2); text-decoration: none; position: relative; padding-bottom: 2px; transition: color .2s; }
+                .nav-link::after { content: ''; position: absolute; bottom: -2px; left: 0; width: 0; height: 2px; background: var(--blue); border-radius: 2px; transition: width .25s; }
+                .nav-link:hover { color: var(--blue); }
+                .nav-link:hover::after { width: 100%; }
+                .nav-link.active { color: var(--blue); font-weight: 600; }
+                .nav-link.active::after { width: 100%; }
+                .nav-login { padding: .5rem 1.4rem; font-size: .875rem; font-weight: 600; color: var(--blue); background: var(--blue-lt); border: 1.5px solid rgba(0,102,255,.2); border-radius: 9999px; text-decoration: none; transition: all .25s; }
+                .nav-login:hover { background: var(--blue); color: white; border-color: var(--blue); box-shadow: 0 4px 16px rgba(0,102,255,.3); }
+
+                /* ── Hero ── */
+                .hero-section { position: relative; height: 65vh; min-height: 480px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+                .hero-bg { position: absolute; inset: 0; background-image: url('https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&w=1800&q=90'); background-size: cover; background-position: center; }
+                .hero-overlay { position: absolute; inset: 0; background: linear-gradient(165deg,rgba(5,10,25,.85) 0%,rgba(5,10,25,.6) 55%,rgba(0,60,160,.25) 100%); }
+                .hero-grid { position: absolute; inset: 0; opacity: .04; background-image: linear-gradient(rgba(255,255,255,.6) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.6) 1px,transparent 1px); background-size: 48px 48px; }
+                .hero-content { position: relative; z-index: 2; text-align: center; padding: 0 1.5rem; max-width: 760px; }
+                .hero-eyebrow { display: inline-flex; align-items: center; gap: .5rem; padding: .35rem 1rem; border-radius: 9999px; background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.2); color: rgba(255,255,255,.9); font-size: .72rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; margin-bottom: 1.5rem; backdrop-filter: blur(8px); animation: fadeUp .8s ease both; }
+                .hero-eyebrow-dot { width: 6px; height: 6px; border-radius: 50%; background: #4af; animation: pulse 2s ease-in-out infinite; }
+                @keyframes pulse { 0%,100%{ opacity:1;transform:scale(1); } 50%{ opacity:.4;transform:scale(1.5); } }
+                @keyframes fadeUp { from{opacity:0;transform:translateY(24px);} to{opacity:1;transform:translateY(0);} }
+                .hero-title { font-family: 'Playfair Display', serif; font-size: clamp(2.5rem,6vw,4.5rem); font-weight: 900; color: white; line-height: 1.08; letter-spacing: -.03em; margin-bottom: 1.25rem; animation: fadeUp .9s .15s ease both; }
+                .hero-title .accent { color: #5aacff; font-style: italic; }
+                .hero-sub { font-size: 1.05rem; color: rgba(255,255,255,.72); max-width: 460px; margin: 0 auto; line-height: 1.75; animation: fadeUp 1s .3s ease both; }
+
+                /* Hero stat strip */
+                .hero-stats { display: flex; justify-content: center; gap: 3rem; margin-top: 2.5rem; animation: fadeUp 1s .45s ease both; }
+                .hero-stat-num   { font-family: 'Playfair Display', serif; font-size: 1.75rem; font-weight: 900; color: white; display: block; line-height: 1; }
+                .hero-stat-label { font-size: .68rem; font-weight: 600; color: rgba(255,255,255,.45); letter-spacing: .1em; text-transform: uppercase; margin-top: .2rem; display: block; }
+
+                /* ── Controls bar ── */
+                .controls-bar { background: var(--card-bg); border-bottom: 1px solid var(--border); position: sticky; top: 76px; z-index: 50; box-shadow: 0 4px 24px rgba(0,0,0,.05); }
+                .controls-inner { max-width: 82rem; margin: 0 auto; padding: .9rem 2rem; display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; flex-wrap: wrap; }
+                .filter-group { display: flex; align-items: center; gap: .75rem; }
+                .filter-label { font-size: .72rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .1em; white-space: nowrap; }
+                .filter-pills { display: flex; gap: .4rem; flex-wrap: wrap; }
+                .pill { padding: .35rem .9rem; border-radius: 9999px; font-size: .78rem; font-weight: 600; cursor: pointer; border: 1.5px solid var(--border); background: var(--offwhite); color: var(--muted); transition: all .2s; }
+                .pill:hover  { border-color: var(--blue); color: var(--blue); }
+                .pill.active { background: var(--blue); color: white; border-color: var(--blue); box-shadow: 0 4px 12px rgba(0,102,255,.25); }
+                .results-count { font-size: .8rem; color: var(--muted); font-weight: 500; white-space: nowrap; }
+                .controls-sep { width: 1px; height: 24px; background: var(--border); flex-shrink: 0; }
+
+                /* ── Gallery section ── */
+                .gallery-section { padding: 4rem 0 6rem; }
+                .gallery-container { max-width: 82rem; margin: 0 auto; padding: 0 2rem; }
+
+                /* Masonry-style CSS columns */
+                .masonry-grid {
+                    columns: 3;
+                    column-gap: 1.5rem;
+                }
+                .masonry-item {
+                    break-inside: avoid;
+                    margin-bottom: 1.5rem;
+                    position: relative;
+                    border-radius: var(--radius-lg);
+                    overflow: hidden;
+                    cursor: pointer;
+                    box-shadow: 0 2px 12px rgba(0,0,0,.08);
+                    transition: transform .35s cubic-bezier(.4,0,.2,1), box-shadow .35s;
+                }
+                .masonry-item:hover { transform: translateY(-4px); box-shadow: 0 20px 48px rgba(0,0,0,.18); }
+                .masonry-item img {
+                    width: 100%; display: block;
+                    transition: transform .6s ease;
+                }
+                .masonry-item:hover img { transform: scale(1.04); }
+                /* Tall items */
+                .masonry-item.tall img { aspect-ratio: 2/3; object-fit: cover; }
+                .masonry-item.normal img { aspect-ratio: 4/3; object-fit: cover; }
+                .masonry-item.wide img  { aspect-ratio: 16/9; object-fit: cover; }
+
+                /* Overlay on hover */
+                .masonry-overlay {
+                    position: absolute; inset: 0;
+                    background: linear-gradient(to top, rgba(5,10,25,.82) 0%, transparent 55%);
+                    opacity: 0; transition: opacity .3s;
+                    display: flex; flex-direction: column; justify-content: flex-end;
+                    padding: 1.25rem 1.25rem 1rem;
+                }
+                .masonry-item:hover .masonry-overlay { opacity: 1; }
+                .overlay-year  { font-size: .68rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #5aacff; margin-bottom: .2rem; }
+                .overlay-title { font-family: 'Playfair Display', serif; font-size: 1rem; font-weight: 800; color: white; letter-spacing: -.01em; }
+                .overlay-cat   { font-size: .72rem; color: rgba(255,255,255,.6); margin-top: .2rem; }
+
+                /* Zoom icon */
+                .zoom-icon {
+                    position: absolute; top: .85rem; right: .85rem;
+                    width: 34px; height: 34px; border-radius: 50%;
+                    background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.25);
+                    display: flex; align-items: center; justify-content: center;
+                    color: white; opacity: 0; transition: opacity .3s;
+                    backdrop-filter: blur(4px);
+                }
+                .masonry-item:hover .zoom-icon { opacity: 1; }
+
+                /* ── Empty state ── */
+                .empty-state { text-align: center; padding: 5rem 0; color: var(--muted); }
+                .empty-state svg { color: #cbd5e1; margin: 0 auto 1.25rem; display: block; }
+                .empty-state h3 { font-family: 'Playfair Display', serif; font-size: 1.4rem; color: var(--ink); margin-bottom: .5rem; }
+
+                /* ── Lightbox ── */
+                .lightbox-backdrop {
+                    position: fixed; inset: 0; z-index: 999;
+                    background: rgba(5,10,25,.96);
+                    backdrop-filter: blur(16px);
+                    display: flex; align-items: center; justify-content: center;
+                    animation: fadeIn .25s ease;
+                }
+                @keyframes fadeIn { from{opacity:0;} to{opacity:1;} }
+                .lightbox-inner {
+                    position: relative; max-width: 90vw; max-height: 90vh;
+                    display: flex; flex-direction: column; align-items: center;
+                }
+                .lightbox-img {
+                    max-width: 88vw; max-height: 75vh;
+                    border-radius: var(--radius-lg);
+                    box-shadow: 0 32px 80px rgba(0,0,0,.6);
+                    object-fit: contain; display: block;
+                }
+                .lightbox-info { text-align: center; margin-top: 1.25rem; }
+                .lightbox-title { font-family: 'Playfair Display', serif; font-size: 1.25rem; font-weight: 800; color: white; }
+                .lightbox-meta  { font-size: .82rem; color: rgba(255,255,255,.5); margin-top: .25rem; }
+                .lb-close { position: absolute; top: -3rem; right: 0; width: 38px; height: 38px; border-radius: 50%; background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.2); display: flex; align-items: center; justify-content: center; color: white; cursor: pointer; font-size: 1.1rem; transition: background .2s; }
+                .lb-close:hover { background: rgba(255,255,255,.2); }
+                .lb-nav { position: absolute; top: 50%; transform: translateY(-50%); width: 44px; height: 44px; border-radius: 50%; background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.2); display: flex; align-items: center; justify-content: center; color: white; cursor: pointer; font-size: 1.2rem; transition: background .2s; }
+                .lb-nav:hover { background: var(--blue); border-color: var(--blue); }
+                .lb-prev { left: -3.5rem; }
+                .lb-next { right: -3.5rem; }
+                .lb-counter { position: absolute; bottom: -2.5rem; left: 50%; transform: translateX(-50%); font-size: .78rem; color: rgba(255,255,255,.4); font-weight: 600; white-space: nowrap; }
+
+                /* ── Footer ── */
+                .footer { background: #080d14; padding: 5rem 0 0; }
+                .footer-grid { display: grid; grid-template-columns: 1.5fr 1fr 1fr 1.4fr; gap: 3rem; padding-bottom: 3.5rem; }
+                .footer-brand-logo { width: 56px; height: 56px; border-radius: 50%; background: var(--blue); display: flex; align-items: center; justify-content: center; overflow: hidden; margin-bottom: 1.25rem; box-shadow: 0 4px 18px rgba(0,102,255,.35); }
+                .footer-brand-logo img { width: 100%; height: 100%; object-fit: cover; }
+                .footer-brand-logo .logo-letter { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.6rem; color: white; }
+                .footer-brand-name { font-size: 1.1rem; font-weight: 700; color: white; display: block; margin-bottom: .15rem; }
+                .footer-brand-sub  { font-size: .68rem; font-weight: 500; color: #475569; letter-spacing: .1em; text-transform: uppercase; display: block; margin-bottom: 1rem; }
+                .footer-about { font-size: .85rem; color: #64748b; line-height: 1.75; }
+                .footer-col-title { font-size: .7rem; font-weight: 700; color: #cbd5e1; letter-spacing: .12em; text-transform: uppercase; margin-bottom: 1.25rem; display: block; }
+                .footer-link { display: block; font-size: .875rem; color: #64748b; text-decoration: none; padding: .3rem 0; transition: color .2s; }
+                .footer-link:hover { color: white; }
+                .footer-contact-item { display: flex; align-items: flex-start; gap: .75rem; margin-bottom: 1rem; }
+                .footer-contact-item svg { flex-shrink: 0; margin-top: .15rem; }
+                .footer-contact-text { font-size: .85rem; color: #64748b; line-height: 1.6; }
+                .footer-bottom { border-top: 1px solid #1a2332; padding: 1.5rem 0; display: flex; justify-content: space-between; align-items: center; }
+                .footer-copy { font-size: .78rem; color: #334155; }
+                .footer-socials { display: flex; gap: .875rem; }
+                .social-btn { width: 38px; height: 38px; border-radius: 50%; background: #0d1a2e; border: 1px solid #1e2d42; display: flex; align-items: center; justify-content: center; color: #64748b; text-decoration: none; transition: all .25s; }
+                .social-btn:hover { background: var(--blue); border-color: var(--blue); color: white; transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,102,255,.35); }
+            `}</style>
+
+            {/* ════════ NAV ════════ */}
+            <nav className={`nav-root ${scrolled ? 'scrolled' : 'top'}`}>
+                <div className="nav-inner">
+                    <a href="/" className="nav-logo-wrap">
+                        <div className="nav-logo-circle">
+                            <img src="/images/logo.png" alt="JNEC Fab Lab"
+                                onError={e => { e.currentTarget.style.display = 'none'; e.currentTarget.nextSibling.style.display = 'flex'; }} />
+                            <span className="logo-letter" style={{ display: 'none' }}>J</span>
                         </div>
+                        <div className="nav-brand-text">
+                            <span className="name">JNEC Fab Lab</span>
+                            <span className="sub">Fabrication Laboratory</span>
+                        </div>
+                    </a>
+                    <div className="nav-links">
+                        <a href="/" className="nav-link">Home</a>
+                        <a href="/machines" className="nav-link">Machines</a>
+                        <a href="/shop" className="nav-link">Shop</a>
+                        <a href="/training" className="nav-link">Training</a>
+                        <a href="/projects" className="nav-link">Projects</a>
+                        <a href="/about" className="nav-link">About</a>
+                        <a href="/gallery" className="nav-link active">Gallery</a>
+                        <a href="/faq" className="nav-link">FAQ</a>
+                        <Link to="/login" className="nav-login">Login</Link>
                     </div>
                 </div>
             </nav>
 
-            {/* Hero Section */}
-            <section className="relative py-16 bg-gray-300">
-                <div className="absolute inset-0 bg-cover bg-center blur-sm" style={{
-                    backgroundImage: "url('/images/fablab-bg.jpg')"
-                }}>
-                    <div className="absolute inset-0 bg-white bg-opacity-30"></div>
-                </div>
-                <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-                    <h1 className="text-4xl font-bold text-white mb-4">Fab Lab Gallery</h1>
-                    <p className="text-lg text-white max-w-3xl mx-auto">
-                        Photos of activities, workshops and projects in the Fab Lab.
-                    </p>
-                </div>
-            </section>
-
-            {/* Filter Buttons */}
-            <section className="py-8 bg-gray-100">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex justify-center space-x-4">
-                        {['All', '2026', '2025', '2024'].map((year) => (
-                            <button
-                                key={year}
-                                onClick={() => setActiveFilter(year)}
-                                className={`px-6 py-2 rounded-lg text-sm font-medium transition duration-200 ${
-                                    activeFilter === year
-                                        ? 'bg-blue-400 text-white shadow-md'
-                                        : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-300'
-                                }`}
-                            >
-                                {year}
-                            </button>
-                        ))}
+            {/* ════════ HERO ════════ */}
+            <section className="hero-section">
+                <div className="hero-bg" />
+                <div className="hero-overlay" />
+                <div className="hero-grid" />
+                <div className="hero-content">
+                    <div className="hero-eyebrow">
+                        <span className="hero-eyebrow-dot" />
+                        Visual Archive
                     </div>
-                </div>
-            </section>
-
-            {/* Gallery Grid */}
-            <section className="py-12 bg-gray-100">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="grid md:grid-cols-3 gap-6">
-                        {filteredImages.map((image) => (
-                            <div 
-                                key={image.id} 
-                                className="bg-white rounded-lg shadow-md hover:shadow-lg transition duration-300 aspect-square flex items-center justify-center"
-                            >
-                                {/* Placeholder for actual images */}
-                                <div className="text-center p-8">
-                                    <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                                    </svg>
-                                    <p className="text-gray-500 text-sm">{image.title}</p>
-                                    <p className="text-gray-400 text-xs mt-2">{image.year}</p>
-                                </div>
+                    <h1 className="hero-title">
+                        Fab Lab <span className="accent">Gallery</span>
+                    </h1>
+                    <p className="hero-sub">
+                        Photos of activities, workshops, projects, and events captured inside the Fab Lab.
+                    </p>
+                    <div className="hero-stats">
+                        {[
+                            [galleryImages.length + '+', 'Photos'],
+                            ['3', 'Years'],
+                            ['3', 'Categories'],
+                        ].map(([n, l]) => (
+                            <div key={l} style={{ textAlign: 'center' }}>
+                                <span className="hero-stat-num">{n}</span>
+                                <span className="hero-stat-label">{l}</span>
                             </div>
                         ))}
                     </div>
                 </div>
             </section>
 
-            {/* Footer */}
-            <Footer />
+            {/* ════════ CONTROLS ════════ */}
+            <div className="controls-bar">
+                <div className="controls-inner">
+                    {/* Year filter */}
+                    <div className="filter-group">
+                        <span className="filter-label">Year</span>
+                        <div className="filter-pills">
+                            {years.map(y => (
+                                <button key={y} className={`pill ${activeFilter === y ? 'active' : ''}`}
+                                    onClick={() => setActiveFilter(y)}>{y}</button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="controls-sep" />
+
+                    {/* Category filter */}
+                    <div className="filter-group">
+                        <span className="filter-label">Type</span>
+                        <div className="filter-pills">
+                            {categories.map(c => (
+                                <button key={c} className={`pill ${catFilter === c ? 'active' : ''}`}
+                                    onClick={() => setCatFilter(c)}>{c}</button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <span className="results-count">{filtered.length} photo{filtered.length !== 1 ? 's' : ''}</span>
+                </div>
+            </div>
+
+            {/* ════════ GALLERY GRID ════════ */}
+            <section className="gallery-section">
+                <div className="gallery-container">
+                    {filtered.length === 0 ? (
+                        <div className="empty-state">
+                            <svg width="56" height="56" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            <h3>No photos found</h3>
+                            <p>Try a different year or category filter.</p>
+                        </div>
+                    ) : (
+                        <div className="masonry-grid">
+                            {filtered.map((img, idx) => (
+                                <div key={img.id} className={`masonry-item ${img.size}`}
+                                    onClick={() => openLightbox(img, idx)}>
+                                    <img src={img.img} alt={img.title} loading="lazy" />
+                                    <div className="masonry-overlay">
+                                        <span className="overlay-year">{img.year}</span>
+                                        <div className="overlay-title">{img.title}</div>
+                                        <div className="overlay-cat">{img.category}</div>
+                                    </div>
+                                    <div className="zoom-icon">
+                                        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
+                                        </svg>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </section>
+
+            {/* ════════ LIGHTBOX ════════ */}
+            {lightbox && (
+                <div className="lightbox-backdrop" onClick={() => setLightbox(null)}>
+                    <div className="lightbox-inner" onClick={e => e.stopPropagation()}>
+                        {/* Close */}
+                        <button className="lb-close" onClick={() => setLightbox(null)}>✕</button>
+
+                        {/* Prev / Next */}
+                        {filtered.length > 1 && (
+                            <>
+                                <button className="lb-nav lb-prev" onClick={() => navigateLightbox(-1)}>‹</button>
+                                <button className="lb-nav lb-next" onClick={() => navigateLightbox(1)}>›</button>
+                            </>
+                        )}
+
+                        <img src={lightbox.img} alt={lightbox.title} className="lightbox-img" />
+
+                        <div className="lightbox-info">
+                            <div className="lightbox-title">{lightbox.title}</div>
+                            <div className="lightbox-meta">{lightbox.category} · {lightbox.year}</div>
+                        </div>
+
+                        <div className="lb-counter">{lightbox.idx + 1} / {filtered.length}</div>
+                    </div>
+                </div>
+            )}
+
+            {/* ════════ FOOTER ════════ */}
+            <footer className="footer">
+                <div style={{ maxWidth: '82rem', margin: '0 auto', padding: '0 2rem' }}>
+                    <div className="footer-grid">
+                        <div>
+                            <div className="footer-brand-logo">
+                                <img src="/images/logo.png" alt="JNEC Fab Lab"
+                                    onError={e => { e.currentTarget.style.display = 'none'; e.currentTarget.nextSibling.style.display = 'block'; }} />
+                                <span className="logo-letter" style={{ display: 'none' }}>J</span>
+                            </div>
+                            <span className="footer-brand-name">JNEC Fab Lab</span>
+                            <span className="footer-brand-sub">Fabrication Laboratory</span>
+                            <p className="footer-about">The JNEC Fabrication Lab provides access to digital fabrication tools and hands-on training for students, faculty, and the wider community.</p>
+                        </div>
+                        <div>
+                            <span className="footer-col-title">Quick Links</span>
+                            {[['Machines', '/machines'], ['Training', '/training'], ['Projects', '/projects'], ['Gallery', '/gallery'], ['About Us', '/about'], ['FAQ', '/faq']].map(([l, h]) => (
+                                <a key={l} href={h} className="footer-link">{l}</a>
+                            ))}
+                        </div>
+                        <div>
+                            <span className="footer-col-title">Support</span>
+                            <a href="/faq" className="footer-link">FAQ</a>
+                            <a href="/contact" className="footer-link">Contact Us</a>
+                            <Link to="/login" className="footer-link">Login / Register</Link>
+                        </div>
+                        <div>
+                            <span className="footer-col-title">Contact</span>
+                            <div className="footer-contact-item">
+                                <svg width="16" height="16" fill="none" stroke="#475569" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                                <span className="footer-contact-text">Fab Lab, JNEC Campus, Dewathang, Samdrupjongkhar, Bhutan.</span>
+                            </div>
+                            <div className="footer-contact-item">
+                                <svg width="16" height="16" fill="none" stroke="#475569" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                                <span className="footer-contact-text">fablab@jnec.ac.in</span>
+                            </div>
+                            <div className="footer-contact-item">
+                                <svg width="16" height="16" fill="none" stroke="#475569" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
+                                <span className="footer-contact-text">+975 77653429</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="footer-bottom">
+                        <p className="footer-copy">© 2026 JNEC Fab Lab, Jigme Namgyel Engineering College. All rights reserved.</p>
+                        <div className="footer-socials">
+                            <a href="https://www.tiktok.com/@jnec_fablab" target="_blank" rel="noreferrer" className="social-btn" aria-label="TikTok">
+                                <svg width="15" height="15" fill="currentColor" viewBox="0 0 24 24"><path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-5.2 1.74 2.89 2.89 0 012.31-4.64 2.93 2.93 0 01.88.13V9.4a6.84 6.84 0 00-1-.05A6.33 6.33 0 005 20.1a6.34 6.34 0 0010.86-4.43v-7a8.16 8.16 0 004.77 1.52v-3.4a4.85 4.85 0 01-1-.1z" /></svg>
+                            </a>
+                            <a href="https://www.facebook.com/share/18HY9mpzDF/" target="_blank" rel="noreferrer" className="social-btn" aria-label="Facebook">
+                                <svg width="15" height="15" fill="currentColor" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" /></svg>
+                            </a>
+                            <a href="http://www.youtube.com/@JNECFabLab" target="_blank" rel="noreferrer" className="social-btn" aria-label="YouTube">
+                                <svg width="15" height="15" fill="currentColor" viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" /></svg>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </footer>
         </div>
     );
 }

@@ -66,6 +66,7 @@ import ProductionTeamDashboard from './Pages/ProductionTeam/Dashboard';
 import ProductionTeamCustomOrders from './Pages/ProductionTeam/CustomOrders';
 import ProductionTeamLayout from './Pages/ProductionTeam/ProductionTeamLayout';  // ← Add this!
 import AssignedOrders from './Pages/ProductionTeam/AssignedOrders';
+import ProductionTeamBookMachine from './Pages/ProductionTeam/BookMachine'; 
 
 // Create root element
 const root = createRoot(document.getElementById('app'));
@@ -125,7 +126,8 @@ root.render(
             {/* ✅ Production Team Routes - Using Layout for sidebar */}
             <Route path="/production-team" element={<ProductionTeamLayout />}>
                 <Route path="dashboard" element={<ProductionTeamDashboard />} />
-                <Route path="custom-orders" element={<ProductionTeamCustomOrders />} /> {/* ← NEW */}
+                <Route path="custom-orders" element={<ProductionTeamCustomOrders />} />
+                <Route path="book-machine" element={<ProductionTeamBookMachine />} /> {/* ✅ Only this one! */}
             </Route>
 
             {/* Placeholder routes */}

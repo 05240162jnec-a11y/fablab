@@ -44,6 +44,7 @@ import AdminGallery from './Pages/Admin/Gallery';
 import AdminFAQ from './Pages/Admin/FAQ';
 import AdminProducts from './Pages/Admin/Products';
 import AdminLayout from './Pages/Admin/AdminLayout';
+import AdminProfile from './Pages/Admin/Profile'; // ✅ ADD THIS LINE
 
 // User Pages
 import UserDashboard from './Pages/User/Dashboard';
@@ -66,7 +67,9 @@ import ProductionTeamDashboard from './Pages/ProductionTeam/Dashboard';
 import ProductionTeamCustomOrders from './Pages/ProductionTeam/CustomOrders';
 import ProductionTeamLayout from './Pages/ProductionTeam/ProductionTeamLayout';  // ← Add this!
 import AssignedOrders from './Pages/ProductionTeam/AssignedOrders';
-import ProductionTeamBookMachine from './Pages/ProductionTeam/BookMachine'; 
+import ProductionTeamBookMachine from './Pages/ProductionTeam/BookMachine';
+import ProductionTeamInventory from './Pages/ProductionTeam/Inventory'; // ✅ Add this
+import ProductionTeamProfile from './Pages/ProductionTeam/Profile'; // ✅ Add this 
 
 // Create root element
 const root = createRoot(document.getElementById('app'));
@@ -101,6 +104,7 @@ root.render(
             {/* Admin Pages - Using Layout for persistent sidebar */}
             <Route path="/admin" element={<AdminLayout />}>
                 <Route path="dashboard" element={<AdminDashboard />} />
+                <Route path="profile" element={<AdminProfile />} /> {/* ✅ ADD THIS LINE */}
                 <Route path="users" element={<Users />} />
                 <Route path="production-team" element={<ProductionTeam />} />
                 <Route path="machines" element={<AdminMachines />} />
@@ -128,6 +132,8 @@ root.render(
                 <Route path="dashboard" element={<ProductionTeamDashboard />} />
                 <Route path="custom-orders" element={<ProductionTeamCustomOrders />} />
                 <Route path="book-machine" element={<ProductionTeamBookMachine />} /> {/* ✅ Only this one! */}
+                <Route path="inventory" element={<ProductionTeamInventory />} />
+                <Route path="profile" element={<ProductionTeamProfile />} />
             </Route>
 
             {/* Placeholder routes */}

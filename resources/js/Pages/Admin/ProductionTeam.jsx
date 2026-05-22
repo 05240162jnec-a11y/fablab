@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react'; // ✅ Added useRef
 import axios from 'axios';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom'; // ✅ Added useNavigate
 
 export default function ProductionTeam() {
 
@@ -16,6 +16,12 @@ export default function ProductionTeam() {
 
     // Dropdown States
     const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+
+    // ✅ Profile Dropdown State
+    const [admin, setAdmin] = useState(null);
+    const [showDropdown, setShowDropdown] = useState(false);
+    const dropdownRef = useRef(null);
+    const navigate = useNavigate(); // ✅ Added navigate
 
     // Add/Edit Form State
     const [formState, setFormState] = useState({
@@ -35,14 +41,53 @@ export default function ProductionTeam() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    // ✅ Fetch members from API (using unified auth_token)
+    // ✅ Fetch admin data from localStorage
+    useEffect(() => {
+        const storedAdmin = JSON.parse(localStorage.getItem('admin'));
+        if (storedAdmin) {
+            setAdmin(storedAdmin);
+        }
+    }, []);
+
+    // ✅ Close dropdown when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+                setShowDropdown(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    // ✅ Profile click handler
+    const handleProfileClick = () => {
+        setShowDropdown(false);
+        navigate('/admin/profile');
+    };
+
+    // ✅ Logout handler
+    const handleLogout = () => {
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('admin_token');
+        localStorage.removeItem('user');
+        localStorage.removeItem('admin');
+        localStorage.removeItem('admin_dashboard_data');
+        localStorage.removeItem('user_data');
+        localStorage.removeItem('enrollments');
+        localStorage.removeItem('courses');
+        localStorage.removeItem('bookings');
+        localStorage.removeItem('machines');
+        sessionStorage.clear();
+        navigate('/login', { replace: true });
+    };
+
+    // ✅ Fetch members from API
     const fetchMembers = async () => {
         try {
             setLoading(true);
-            // ✅ Use auth_token (unified token for all roles)
             const token = localStorage.getItem('auth_token');
 
-            // ✅ FIXED: Removed /api prefix - axios baseURL handles it
             const response = await axios.get('/admin/production-team', {
                 headers: {
                     'Accept': 'application/json',
@@ -50,13 +95,11 @@ export default function ProductionTeam() {
                 },
                 params: {
                     search: searchTerm || null,
-                    // status filter removed - users table doesn't have status column yet
                 }
             });
 
             if (response.data.success) {
                 setMembers(response.data.data);
-                // ✅ Handle stats that might not include 'available'/'assigned'
                 setStats({
                     total: response.data.stats?.total || 0,
                     available: response.data.stats?.available || 0,
@@ -75,21 +118,19 @@ export default function ProductionTeam() {
     // Fetch on mount and when filters change
     useEffect(() => {
         fetchMembers();
-    }, [searchTerm]); // Removed statusFilter dependency since we don't filter by status yet
+    }, [searchTerm]);
 
-    // ✅ Safe filter members (handle missing fields)
+    // ✅ Safe filter members
     const filteredMembers = members.filter(member => {
         const name = member?.name || '';
         const email = member?.email || '';
         const matchesSearch = name.toLowerCase().includes(searchTerm.toLowerCase()) ||
             email.toLowerCase().includes(searchTerm.toLowerCase());
-        // Skip status filter for now since users table doesn't have it
         return matchesSearch;
     });
 
-    // ✅ Safe status badge class (handle missing status field)
+    // ✅ Safe status badge class
     const getStatusBadgeClass = (status) => {
-        // If status doesn't exist, default to 'available' style
         const safeStatus = status || 'available';
         switch (safeStatus) {
             case 'assigned':
@@ -101,13 +142,13 @@ export default function ProductionTeam() {
         }
     };
 
-    // ✅ SAFE capitalize function - handles undefined/null
+    // ✅ SAFE capitalize function
     const capitalize = (str) => {
         if (!str || typeof str !== 'string') return '—';
         return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
     };
 
-    // ✅ Safe get initials (handle missing name)
+    // ✅ Safe get initials
     const getInitials = (name) => {
         if (!name || typeof name !== 'string') return 'PT';
         return name.split(' ').map(n => n?.[0] || '').join('').substring(0, 2).toUpperCase();
@@ -159,9 +200,7 @@ export default function ProductionTeam() {
     // Confirm Delete
     const confirmDelete = async () => {
         try {
-            // ✅ Use auth_token
             const token = localStorage.getItem('auth_token');
-            // ✅ FIXED: Removed /api prefix
             await axios.delete(`/admin/production-team/${selectedMember.id}`, {
                 headers: {
                     'Accept': 'application/json',
@@ -171,7 +210,7 @@ export default function ProductionTeam() {
 
             setShowDeleteModal(false);
             setSelectedMember(null);
-            fetchMembers(); // Refresh list
+            fetchMembers();
             alert('✅ Team member deleted successfully!');
         } catch (err) {
             console.error('Delete error:', err);
@@ -179,19 +218,15 @@ export default function ProductionTeam() {
         }
     };
 
-    // Save Add - ✅ Updated for merged User model
+    // Save Add
     const handleSaveAdd = async () => {
         try {
-            // ✅ Use auth_token
             const token = localStorage.getItem('auth_token');
-            // ✅ FIXED: Removed /api prefix
             await axios.post('/admin/production-team', {
                 name: formState.name,
                 email: formState.email,
                 phone: formState.phone,
                 gender: formState.gender,
-                // status and assigned_task removed - not in users table yet
-                // Backend will auto-generate password and send email
             }, {
                 headers: {
                     'Accept': 'application/json',
@@ -201,30 +236,25 @@ export default function ProductionTeam() {
             });
 
             setShowAddModal(false);
-            fetchMembers(); // Refresh list
+            fetchMembers();
             alert('✅ Team member added successfully! Credentials sent to their email.');
         } catch (err) {
             console.error('Add error:', err);
-            // Show detailed error if available
             const errorMsg = err.response?.data?.message || 'Failed to add team member';
             alert('❌ ' + errorMsg);
         }
     };
 
-    // Save Edit - ✅ Updated for merged User model
+    // Save Edit
     const handleSaveEdit = async () => {
         try {
-            // ✅ Use auth_token
             const token = localStorage.getItem('auth_token');
-            // ✅ FIXED: Removed /api prefix
             await axios.put(`/admin/production-team/${selectedMember.id}`, {
                 name: formState.name,
                 email: formState.email,
                 phone: formState.phone,
                 gender: formState.gender,
-                // Only send password if user filled it in
                 ...(formState.password && { password: formState.password, password_confirmation: formState.confirmPassword }),
-                // status and assigned_task removed - not in users table yet
             }, {
                 headers: {
                     'Accept': 'application/json',
@@ -235,7 +265,7 @@ export default function ProductionTeam() {
 
             setShowEditModal(false);
             setSelectedMember(null);
-            fetchMembers(); // Refresh list
+            fetchMembers();
             alert('✅ Team member updated successfully!');
         } catch (err) {
             console.error('Update error:', err);
@@ -255,11 +285,9 @@ export default function ProductionTeam() {
 
     return (
         <div className="flex min-h-screen bg-gray-50">
-
-
             {/* Main Content */}
             <div className="flex-1">
-                {/* Top Header */}
+                {/* ✅ Top Header - Updated with clickable avatar, no notification */}
                 <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
                     <div className="flex items-center justify-between px-6 py-4">
                         <div>
@@ -267,22 +295,56 @@ export default function ProductionTeam() {
                             <p className="text-sm text-gray-600">Manage production team members and assignments</p>
                         </div>
 
-                        {/* Right Side */}
-                        <div className="flex items-center gap-4">
-                            {/* Notifications */}
-                            <button className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                                <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                                </svg>
-                                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+                        {/* ✅ Right Side - Profile Dropdown (No notification icon) */}
+                        <div className="relative" ref={dropdownRef}>
+                            <button
+                                onClick={() => setShowDropdown(!showDropdown)}
+                                className="flex items-center gap-3 focus:outline-none"
+                            >
+                                <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-cyan-600 rounded-full flex items-center justify-center text-white font-bold text-sm cursor-pointer hover:shadow-md transition-shadow">
+                                    {admin?.name?.charAt(0) || 'A'}
+                                </div>
                             </button>
 
-                            {/* Admin Profile */}
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-cyan-600 rounded-full flex items-center justify-center text-white font-bold text-sm">
-                                    AD
+                            {/* ✅ Dropdown Menu */}
+                            {showDropdown && (
+                                <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-50 animate-fade-in">
+                                    {/* Admin Info */}
+                                    <div className="px-4 py-3 border-b border-gray-100">
+                                        <p className="font-semibold text-gray-900">{admin?.name || 'Admin'}</p>
+                                        <p className="text-sm text-gray-500 truncate">{admin?.email || 'admin@fablab.jnec.rub.edu.bt'}</p>
+                                        <span className="inline-flex mt-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                                            Administrator
+                                        </span>
+                                    </div>
+
+                                    {/* Menu Items */}
+                                    <div className="py-1">
+                                        <button
+                                            onClick={handleProfileClick}
+                                            className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors flex items-center gap-2"
+                                        >
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                            </svg>
+                                            My Profile
+                                        </button>
+                                    </div>
+
+                                    {/* Logout */}
+                                    <div className="py-1 border-t border-gray-100">
+                                        <button
+                                            onClick={handleLogout}
+                                            className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2"
+                                        >
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                                            </svg>
+                                            Logout
+                                        </button>
+                                    </div>
                                 </div>
-                            </div>
+                            )}
                         </div>
                     </div>
                 </header>
@@ -322,9 +384,6 @@ export default function ProductionTeam() {
                                         className="pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:w-64"
                                     />
                                 </div>
-
-                                {/* ✅ Status Filter Removed - users table doesn't have status column yet */}
-                                {/* We can add it back later if you add a 'status' column to users table */}
                             </div>
                         </div>
 
@@ -369,7 +428,6 @@ export default function ProductionTeam() {
                                                     </div>
                                                 </td>
                                                 <td className="py-4 px-4">
-                                                    {/* ✅ Show role instead of status */}
                                                     <span className="inline-flex px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700 border border-purple-200">
                                                         {capitalize(member?.role) || 'Production Team'}
                                                     </span>
@@ -417,11 +475,10 @@ export default function ProductionTeam() {
                 </main>
             </div>
 
-            {/* ===== ADD TEAM MEMBER MODAL - UPDATED FOR USER MODEL ===== */}
+            {/* ===== ADD TEAM MEMBER MODAL ===== */}
             {showAddModal && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
-                        {/* Modal Header */}
                         <div className="flex items-center justify-between p-6 border-b border-gray-100">
                             <div>
                                 <h3 className="text-xl font-bold text-gray-900">Add New Team Member</h3>
@@ -434,9 +491,7 @@ export default function ProductionTeam() {
                             </button>
                         </div>
 
-                        {/* Modal Content */}
                         <div className="p-6 space-y-4">
-                            {/* Full Name */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
                                 <input
@@ -448,7 +503,6 @@ export default function ProductionTeam() {
                                 />
                             </div>
 
-                            {/* Email */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
                                 <input
@@ -460,7 +514,6 @@ export default function ProductionTeam() {
                                 />
                             </div>
 
-                            {/* Phone & Gender */}
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
@@ -486,7 +539,6 @@ export default function ProductionTeam() {
                                 </div>
                             </div>
 
-                            {/* Info Message */}
                             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                                 <p className="text-sm text-blue-800">
                                     🔐 A random password will be generated and sent to <strong>{formState.email || 'member email'}</strong>
@@ -494,7 +546,6 @@ export default function ProductionTeam() {
                             </div>
                         </div>
 
-                        {/* Modal Footer */}
                         <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-100">
                             <button
                                 onClick={closeAllModals}
@@ -513,11 +564,10 @@ export default function ProductionTeam() {
                 </div>
             )}
 
-            {/* ===== VIEW TEAM MEMBER MODAL - UPDATED FOR USER MODEL ===== */}
+            {/* ===== VIEW TEAM MEMBER MODAL ===== */}
             {showViewModal && selectedMember && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
-                        {/* Modal Header */}
                         <div className="flex items-center justify-between p-6 border-b border-gray-100">
                             <div>
                                 <h3 className="text-xl font-bold text-gray-900">Team Member Details</h3>
@@ -530,9 +580,7 @@ export default function ProductionTeam() {
                             </button>
                         </div>
 
-                        {/* Modal Content */}
                         <div className="p-6">
-                            {/* Member Info */}
                             <div className="flex items-center gap-4 mb-6">
                                 <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-lg">
                                     {getInitials(selectedMember?.name)}
@@ -547,7 +595,6 @@ export default function ProductionTeam() {
 
                             <hr className="border-gray-100 mb-6" />
 
-                            {/* Details */}
                             <div className="space-y-4">
                                 <div className="flex items-start gap-3">
                                     <svg className="w-5 h-5 text-gray-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -579,7 +626,6 @@ export default function ProductionTeam() {
                                     </div>
                                 </div>
 
-                                {/* Email Verified Status */}
                                 <div className="flex items-start gap-3">
                                     <svg className="w-5 h-5 text-gray-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -594,7 +640,6 @@ export default function ProductionTeam() {
                             </div>
                         </div>
 
-                        {/* Modal Footer */}
                         <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-100">
                             <button
                                 onClick={() => { closeAllModals(); handleDeleteMember(selectedMember); }}
@@ -610,11 +655,10 @@ export default function ProductionTeam() {
                 </div>
             )}
 
-            {/* ===== EDIT TEAM MEMBER MODAL - UPDATED FOR USER MODEL ===== */}
+            {/* ===== EDIT TEAM MEMBER MODAL ===== */}
             {showEditModal && selectedMember && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
-                        {/* Modal Header */}
                         <div className="flex items-center justify-between p-6 border-b border-gray-100">
                             <div>
                                 <h3 className="text-xl font-bold text-gray-900">Edit Team Member</h3>
@@ -627,9 +671,7 @@ export default function ProductionTeam() {
                             </button>
                         </div>
 
-                        {/* Modal Content */}
                         <div className="p-6 space-y-4">
-                            {/* Full Name */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
                                 <input
@@ -640,7 +682,6 @@ export default function ProductionTeam() {
                                 />
                             </div>
 
-                            {/* Email */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
                                 <input
@@ -651,7 +692,6 @@ export default function ProductionTeam() {
                                 />
                             </div>
 
-                            {/* Phone & Gender */}
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
@@ -676,7 +716,6 @@ export default function ProductionTeam() {
                                 </div>
                             </div>
 
-                            {/* Password Change (Optional) */}
                             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
                                 <p className="text-sm text-yellow-800 font-medium mb-2">🔐 Change Password (Optional)</p>
                                 <input
@@ -697,7 +736,6 @@ export default function ProductionTeam() {
                             </div>
                         </div>
 
-                        {/* Modal Footer */}
                         <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-100">
                             <button
                                 onClick={closeAllModals}
@@ -720,7 +758,6 @@ export default function ProductionTeam() {
             {showDeleteModal && selectedMember && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full">
-                        {/* Modal Header */}
                         <div className="p-6 text-center">
                             <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
                                 <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -733,7 +770,6 @@ export default function ProductionTeam() {
                             </p>
                         </div>
 
-                        {/* Modal Footer */}
                         <div className="flex items-center justify-center gap-3 p-6 border-t border-gray-100">
                             <button
                                 onClick={closeAllModals}

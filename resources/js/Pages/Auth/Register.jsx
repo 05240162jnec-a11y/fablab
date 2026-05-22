@@ -19,14 +19,14 @@ export default function Register() {
         year_of_study: '',
     });
 
-    const [countryCode, setCountryCode] = useState('BT'); // Default to Bhutan
-
-    // UI state
+    const [countryCode, setCountryCode] = useState('BT');
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState('');
     const [errors, setErrors] = useState({});
+    const [showPassword, setShowPwd] = useState(false);
+    const [showConfirm, setShowConfirm] = useState(false);
 
-    // List of common weak passwords to reject
+    // Weak password list
     const weakPasswords = [
         'password', 'password123', '12345678', '123456789', 'qwerty',
         'abc123', 'monkey', '1234567', 'letmein', 'trustno1',
@@ -35,186 +35,85 @@ export default function Register() {
         '123123', 'admin', 'welcome', 'jennifer', 'login'
     ];
 
-    // Validate phone number
     const validatePhone = (phone, country) => {
-        // Bhutanese numbers: 17xxxxxx or 77xxxxxx (8 digits)
-        if (country === 'BT') {
-            const bhutanPattern = /^(17|77)\d{6}$/;
-            return bhutanPattern.test(phone);
-        }
-
-        // International numbers: digits only, 7-15 digits
-        const internationalPattern = /^\d{7,15}$/;
-        return internationalPattern.test(phone);
+        if (country === 'BT') return /^(17|77)\d{6}$/.test(phone);
+        return /^\d{7,15}$/.test(phone);
     };
 
-    // Validate password strength
     const validatePassword = (password) => {
-        const errors = [];
-
-        // Check minimum length
-        if (password.length < 8) {
-            errors.push('at least 8 characters');
-        }
-
-        // Check uppercase
-        if (!/[A-Z]/.test(password)) {
-            errors.push('one uppercase letter');
-        }
-
-        // Check lowercase
-        if (!/[a-z]/.test(password)) {
-            errors.push('one lowercase letter');
-        }
-
-        // Check numbers
-        if (!/[0-9]/.test(password)) {
-            errors.push('one number');
-        }
-
-        // Check special characters
-        if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
-            errors.push('one special character (!@#$%^&*)');
-        }
-
-        // Check weak passwords
-        if (weakPasswords.includes(password.toLowerCase())) {
-            errors.push('password is too common');
-        }
-
-        return errors;
+        const errs = [];
+        if (password.length < 8) errs.push('at least 8 characters');
+        if (!/[A-Z]/.test(password)) errs.push('one uppercase letter');
+        if (!/[a-z]/.test(password)) errs.push('one lowercase letter');
+        if (!/[0-9]/.test(password)) errs.push('one number');
+        if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) errs.push('one special character (!@#$%^&*)');
+        if (weakPasswords.includes(password.toLowerCase())) errs.push('password is too common');
+        return errs;
     };
 
-    // Handle input changes
     const handleChange = (e) => {
         const { name, value } = e.target;
-        setFormData(prev => ({
-            ...prev,
-            [name]: value
-        }));
+        setFormData(prev => ({ ...prev, [name]: value }));
 
-        // Clear errors when user types
-        if (errors[name]) {
-            setErrors(prev => ({
-                ...prev,
-                [name]: ''
-            }));
-        }
-        // Clear department/year when Outsider is selected
-        if (name === 'role' && value === 'outsider') {
-            setFormData(prev => ({
-                ...prev,
-                department: '',
-                year_of_study: ''
-            }));
-        }
+        if (errors[name]) setErrors(prev => ({ ...prev, [name]: '' }));
 
-        // Validate phone number in real-time
+        if (name === 'role' && value === 'outsider')
+            setFormData(prev => ({ ...prev, department: '', year_of_study: '', role: value }));
+
         if (name === 'phone') {
             if (value && !validatePhone(value, countryCode)) {
-                if (countryCode === 'BT') {
-                    setErrors(prev => ({
-                        ...prev,
-                        phone: 'Bhutan numbers must be exactly 8 digits (17XXXXXX or 77XXXXXX)'
-                    }));
-                } else {
-                    setErrors(prev => ({
-                        ...prev,
-                        phone: 'Phone number must be 7-15 digits'
-                    }));
-                }
-            } else {
                 setErrors(prev => ({
                     ...prev,
-                    phone: ''
+                    phone: countryCode === 'BT'
+                        ? 'Bhutan numbers must be exactly 8 digits (17XXXXXX or 77XXXXXX)'
+                        : 'Phone number must be 7-15 digits'
                 }));
+            } else {
+                setErrors(prev => ({ ...prev, phone: '' }));
             }
         }
 
-        // Validate password in real-time
-        if (name === 'password') {
-            if (value) {
-                const pwdErrors = validatePassword(value);
-                if (pwdErrors.length > 0) {
-                    setErrors(prev => ({
-                        ...prev,
-                        password: 'Password must contain: ' + pwdErrors.join(', ')
-                    }));
-                } else {
-                    setErrors(prev => ({
-                        ...prev,
-                        password: ''
-                    }));
-                }
-            }
+        if (name === 'password' && value) {
+            const pwdErrs = validatePassword(value);
+            setErrors(prev => ({
+                ...prev,
+                password: pwdErrs.length > 0 ? 'Password must contain: ' + pwdErrs.join(', ') : ''
+            }));
         }
     };
 
-    // Handle form submission
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
         setMessage('');
         setErrors({});
 
-        // Validate phone before submission
         if (!validatePhone(formData.phone, countryCode)) {
-            if (countryCode === 'BT') {
-                setErrors({
-                    phone: ['Bhutan numbers must be exactly 8 digits (17XXXXXX or 77XXXXXX)']
-                });
-            } else {
-                setErrors({
-                    phone: ['Phone number must be 7-15 digits']
-                });
-            }
+            setErrors({
+                phone: [countryCode === 'BT'
+                    ? 'Bhutan numbers must be exactly 8 digits (17XXXXXX or 77XXXXXX)'
+                    : 'Phone number must be 7-15 digits']
+            });
             setLoading(false);
             return;
         }
 
-        // Validate password before submission
-        const pwdErrors = validatePassword(formData.password);
-        if (pwdErrors.length > 0) {
-            setErrors({
-                password: ['Password must contain: ' + pwdErrors.join(', ')]
-            });
+        const pwdErrs = validatePassword(formData.password);
+        if (pwdErrs.length > 0) {
+            setErrors({ password: ['Password must contain: ' + pwdErrs.join(', ')] });
             setLoading(false);
             return;
         }
 
         try {
             const response = await axios.post('http://127.0.0.1:8000/api/register', formData);
-
-            // Show success message
             setMessage('✅ ' + response.data.message);
-
-            // Reset form
-            setFormData({
-                name: '',
-                email: '',
-                password: '',
-                password_confirmation: '',
-                gender: '',
-                phone: '',
-                role: 'student',
-                department: '',
-                year_of_study: '',
-            });
-
-            // Optional: Redirect to login after 2 seconds
-            setTimeout(() => {
-                navigate('/login');
-            }, 2000);
-
+            setFormData({ name: '', email: '', password: '', password_confirmation: '', gender: '', phone: '', role: 'student', department: '', year_of_study: '' });
+            setTimeout(() => navigate('/login'), 2000);
         } catch (error) {
-            console.error('Registration error:', error);
-
             if (error.response?.status === 422) {
-                if (error.response.data.errors) {
-                    setErrors(error.response.data.errors);
-                } else if (error.response.data.message) {
-                    setMessage('❌ ' + error.response.data.message);
-                }
+                if (error.response.data.errors) setErrors(error.response.data.errors);
+                else setMessage('❌ ' + error.response.data.message);
             } else if (error.response?.status === 403) {
                 setMessage('❌ ' + error.response.data.message);
             } else {
@@ -226,272 +125,354 @@ export default function Register() {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 flex">
-            {/* Left Side - Image with Blur */}
-            <div className="hidden lg:flex lg:w-1/2 relative">
-                <div
-                    className="absolute inset-0 bg-cover bg-center blur-sm"
-                    style={{
-                        backgroundImage: "url('/images/fablab-bg.jpg')"
-                    }}
-                >
+        <div style={styles.root}>
+            <style>{`
+                @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap');
+                @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
 
-                </div>
-                <div className="relative z-10 flex flex-col justify-center items-center text-white p-12">
-                    <h1 className="text-4xl font-bold mb-4">FAB-Lab System</h1>
-                    <p className="text-lg text-center max-w-md">
-                        Access machines, enroll in training, and manage your bookings easily.
-                    </p>
-                </div>
-            </div>
+                * { box-sizing: border-box; margin: 0; padding: 0; }
 
-            {/* Right Side - Form */}
-            <div className="w-full lg:w-1/2 flex items-center justify-center p-8">
-                <div className="w-full max-w-md">
+                .reg-bg-overlay {
+                    position: fixed; inset: 0;
+                    background: url('/images/fablab-bg.jpg') no-repeat center center / cover;
+                    z-index: 0;
+                }
+                .reg-bg-overlay::after {
+                    content: '';
+                    position: absolute; inset: 0;
+                    background: rgba(0,0,0,0.58);
+                }
+
+                /* ── Glass card ── */
+                .glass-card {
+                    background: rgba(255,255,255,0.10);
+                    backdrop-filter: blur(18px);
+                    -webkit-backdrop-filter: blur(18px);
+                    border-radius: 22px;
+                    border: 1px solid rgba(255,255,255,0.18);
+                    box-shadow: 0 8px 40px rgba(0,0,0,0.45);
+                    padding: 32px 28px;
+                    width: 100%;
+                    max-width: 460px;
+                }
+
+                /* Logo circle */
+                .logo-circle {
+                    width: 88px; height: 88px; border-radius: 50%;
+                    background: rgba(255,255,255,0.95);
+                    display: flex; align-items: center; justify-content: center;
+                    margin: 0 auto 22px;
+                    box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+                    overflow: hidden;
+                    padding: 8px;
+                }
+                .logo-circle img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+                .logo-circle .logo-fallback {
+                    font-family: 'Playfair Display', serif;
+                    font-size: 2rem; font-weight: 900; color: #0066FF;
+                }
+
+                /* Tabs */
+                .tabs { display: flex; justify-content: center; gap: 2rem; margin-bottom: 18px; }
+                .tab-link {
+                    color: rgba(255,255,255,0.65);
+                    font-size: 1rem; font-weight: 500;
+                    text-decoration: none;
+                    padding-bottom: 6px;
+                    border-bottom: 2px solid transparent;
+                    transition: all .25s;
+                }
+                .tab-link:hover { color: white; }
+                .tab-link.active { color: white; border-bottom-color: white; }
+
+                /* Form title */
+                .form-title {
+                    color: white; text-align: center;
+                    font-size: 1.15rem; font-weight: 600;
+                    margin-bottom: 18px; letter-spacing: .01em;
+                }
+
+                /* Message banner */
+                .msg-banner {
+                    padding: 10px 14px; border-radius: 10px;
+                    font-size: .85rem; font-weight: 500;
+                    margin-bottom: 14px;
+                    backdrop-filter: blur(8px);
+                }
+                .msg-success { background: rgba(22,163,74,.25); color: #bbf7d0; border: 1px solid rgba(22,163,74,.35); }
+                .msg-error   { background: rgba(239,68,68,.2);  color: #fecaca; border: 1px solid rgba(239,68,68,.3); }
+
+                /* Input field */
+                .reg-label {
+                    display: block; color: rgba(255,255,255,.88);
+                    font-size: .82rem; font-weight: 500; margin-bottom: 6px;
+                }
+                .reg-input, .reg-select {
+                    width: 100%; padding: 11px 36px 11px 14px;
+                    background: rgba(255,255,255,.14);
+                    border: 1px solid rgba(255,255,255,.2);
+                    border-radius: 9px;
+                    color: white; font-size: .9rem;
+                    font-family: 'DM Sans', sans-serif;
+                    outline: none; transition: all .25s;
+                }
+                .reg-input::placeholder { color: rgba(255,255,255,.5); }
+                .reg-input:focus, .reg-select:focus {
+                    background: rgba(255,255,255,.22);
+                    border-color: rgba(255,255,255,.45);
+                    box-shadow: 0 0 0 3px rgba(255,255,255,.08);
+                }
+                .reg-input.err, .reg-select.err {
+                    border-color: rgba(252,165,165,.7);
+                    box-shadow: 0 0 0 3px rgba(239,68,68,.12);
+                }
+                .reg-select {
+                    appearance: none; -webkit-appearance: none;
+                    cursor: pointer;
+                    color: rgba(255,255,255,.85);
+                }
+                .reg-select option { background: #1a1a2e; color: white; }
+
+                /* Select wrapper */
+                .sel-wrap { position: relative; }
+                .sel-wrap .chev {
+                    position: absolute; right: 13px; top: 50%; transform: translateY(-50%);
+                    color: rgba(255,255,255,.55); pointer-events: none; font-size: .7rem;
+                }
+
+                /* Password wrapper */
+                .pwd-wrap { position: relative; }
+                .pwd-wrap .reg-input { padding-right: 42px; }
+                .eye-btn {
+                    position: absolute; right: 13px; top: 50%; transform: translateY(-50%);
+                    background: none; border: none; cursor: pointer;
+                    color: rgba(255,255,255,.55); font-size: .95rem;
+                    transition: color .2s; padding: 0;
+                }
+                .eye-btn:hover { color: white; }
+
+                /* Phone row */
+                .phone-row { display: flex; gap: 10px; }
+                .phone-row .country-col { width: 44%; flex-shrink: 0; }
+                .phone-row .num-col { flex: 1; }
+                .phone-row .reg-input { padding-right: 14px; }
+
+                /* Help text */
+                .help-txt { color: rgba(255,255,255,.45); font-size: .72rem; margin-top: 4px; }
+                .err-txt  { color: #fca5a5; font-size: .75rem; margin-top: 5px; font-weight: 500; }
+                .ok-txt   { color: #86efac; font-size: .75rem; margin-top: 5px; font-weight: 500; }
+
+                /* Field gap */
+                .field { margin-bottom: 13px; }
+
+                /* Submit btn */
+                .reg-btn {
+                    width: 100%; padding: 13px;
+                    background: #0066FF;
+                    border: none; border-radius: 11px;
+                    color: white; font-size: 1rem; font-weight: 700;
+                    cursor: pointer; margin-top: 8px;
+                    font-family: 'DM Sans', sans-serif;
+                    box-shadow: 0 4px 18px rgba(0,102,255,.45);
+                    transition: all .3s;
+                }
+                .reg-btn:hover:not(:disabled) {
+                    background: #0051cc;
+                    transform: translateY(-2px);
+                    box-shadow: 0 8px 28px rgba(0,102,255,.55);
+                }
+                .reg-btn:disabled { background: rgba(255,255,255,.2); cursor: not-allowed; color: rgba(255,255,255,.5); box-shadow: none; }
+            `}</style>
+
+            {/* Background */}
+            <div className="reg-bg-overlay" />
+
+            {/* Card */}
+            <div style={styles.wrap}>
+                <div className="glass-card">
+
                     {/* Logo */}
-                    <div className="text-center mb-8">
-                        <img
-                            src="/images/logo.png"
-                            alt="JNEC FABLAB Logo"
-                            className="mx-auto mb-4 w-16 h-16 rounded-full object-cover border-2 border-gray-200"
-                        />
+                    <div className="logo-circle">
+                        <img src="/images/logo.png" alt="JNEC Fab Lab"
+                            onError={e => { e.currentTarget.style.display = 'none'; e.currentTarget.nextSibling.style.display = 'flex'; }} />
+                        <span className="logo-fallback" style={{ display: 'none' }}>J</span>
                     </div>
 
-                    {/* Navigation Tabs */}
-                    <div className="flex justify-center mb-8">
-                        <a href="/login" className="px-6 py-2 text-gray-600 font-medium hover:text-gray-800 transition">
-                            Login
-                        </a>
-                        <a href="/register" className="px-6 py-2 text-gray-800 font-medium border-b-2 border-gray-800">
-                            Register
-                        </a>
+                    {/* Tabs */}
+                    <div className="tabs">
+                        <Link to="/login" className="tab-link">Login</Link>
+                        <Link to="/register" className="tab-link active">Register</Link>
                     </div>
 
-                    {/* Form Card */}
-                    <div className="bg-white rounded-2xl shadow-sm p-8">
-                        <h2 className="text-2xl font-semibold text-gray-800 mb-6">Create Account</h2>
+                    <div className="form-title">Create Account</div>
 
-                        {message && (
-                            <div className={`mb-4 p-3 rounded-lg text-sm ${message.includes('✅')
-                                ? 'bg-green-100 text-green-800'
-                                : 'bg-red-100 text-red-800'
-                                }`}>
-                                {message}
-                            </div>
-                        )}
+                    {/* Message */}
+                    {message && (
+                        <div className={`msg-banner ${message.startsWith('✅') ? 'msg-success' : 'msg-error'}`}>
+                            {message}
+                        </div>
+                    )}
 
-                        <form onSubmit={handleSubmit}>
-                            {/* Name */}
-                            <div className="mb-4">
-                                <input
-                                    type="text"
-                                    name="name"
-                                    value={formData.name}
-                                    onChange={handleChange}
-                                    placeholder="Full Name"
-                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent placeholder-gray-500 italic"
-                                    required
-                                />
-                                {errors.name && (
-                                    <p className="mt-1 text-sm text-red-600">{errors.name[0]}</p>
-                                )}
-                            </div>
+                    <form onSubmit={handleSubmit}>
 
-                            {/* Gender */}
-                            <div className="mb-4">
-                                <select
-                                    name="gender"
-                                    value={formData.gender}
-                                    onChange={handleChange}
-                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent"
-                                    required
-                                >
-                                    <option value="">Select Gender</option>
-                                    <option value="male">Male</option>
-                                    <option value="female">Female</option>
-                                    <option value="other">Other</option>
-                                </select>
-                                {errors.gender && (
-                                    <p className="mt-1 text-sm text-red-600">{errors.gender[0]}</p>
-                                )}
-                            </div>
+                        {/* Full Name */}
+                        <div className="field">
+                            <input type="text" name="name" value={formData.name} onChange={handleChange}
+                                placeholder="Full Name" required
+                                className={`reg-input ${errors.name ? 'err' : ''}`} />
+                            {errors.name && <p className="err-txt">{Array.isArray(errors.name) ? errors.name[0] : errors.name}</p>}
+                        </div>
 
-                            {/* Phone Number */}
-                            <div className="mb-4">
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Phone Number
-                                </label>
-                                <div className="flex gap-2">
-                                    {/* Country Dropdown */}
+                        {/* Gender */}
+                        <div className="field sel-wrap">
+                            <select name="gender" value={formData.gender} onChange={handleChange} required
+                                className={`reg-select ${errors.gender ? 'err' : ''}`}>
+                                <option value="" disabled>Select Gender</option>
+                                <option value="male">Male</option>
+                                <option value="female">Female</option>
+                                <option value="other">Other</option>
+                            </select>
+                            <i className="fas fa-chevron-down chev" />
+                            {errors.gender && <p className="err-txt">{Array.isArray(errors.gender) ? errors.gender[0] : errors.gender}</p>}
+                        </div>
+
+                        {/* Phone */}
+                        <div className="field">
+                            <label className="reg-label">Phone Number</label>
+                            <div className="phone-row">
+                                <div className="country-col">
                                     <CountrySelect
                                         value={countryCode}
                                         onChange={setCountryCode}
                                         error={errors.phone}
                                     />
-
-                                    {/* Phone Input */}
-                                    <input
-                                        type="tel"
-                                        name="phone"
-                                        value={formData.phone}
-                                        onChange={handleChange}
+                                </div>
+                                <div className="num-col">
+                                    <input type="tel" name="phone" value={formData.phone} onChange={handleChange}
                                         placeholder={countryCode === 'BT' ? '17XXXXXX' : 'Phone number'}
-                                        className={`flex-1 px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:border-transparent placeholder-gray-500 italic ${errors.phone
-                                            ? 'border-red-500 focus:ring-red-400'
-                                            : 'border-gray-300 focus:ring-blue-400'
-                                            }`}
-                                        required
-                                    />
+                                        className={`reg-input ${errors.phone ? 'err' : ''}`} required />
                                 </div>
-
-                                {/* Error Message */}
-                                {errors.phone && (
-                                    <p className="mt-1 text-sm text-red-600">{errors.phone}</p>
-                                )}
-
-                                {/* Helper Text */}
-                                {!errors.phone && (
-                                    <p className="mt-1 text-xs text-gray-400 italic">
-                                        {countryCode === 'BT'
-                                            ? 'Bhutan numbers must be exactly 8 digits (17XXXXXX or 77XXXXXX)'
-                                            : 'Enter your phone number without country code'}
-                                    </p>
-                                )}
                             </div>
+                            {errors.phone
+                                ? <p className="err-txt">{Array.isArray(errors.phone) ? errors.phone[0] : errors.phone}</p>
+                                : <p className="help-txt">{countryCode === 'BT'
+                                    ? 'Bhutan numbers must be exactly 8 digits (17XXXXXX or 77XXXXXX)'
+                                    : 'Enter your phone number without country code'}</p>
+                            }
+                        </div>
 
-                            {/* Email */}
-                            <div className="mb-4">
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Email Address
-                                </label>
-                                <input
-                                    type="email"
-                                    name="email"
-                                    value={formData.email}
-                                    onChange={handleChange}
-                                    placeholder="your.email@example.com"
-                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent placeholder-gray-500 italic"
-                                    required
-                                />
-                                {errors.email && (
-                                    <p className="mt-1 text-sm text-red-600">{errors.email[0]}</p>
-                                )}
-                            </div>
+                        {/* Email */}
+                        <div className="field">
+                            <input type="email" name="email" value={formData.email} onChange={handleChange}
+                                placeholder="Email Address" required
+                                className={`reg-input ${errors.email ? 'err' : ''}`} />
+                            {errors.email && <p className="err-txt">{Array.isArray(errors.email) ? errors.email[0] : errors.email}</p>}
+                        </div>
 
-                            {/* Role */}
-                            <div className="mb-4">
-                                <select
-                                    name="role"
-                                    value={formData.role}
-                                    onChange={handleChange}
-                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent"
-                                    required
-                                >
-                                    <option value="student">Student</option>
-                                    <option value="faculty">Faculty</option>
-                                    <option value="outsider">Outsider</option>
+                        {/* Role */}
+                        <div className="field sel-wrap">
+                            <select name="role" value={formData.role} onChange={handleChange} required
+                                className={`reg-select ${errors.role ? 'err' : ''}`}>
+                                <option value="student">Student</option>
+                                <option value="faculty">Faculty</option>
+                                <option value="outsider">Outsider</option>
+                            </select>
+                            <i className="fas fa-chevron-down chev" />
+                            {errors.role && <p className="err-txt">{Array.isArray(errors.role) ? errors.role[0] : errors.role}</p>}
+                        </div>
+
+                        {/* Department — only for student / faculty */}
+                        {(formData.role === 'student' || formData.role === 'faculty') && (
+                            <div className="field sel-wrap">
+                                <select name="department" value={formData.department} onChange={handleChange}
+                                    className={`reg-select ${errors.department ? 'err' : ''}`}>
+                                    <option value="" disabled>Select Department</option>
+                                    <option value="civil">Civil Engineering &amp; Surveying Team</option>
+                                    <option value="eee">Electrical and Electronics Engineering Team</option>
+                                    <option value="mech">Mechanical Engineering Team</option>
+                                    <option value="it">Information Technology Team</option>
+                                    <option value="hum">Humanities and Management Team</option>
                                 </select>
-                                {errors.role && (
-                                    <p className="mt-1 text-sm text-red-600">{errors.role[0]}</p>
-                                )}
+                                <i className="fas fa-chevron-down chev" />
+                                {errors.department && <p className="err-txt">{Array.isArray(errors.department) ? errors.department[0] : errors.department}</p>}
                             </div>
+                        )}
 
-                            {/* Department - Only show for Student and Faculty */}
-                            {(formData.role === 'student' || formData.role === 'faculty') && (
-                                <div className="mb-4">
-                                    <input
-                                        type="text"
-                                        name="department"
-                                        value={formData.department}
-                                        onChange={handleChange}
-                                        placeholder="Department"
-                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent placeholder-gray-500 italic"
-                                    />
-                                    {errors.department && (
-                                        <p className="mt-1 text-sm text-red-600">{errors.department[0]}</p>
-                                    )}
-                                </div>
+                        {/* Year — only for student / faculty */}
+                        {(formData.role === 'student' || formData.role === 'faculty') && (
+                            <div className="field sel-wrap">
+                                <select name="year_of_study" value={formData.year_of_study} onChange={handleChange}
+                                    className={`reg-select ${errors.year_of_study ? 'err' : ''}`}>
+                                    <option value="">Select Year</option>
+                                    <option value="1">1st Year</option>
+                                    <option value="2">2nd Year</option>
+                                    <option value="3">3rd Year</option>
+                                    <option value="4">4th Year</option>
+                                </select>
+                                <i className="fas fa-chevron-down chev" />
+                                {errors.year_of_study && <p className="err-txt">{Array.isArray(errors.year_of_study) ? errors.year_of_study[0] : errors.year_of_study}</p>}
+                            </div>
+                        )}
+
+                        {/* Password */}
+                        <div className="field">
+                            <div className="pwd-wrap">
+                                <input type={showPassword ? 'text' : 'password'}
+                                    name="password" value={formData.password} onChange={handleChange}
+                                    placeholder="Password" required
+                                    className={`reg-input ${errors.password ? 'err' : ''}`} />
+                                <button type="button" className="eye-btn"
+                                    onClick={() => setShowPwd(p => !p)}>
+                                    <i className={`fas ${showPassword ? 'fa-eye' : 'fa-eye-slash'}`} />
+                                </button>
+                            </div>
+                            {errors.password && <p className="err-txt">{Array.isArray(errors.password) ? errors.password[0] : errors.password}</p>}
+                        </div>
+
+                        {/* Confirm Password */}
+                        <div className="field">
+                            <div className="pwd-wrap">
+                                <input type={showConfirm ? 'text' : 'password'}
+                                    name="password_confirmation" value={formData.password_confirmation} onChange={handleChange}
+                                    placeholder="Confirm Password" required
+                                    className={`reg-input ${formData.password && formData.password_confirmation && formData.password !== formData.password_confirmation ? 'err' : ''}`} />
+                                <button type="button" className="eye-btn"
+                                    onClick={() => setShowConfirm(p => !p)}>
+                                    <i className={`fas ${showConfirm ? 'fa-eye' : 'fa-eye-slash'}`} />
+                                </button>
+                            </div>
+                            {formData.password && formData.password_confirmation && (
+                                <p className={formData.password === formData.password_confirmation ? 'ok-txt' : 'err-txt'}>
+                                    {formData.password === formData.password_confirmation ? '✓ Passwords match' : '✗ Passwords do not match'}
+                                </p>
                             )}
+                        </div>
 
-                            {/* Year of Study - Only show for Student and Faculty */}
-                            {(formData.role === 'student' || formData.role === 'faculty') && (
-                                <div className="mb-4">
-                                    <select
-                                        name="year_of_study"
-                                        value={formData.year_of_study}
-                                        onChange={handleChange}
-                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent"
-                                    >
-                                        <option value="">Select Year</option>
-                                        <option value="1">1st Year</option>
-                                        <option value="2">2nd Year</option>
-                                        <option value="3">3rd Year</option>
-                                        <option value="4">4th Year</option>
-                                    </select>
-                                    {errors.year_of_study && (
-                                        <p className="mt-1 text-sm text-red-600">{errors.year_of_study[0]}</p>
-                                    )}
-                                </div>
-                            )}
-
-                            {/* Password */}
-                            <div className="mb-4">
-                                <input
-                                    type="password"
-                                    name="password"
-                                    value={formData.password}
-                                    onChange={handleChange}
-                                    placeholder="Password"
-                                    className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:border-transparent placeholder-gray-500 italic ${errors.password
-                                        ? 'border-red-500 focus:ring-red-400'
-                                        : 'border-gray-300 focus:ring-blue-400'
-                                        }`}
-                                    required
-                                />
-                                {/* ← ONLY show error message, NO helper text */}
-                                {errors.password && (
-                                    <p className="mt-1 text-sm text-red-600">{errors.password}</p>
-                                )}
-                            </div>
-
-                            {/* Confirm Password */}
-                            <div className="mb-6">
-                                <input
-                                    type="password"
-                                    name="password_confirmation"
-                                    value={formData.password_confirmation}
-                                    onChange={handleChange}
-                                    placeholder="Confirm Password"
-                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent placeholder-gray-500 italic"
-                                    required
-                                />
-                                {formData.password && formData.password_confirmation && (
-                                    <p className={`mt-1 text-xs ${formData.password === formData.password_confirmation
-                                        ? 'text-green-600'
-                                        : 'text-red-600'
-                                        }`}>
-                                        {formData.password === formData.password_confirmation
-                                            ? '✓ Passwords match'
-                                            : '✗ Passwords do not match'}
-                                    </p>
-                                )}
-                            </div>
-
-                            {/* Submit Button */}
-                            <button
-                                type="submit"
-                                disabled={loading}
-                                className={`w-full py-3 px-6 rounded-lg font-medium text-white transition duration-200 ${loading
-                                    ? 'bg-gray-400 cursor-not-allowed'
-                                    : 'bg-blue-400 hover:bg-blue-500'
-                                    }`}
-                            >
-                                {loading ? 'Registering...' : 'Register'}
-                            </button>
-                        </form>
-                    </div>
+                        {/* Submit */}
+                        <button type="submit" disabled={loading} className="reg-btn">
+                            {loading ? 'Registering…' : 'Register'}
+                        </button>
+                    </form>
                 </div>
             </div>
         </div>
     );
 }
+
+const styles = {
+    root: {
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        position: 'relative',
+        fontFamily: "'DM Sans', sans-serif",
+        padding: '20px',
+    },
+    wrap: {
+        position: 'relative',
+        zIndex: 2,
+        width: '100%',
+        maxWidth: '460px',
+    },
+};

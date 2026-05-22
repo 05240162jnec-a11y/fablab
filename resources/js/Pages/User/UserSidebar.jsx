@@ -9,7 +9,7 @@ export default function UserSidebar({ onLogout }) {
     const isActive = (path) => {
         // For tabbed pages, check if the path starts with the base URL
         if (path.includes('/shop-orders') || path.includes('/machines') ||
-            path.includes('/learning') || path.includes('/explore') || path.includes('/support')) {
+            path.includes('/learning')) {
             return location.pathname.startsWith(path);
         }
         return location.pathname === path;
@@ -110,50 +110,8 @@ export default function UserSidebar({ onLogout }) {
                     <span className="font-medium">Learning</span>
                 </Link>
 
-                {/* ✅ Explore (Tabbed Page) */}
-                <Link
-                    to="/user/explore"
-                    className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${isActive('/user/explore')
-                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20'
-                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
-                        }`}
-                >
-                    <svg className={`w-5 h-5 ${isActive('/user/explore') ? 'text-white' : 'text-slate-500 group-hover:text-blue-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
-                    </svg>
-                    <span className="font-medium">Explore</span>
-                </Link>
-
-                {/* ✅ Support (Tabbed Page) */}
-                <Link
-                    to="/user/support"
-                    className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${isActive('/user/support')
-                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20'
-                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
-                        }`}
-                >
-                    <svg className={`w-5 h-5 ${isActive('/user/support') ? 'text-white' : 'text-slate-500 group-hover:text-blue-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span className="font-medium">Support</span>
-                </Link>
-
                 {/* Divider */}
                 <div className="my-4 border-t border-slate-700/50"></div>
-
-                {/* My Transactions */}
-                <Link
-                    to="/user/transactions"
-                    className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${isActive('/user/transactions')
-                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20'
-                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
-                        }`}
-                >
-                    <svg className={`w-5 h-5 ${isActive('/user/transactions') ? 'text-white' : 'text-slate-500 group-hover:text-blue-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                    </svg>
-                    <span className="font-medium">My Transactions</span>
-                </Link>
 
                 {/* My Profile */}
                 <Link
@@ -174,7 +132,7 @@ export default function UserSidebar({ onLogout }) {
             <div className="p-4 border-t border-slate-700/50 bg-slate-900/50">
                 <button
                     onClick={handleLogout}
-                    className="flex items-center gap-3 w-full px-4 py-3 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-xl transition-all text-left font-medium"
+                    className="flex items-center gap-3 w-full px-4 py-3 text-white-400 hover:text-white-300 hover:bg-white-500/10 rounded-xl transition-all text-left font-medium"
                 >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />

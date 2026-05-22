@@ -110,6 +110,11 @@ Route::prefix('admin')->group(function () {
         Route::post('/faq', [App\Http\Controllers\Api\FAQController::class, 'store']);
         Route::put('/faq/{id}', [App\Http\Controllers\Api\FAQController::class, 'update']);
         Route::delete('/faq/{id}', [App\Http\Controllers\Api\FAQController::class, 'destroy']);
+
+        // ✅ CORRECT: Just use /profile since we're already in admin prefix
+        Route::get('/profile', [\App\Http\Controllers\Api\Admin\ProfileController::class, 'show']);
+        Route::post('/profile/update', [\App\Http\Controllers\Api\Admin\ProfileController::class, 'update']);
+        Route::post('/profile/change-password', [\App\Http\Controllers\Api\Admin\ProfileController::class, 'changePassword']);
         
         // ✅ Admin Dashboard Stats
         Route::get('/dashboard/stats', [App\Http\Controllers\Api\Admin\DashboardController::class, 'index']);
@@ -181,6 +186,10 @@ Route::middleware('auth:sanctum')->prefix('production-team')->group(function () 
     Route::post('/assigned-orders/{id}/update-status', [\App\Http\Controllers\Api\ProductionTeam\AssignedOrdersController::class, 'updateStatus']);
     // ✅ NEW: Get all custom orders (read-only)
     Route::get('/custom-orders', [\App\Http\Controllers\Api\ProductionTeam\AssignedOrdersController::class, 'getAllCustomOrders']);
+    // ✅ NEW: Profile routes
+    Route::get('/profile', [\App\Http\Controllers\Api\ProductionTeam\ProfileController::class, 'show']);
+    Route::post('/profile/update', [\App\Http\Controllers\Api\ProductionTeam\ProfileController::class, 'update']);
+    Route::post('/profile/change-password', [\App\Http\Controllers\Api\ProductionTeam\ProfileController::class, 'changePassword']);
 });
 
 // ← Email Verification Routes

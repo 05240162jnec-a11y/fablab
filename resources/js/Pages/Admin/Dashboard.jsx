@@ -1,10 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 export default function Dashboard() {
-    
-    // API Data States
     const [stats, setStats] = useState({
         totalUsers: 0,
         activeBookings: 0,
@@ -14,8 +12,51 @@ export default function Dashboard() {
     const [recentActivity, setRecentActivity] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    
-    // Fetch dashboard data on component mount
+    // Profile dropdown state
+    const [admin, setAdmin] = useState(null);
+    const [showDropdown, setShowDropdown] = useState(false);
+    const dropdownRef = useRef(null);
+    const navigate = useNavigate();
+
+    // Fetch admin data from localStorage
+    useEffect(() => {
+        const storedAdmin = JSON.parse(localStorage.getItem('admin'));
+        if (storedAdmin) {
+            setAdmin(storedAdmin);
+        }
+    }, []);
+
+    // Close dropdown when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+                setShowDropdown(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const handleLogout = () => {
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('admin_token');
+        localStorage.removeItem('user');
+        localStorage.removeItem('admin');
+        localStorage.removeItem('admin_dashboard_data');
+        localStorage.removeItem('user_data');
+        localStorage.removeItem('enrollments');
+        localStorage.removeItem('courses');
+        localStorage.removeItem('bookings');
+        localStorage.removeItem('machines');
+        sessionStorage.clear();
+        navigate('/login', { replace: true });
+    };
+
+    const handleProfileClick = () => {
+        setShowDropdown(false);
+        navigate('/admin/profile');
+    };
+
     useEffect(() => {
         fetchDashboardData();
     }, []);
@@ -23,37 +64,22 @@ export default function Dashboard() {
     const fetchDashboardData = async () => {
         try {
             setLoading(true);
-
-            // ✅ FIXED: Use 'auth_token' (same key for both user and admin)
-            // Note: Axios interceptor will auto-add Authorization header, so we don't need to set it manually!
-
-            const response = await axios.get('/admin/dashboard/stats'); // ✅ Relative URL (axios.baseURL handles domain)
-
+            const response = await axios.get('/admin/dashboard/stats');
             setStats(response.data.stats);
             setRecentActivity(response.data.recentActivity);
         } catch (error) {
             console.error('Error fetching dashboard data:', error);
-            // Set default values on error
-            setStats({
-                totalUsers: 0,
-                activeBookings: 0,
-                ongoingCourses: 0,
-                pendingOrders: 0,
-            });
+            setStats({ totalUsers: 0, activeBookings: 0, ongoingCourses: 0, pendingOrders: 0 });
         } finally {
             setLoading(false);
         }
     };
 
-    // Format large numbers (e.g., 1284 -> 1,284)
-    const formatNumber = (num) => {
-        return num.toLocaleString();
-    };
+    const formatNumber = (num) => num.toLocaleString();
 
     return (
-        // ✅ JUST the main content - sidebar is in AdminLayout now
         <div className="flex-1">
-            {/* Top Header */}
+            {/* Top Header - Updated with clickable avatar */}
             <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
                 <div className="flex items-center justify-between px-6 py-4">
                     <div>
@@ -61,22 +87,56 @@ export default function Dashboard() {
                         <p className="text-sm text-gray-600">Welcome back, Admin. Here is an overview of your Fab Lab.</p>
                     </div>
 
-                    {/* Right Side */}
-                    <div className="flex items-center gap-4">
-                        {/* Notifications */}
-                        <button className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                            <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                            </svg>
-                            <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+                    {/* Right Side - Profile Dropdown (No notification icon) */}
+                    <div className="relative" ref={dropdownRef}>
+                        <button
+                            onClick={() => setShowDropdown(!showDropdown)}
+                            className="flex items-center gap-3 focus:outline-none"
+                        >
+                            <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-cyan-600 rounded-full flex items-center justify-center text-white font-bold text-sm cursor-pointer hover:shadow-md transition-shadow">
+                                {admin?.name?.charAt(0) || 'A'}
+                            </div>
                         </button>
 
-                        {/* Admin Profile */}
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-cyan-600 rounded-full flex items-center justify-center text-white font-bold text-sm">
-                                AD
+                        {/* Dropdown Menu */}
+                        {showDropdown && (
+                            <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-50 animate-fade-in">
+                                {/* Admin Info */}
+                                <div className="px-4 py-3 border-b border-gray-100">
+                                    <p className="font-semibold text-gray-900">{admin?.name || 'Admin'}</p>
+                                    <p className="text-sm text-gray-500 truncate">{admin?.email || 'admin@fablab.jnec.rub.edu.bt'}</p>
+                                    <span className="inline-flex mt-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                                        Administrator
+                                    </span>
+                                </div>
+
+                                {/* Menu Items */}
+                                <div className="py-1">
+                                    <button
+                                        onClick={handleProfileClick}
+                                        className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors flex items-center gap-2"
+                                    >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                        </svg>
+                                        My Profile
+                                    </button>
+                                </div>
+
+                                {/* Logout */}
+                                <div className="py-1 border-t border-gray-100">
+                                    <button
+                                        onClick={handleLogout}
+                                        className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2"
+                                    >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                                        </svg>
+                                        Logout
+                                    </button>
+                                </div>
                             </div>
-                        </div>
+                        )}
                     </div>
                 </div>
             </header>
@@ -185,7 +245,6 @@ export default function Dashboard() {
                             </div>
                             <div className="p-5">
                                 <div className="space-y-3">
-                                    {/* Action 1 */}
                                     <Link to="/admin/bookings" className="w-full flex items-center gap-3 p-3 bg-gray-50 hover:bg-blue-50 border border-gray-200 hover:border-blue-300 rounded-lg transition-all group">
                                         <div className="w-10 h-10 bg-blue-100 group-hover:bg-blue-200 rounded-lg flex items-center justify-center transition-colors flex-shrink-0">
                                             <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -198,7 +257,6 @@ export default function Dashboard() {
                                         </div>
                                     </Link>
 
-                                    {/* Action 2 */}
                                     <Link to="/admin/transactions" className="w-full flex items-center gap-3 p-3 bg-gray-50 hover:bg-blue-50 border border-gray-200 hover:border-blue-300 rounded-lg transition-all group">
                                         <div className="w-10 h-10 bg-blue-100 group-hover:bg-blue-200 rounded-lg flex items-center justify-center transition-colors flex-shrink-0">
                                             <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -211,7 +269,6 @@ export default function Dashboard() {
                                         </div>
                                     </Link>
 
-                                    {/* Action 3 */}
                                     <Link to="/admin/machines" className="w-full flex items-center gap-3 p-3 bg-gray-50 hover:bg-blue-50 border border-gray-200 hover:border-blue-300 rounded-lg transition-all group">
                                         <div className="w-10 h-10 bg-blue-100 group-hover:bg-blue-200 rounded-lg flex items-center justify-center transition-colors flex-shrink-0">
                                             <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -224,7 +281,6 @@ export default function Dashboard() {
                                         </div>
                                     </Link>
 
-                                    {/* Action 4 */}
                                     <Link to="/admin/machines" className="w-full flex items-center gap-3 p-3 bg-gray-50 hover:bg-blue-50 border border-gray-200 hover:border-blue-300 rounded-lg transition-all group">
                                         <div className="w-10 h-10 bg-blue-100 group-hover:bg-blue-200 rounded-lg flex items-center justify-center transition-colors flex-shrink-0">
                                             <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -238,7 +294,6 @@ export default function Dashboard() {
                                         </div>
                                     </Link>
 
-                                    {/* Action 5 */}
                                     <Link to="/admin/inventory" className="w-full flex items-center gap-3 p-3 bg-gray-50 hover:bg-blue-50 border border-gray-200 hover:border-blue-300 rounded-lg transition-all group">
                                         <div className="w-10 h-10 bg-blue-100 group-hover:bg-blue-200 rounded-lg flex items-center justify-center transition-colors flex-shrink-0">
                                             <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -251,7 +306,6 @@ export default function Dashboard() {
                                         </div>
                                     </Link>
 
-                                    {/* Action 6 */}
                                     <Link to="/admin/courses" className="w-full flex items-center gap-3 p-3 bg-gray-50 hover:bg-blue-50 border border-gray-200 hover:border-blue-300 rounded-lg transition-all group">
                                         <div className="w-10 h-10 bg-blue-100 group-hover:bg-blue-200 rounded-lg flex items-center justify-center transition-colors flex-shrink-0">
                                             <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">

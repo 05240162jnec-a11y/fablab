@@ -3,7 +3,6 @@ import { Outlet, useNavigate } from 'react-router-dom';
 import AdminSidebar from '../../Components/AdminSidebar';
 
 export default function AdminLayout() {
-    // ✅ Sidebar state - persists across ALL admin pages
     const [expandedMenus, setExpandedMenus] = useState({
         userManagement: false,
         operations: false,
@@ -13,7 +12,6 @@ export default function AdminLayout() {
 
     const navigate = useNavigate();
 
-    // Toggle submenu
     const toggleSubmenu = (menu) => {
         setExpandedMenus(prev => ({
             ...prev,
@@ -21,9 +19,7 @@ export default function AdminLayout() {
         }));
     };
 
-    // ✅ Handle logout - redirect to unified login page
     const handleLogout = () => {
-        // ✅ Clear ALL tokens and data (both user and admin)
         localStorage.removeItem('auth_token');
         localStorage.removeItem('admin_token');
         localStorage.removeItem('user');
@@ -35,21 +31,18 @@ export default function AdminLayout() {
         localStorage.removeItem('bookings');
         localStorage.removeItem('machines');
         sessionStorage.clear();
-
-        // ✅ Redirect to unified login page (not old admin login)
         navigate('/login', { replace: true });
     };
 
     return (
         <div className="flex min-h-screen bg-gray-50">
-            {/* Sidebar with persistent state */}
+            {/* Sidebar */}
             <AdminSidebar
                 expandedMenus={expandedMenus}
                 toggleSubmenu={toggleSubmenu}
-                onLogout={handleLogout}
             />
 
-            {/* Main Content - Child routes render here via Outlet */}
+            {/* Main Content Area - Pages have their own headers */}
             <div className="flex-1">
                 <Outlet />
             </div>

@@ -47,7 +47,7 @@ export default function Dashboard() {
             setLoading(true);
             setError(null);
 
-            const authToken = localStorage.getItem('auth_token');
+            const authToken = sessionStorage.getItem('auth_token');
 
             // ✅ Check if user is logged in
             if (!authToken) {
@@ -94,7 +94,7 @@ export default function Dashboard() {
 
             // ✅ If 401/403, redirect to login (token expired or invalid)
             if (error.response?.status === 401 || error.response?.status === 403) {
-                localStorage.removeItem('auth_token');
+                sessionStorage.removeItem('auth_token');
                 navigate('/login');
             }
 

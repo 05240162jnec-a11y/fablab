@@ -387,11 +387,11 @@ export default function Register() {
                                 <select name="department" value={formData.department} onChange={handleChange}
                                     className={`reg-select ${errors.department ? 'err' : ''}`}>
                                     <option value="" disabled>Select Department</option>
-                                    <option value="civil">Civil Engineering &amp; Surveying Team</option>
-                                    <option value="eee">Electrical and Electronics Engineering Team</option>
-                                    <option value="mech">Mechanical Engineering Team</option>
-                                    <option value="it">Information Technology Team</option>
-                                    <option value="hum">Humanities and Management Team</option>
+                                    <option value="civil">Department of Civil Engineering &amp; Surveying</option>
+                                    <option value="eee">Department Electrical and Electronics Engineering</option>
+                                    <option value="mech">Department Mechanical Engineering</option>
+                                    <option value="it">Department Information Technology</option>
+                                    <option value="hum">Department Humanities and Management</option>
                                 </select>
                                 <i className="fas fa-chevron-down chev" />
                                 {errors.department && <p className="err-txt">{Array.isArray(errors.department) ? errors.department[0] : errors.department}</p>}

@@ -40,7 +40,7 @@ export default function Machines() {
     };
 
     const handleLogout = () => {
-        localStorage.removeItem('auth_token');
+        sessionStorage.removeItem('auth_token');
         window.location.href = '/login';
     };
 

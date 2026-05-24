@@ -38,10 +38,8 @@ export default function Dashboard() {
     }, []);
 
     const handleLogout = () => {
-        localStorage.removeItem('auth_token');
+        // Per-tab auth token is stored in sessionStorage now
         localStorage.removeItem('admin_token');
-        localStorage.removeItem('user');
-        localStorage.removeItem('admin');
         localStorage.removeItem('admin_dashboard_data');
         localStorage.removeItem('user_data');
         localStorage.removeItem('enrollments');

@@ -39,29 +39,21 @@ export default function Login() {
                 }
             }
 
-            // Clear ALL old data
-            localStorage.removeItem('auth_token');
-            localStorage.removeItem('admin_token');
-            localStorage.removeItem('user');
-            localStorage.removeItem('admin');
-            localStorage.removeItem('user_data');
-            localStorage.removeItem('enrollments');
-            localStorage.removeItem('courses');
-            localStorage.removeItem('bookings');
-            localStorage.removeItem('machines');
+            // Clear per-tab old data only (localStorage is shared across tabs)
             sessionStorage.clear();
 
-            localStorage.setItem('auth_token', response.data.token);
+            sessionStorage.setItem('auth_token', response.data.token);
 
             if (loginType === 'admin') {
                 if (response.data.admin) {
-                    localStorage.setItem('user', JSON.stringify({ ...response.data.admin, role: 'admin' }));
+                    sessionStorage.setItem('user', JSON.stringify({ ...response.data.admin, role: 'admin' }));
                 }
             } else {
                 if (response.data.user) {
-                    localStorage.setItem('user', JSON.stringify(response.data.user));
+                    sessionStorage.setItem('user', JSON.stringify(response.data.user));
                 }
             }
+
 
             const userData = response.data.user || response.data.admin;
             const userRole = userData?.role || (loginType === 'admin' ? 'admin' : 'student');
@@ -92,9 +84,9 @@ export default function Login() {
 
     // Logout helper (kept from original)
     const handleLogout = () => {
-        ['auth_token', 'admin_token', 'user', 'admin', 'user_data', 'enrollments', 'courses', 'bookings', 'machines']
-            .forEach(k => localStorage.removeItem(k));
         sessionStorage.clear();
+        // Keep existing localStorage cleanup to avoid stale non-auth data affecting UI.
+        ['admin_token', 'user_data', 'enrollments', 'courses', 'bookings', 'machines'].forEach(k => localStorage.removeItem(k));
         setToken(null);
         setMessage('👋 You have been logged out.');
         setFormData({ email: '', password: '' });

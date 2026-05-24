@@ -42,19 +42,15 @@ export default function AdminLogin() {
                 },
             });
 
-            // ✅ UNIFIED TOKEN FORMAT: Clear old data first
-            localStorage.removeItem('auth_token');
-            localStorage.removeItem('admin_token');
-            localStorage.removeItem('user');
-            localStorage.removeItem('admin_user');
-            localStorage.removeItem('admin_dashboard_data');
+            // Clear per-tab old data only
+            sessionStorage.clear();
 
-            // ✅ Save token as 'auth_token' (unified key for both user & admin)
-            localStorage.setItem('auth_token', response.data.token);
+            // Save token per-tab (prevents other tabs overwriting it)
+            sessionStorage.setItem('auth_token', response.data.token);
 
-            // ✅ Save user data with role: 'admin' (unified format)
+            // Save user data with role: 'admin' per-tab
             if (response.data.admin) {
-                localStorage.setItem('user', JSON.stringify({
+                sessionStorage.setItem('user', JSON.stringify({
                     ...response.data.admin,
                     role: 'admin'  // Add role for unified redirect logic
                 }));

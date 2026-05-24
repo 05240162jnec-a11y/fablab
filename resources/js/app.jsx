@@ -5,7 +5,10 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 
 // ✅ IMPORT AND INITIALIZE AXIOS INTERCEPTORS (CRITICAL!)
 import { setupAxiosInterceptors } from './axios';
-setupAxiosInterceptors();  // ← Registers Authorization header auto-add
+setupAxiosInterceptors();
+
+// ✅ Uniform dialog provider
+import UniformDialogManager from './Components/UniformDialogManager';
 
 // Auth Pages
 import Login from './Pages/Auth/Login';
@@ -44,7 +47,7 @@ import AdminGallery from './Pages/Admin/Gallery';
 import AdminFAQ from './Pages/Admin/FAQ';
 import AdminProducts from './Pages/Admin/Products';
 import AdminLayout from './Pages/Admin/AdminLayout';
-import AdminProfile from './Pages/Admin/Profile'; // ✅ ADD THIS LINE
+import AdminProfile from './Pages/Admin/Profile';
 
 // User Pages
 import UserDashboard from './Pages/User/Dashboard';
@@ -61,93 +64,101 @@ import UserMachines from './Pages/User/Machines';
 import ShopOrders from './Pages/User/ShopOrders';
 import Learning from './Pages/User/Learning';
 
-
-// ✅ Production Team Pages (NEW!)
+// ✅ Production Team Pages
 import ProductionTeamDashboard from './Pages/ProductionTeam/Dashboard';
 import ProductionTeamCustomOrders from './Pages/ProductionTeam/CustomOrders';
-import ProductionTeamLayout from './Pages/ProductionTeam/ProductionTeamLayout';  // ← Add this!
+import ProductionTeamLayout from './Pages/ProductionTeam/ProductionTeamLayout';
 import AssignedOrders from './Pages/ProductionTeam/AssignedOrders';
 import ProductionTeamBookMachine from './Pages/ProductionTeam/BookMachine';
-import ProductionTeamInventory from './Pages/ProductionTeam/Inventory'; // ✅ Add this
-import ProductionTeamProfile from './Pages/ProductionTeam/Profile'; // ✅ Add this 
+import ProductionTeamInventory from './Pages/ProductionTeam/Inventory';
+import ProductionTeamProfile from './Pages/ProductionTeam/Profile';
 
-// Create root element
+// ✅ NEW: Production Team Machines & Products
+import ProductionTeamMachines from './Pages/ProductionTeam/Machines';
+import ProductionTeamProducts from './Pages/ProductionTeam/Products';
+
 const root = createRoot(document.getElementById('app'));
 
-// Render the app with React Router
 root.render(
-    <BrowserRouter>
-        <Routes>
-            {/* Static Pages */}
-            <Route path="/" element={<Home />} />
-            <Route path="/machines" element={<StaticMachines />} />
-            <Route path="/shop" element={<Shop />} />
-            <Route path="/training" element={<Training />} />
-            <Route path="/projects" element={<Projects />} />
-            <Route path="/about" element={<About />} />
-            <Route path="/gallery" element={<Gallery />} />
-            <Route path="/faq" element={<FAQ />} />
-            <Route path="/contact" element={<Contact />} />
+    <UniformDialogManager>
+        <BrowserRouter>
+            <Routes>
+                {/* Static Pages */}
+                <Route path="/" element={<Home />} />
+                <Route path="/machines" element={<StaticMachines />} />
+                <Route path="/shop" element={<Shop />} />
+                <Route path="/training" element={<Training />} />
+                <Route path="/projects" element={<Projects />} />
+                <Route path="/about" element={<About />} />
+                <Route path="/gallery" element={<Gallery />} />
+                <Route path="/faq" element={<FAQ />} />
+                <Route path="/contact" element={<Contact />} />
 
-            {/* Verification Pages */}
-            <Route path="/verification/success" element={<VerificationSuccess />} />
-            <Route path="/verification/invalid" element={<VerificationInvalid />} />
+                {/* Verification Pages */}
+                <Route path="/verification/success" element={<VerificationSuccess />} />
+                <Route path="/verification/invalid" element={<VerificationInvalid />} />
 
-            {/* User Auth Pages */}
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
-            <Route path="/forgot-password" element={<ForgotPassword />} />
-            <Route path="/reset-password/:token" element={<ResetPassword />} />
+                {/* User Auth Pages */}
+                <Route path="/login" element={<Login />} />
+                <Route path="/register" element={<Register />} />
+                <Route path="/forgot-password" element={<ForgotPassword />} />
+                <Route path="/reset-password/:token" element={<ResetPassword />} />
 
-            <Route path="/admin/login" element={<AdminLogin />} />
+                <Route path="/admin/login" element={<AdminLogin />} />
 
-            {/* Admin Pages - Using Layout for persistent sidebar */}
-            <Route path="/admin" element={<AdminLayout />}>
-                <Route path="dashboard" element={<AdminDashboard />} />
-                <Route path="profile" element={<AdminProfile />} /> {/* ✅ ADD THIS LINE */}
-                <Route path="users" element={<Users />} />
-                <Route path="production-team" element={<ProductionTeam />} />
-                <Route path="machines" element={<AdminMachines />} />
-                <Route path="bookings" element={<AdminBookings />} />
-                <Route path="products" element={<AdminProducts />} />
-                <Route path="courses" element={<AdminCourses />} />
-                <Route path="certificates" element={<Certificates />} />
-                <Route path="custom-orders" element={<AdminCustomOrders />} />
-                <Route path="inventory" element={<AdminInventory />} />
-                <Route path="projects" element={<AdminProjects />} />
-                <Route path="gallery" element={<AdminGallery />} />
-                <Route path="faq" element={<AdminFAQ />} />
-            </Route>
+                {/* Admin Pages */}
+                <Route path="/admin" element={<AdminLayout />}>
+                    <Route path="dashboard" element={<AdminDashboard />} />
+                    <Route path="profile" element={<AdminProfile />} />
+                    <Route path="users" element={<Users />} />
+                    <Route path="production-team" element={<ProductionTeam />} />
+                    <Route path="machines" element={<AdminMachines />} />
+                    <Route path="bookings" element={<AdminBookings />} />
+                    <Route path="products" element={<AdminProducts />} />
+                    <Route path="courses" element={<AdminCourses />} />
+                    <Route path="certificates" element={<Certificates />} />
+                    <Route path="custom-orders" element={<AdminCustomOrders />} />
+                    <Route path="inventory" element={<AdminInventory />} />
+                    <Route path="projects" element={<AdminProjects />} />
+                    <Route path="gallery" element={<AdminGallery />} />
+                    <Route path="faq" element={<AdminFAQ />} />
+                </Route>
 
-            {/* User Pages - Dashboard */}
-            <Route path="/user/dashboard" element={<UserDashboard />} />
+                {/* User Pages */}
+                <Route path="/user/dashboard" element={<UserDashboard />} />
 
-            {/* ✅ Tabbed Routes */}
-            <Route path="/user/shop-orders" element={<ShopOrders />} />
-            <Route path="/user/machines" element={<UserMachines />} />
-            <Route path="/user/learning" element={<Learning />} />
+                {/* Tabbed Routes */}
+                <Route path="/user/shop-orders" element={<ShopOrders />} />
+                <Route path="/user/machines" element={<UserMachines />} />
+                <Route path="/user/learning" element={<Learning />} />
 
-            {/* ✅ Production Team Routes - Using Layout for sidebar */}
-            <Route path="/production-team" element={<ProductionTeamLayout />}>
-                <Route path="dashboard" element={<ProductionTeamDashboard />} />
-                <Route path="custom-orders" element={<ProductionTeamCustomOrders />} />
-                <Route path="book-machine" element={<ProductionTeamBookMachine />} /> {/* ✅ Only this one! */}
-                <Route path="inventory" element={<ProductionTeamInventory />} />
-                <Route path="profile" element={<ProductionTeamProfile />} />
-            </Route>
+                {/* Production Team Routes */}
+                <Route path="/production-team" element={<ProductionTeamLayout />}>
+                    <Route path="dashboard" element={<ProductionTeamDashboard />} />
+                    <Route path="profile" element={<ProductionTeamProfile />} />
+                    <Route path="custom-orders" element={<ProductionTeamCustomOrders />} />
+                    <Route path="book-machine" element={<ProductionTeamBookMachine />} />
+                    <Route path="inventory" element={<ProductionTeamInventory />} />
+                    <Route path="assigned-orders" element={<AssignedOrders />} />
 
-            {/* Placeholder routes */}
-            <Route path="/user/explore" element={<div className="p-10 text-center text-2xl font-bold">Explore Page (Coming Soon)</div>} />
-            <Route path="/user/support" element={<div className="p-10 text-center text-2xl font-bold">Support Page (Coming Soon)</div>} />
+                    {/* ✅ NEW: Production Team Machines & Products Routes */}
+                    <Route path="machines" element={<ProductionTeamMachines />} />
+                    <Route path="products" element={<ProductionTeamProducts />} />
+                </Route>
 
-            {/* Existing routes */}
-            <Route path="/user/book-machine" element={<BookMachine />} />
-            <Route path="/user/courses" element={<UserCourses />} />
-            <Route path="/user/custom-orders" element={<CustomOrders />} />
-            <Route path="/user/shop-products" element={<ShopProducts />} />
-            <Route path="/user/my-orders" element={<MyOrders />} />
-            <Route path="/user/my-bookings" element={<MyBookings />} />
-            <Route path="/user/my-enrollments" element={<MyEnrollments />} />
-        </Routes>
-    </BrowserRouter>
+                {/* Placeholder routes */}
+                <Route path="/user/explore" element={<div className="p-10 text-center text-2xl font-bold">Explore Page (Coming Soon)</div>} />
+                <Route path="/user/support" element={<div className="p-10 text-center text-2xl font-bold">Support Page (Coming Soon)</div>} />
+
+                {/* Existing routes */}
+                <Route path="/user/book-machine" element={<BookMachine />} />
+                <Route path="/user/courses" element={<UserCourses />} />
+                <Route path="/user/custom-orders" element={<CustomOrders />} />
+                <Route path="/user/shop-products" element={<ShopProducts />} />
+                <Route path="/user/my-orders" element={<MyOrders />} />
+                <Route path="/user/my-bookings" element={<MyBookings />} />
+                <Route path="/user/my-enrollments" element={<MyEnrollments />} />
+            </Routes>
+        </BrowserRouter>
+    </UniformDialogManager>
 );

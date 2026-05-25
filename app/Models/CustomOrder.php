@@ -11,22 +11,25 @@ class CustomOrder extends Model
     use HasFactory;
 
     protected $fillable = [
-        'user_id',
-        'title',
-        'description',
-        'quantity',
-        'design_image',        // ✅ Design file path/url
-        'status',              // 'pending', 'price_sent', 'paid', 'assigned', 'in_progress', 'completed', 'rejected'
-        'estimated_price',
-        'rejection_reason',
-        'payment_screenshot',
-        'payment_verified_at',
-        'assigned_to',         // ID of production team member
-        'assigned_at',
-        'deadline',            // ✅ Ensure this column exists in your migration
-    ];
+    'user_id',
+    'order_number',
+    'title',
+    'description',
+    'quantity',
+    'design_images',  // ✅ MUST BE HERE!
+    'design_image',   // Keep old field for backward compatibility
+    'status',
+    'estimated_price',
+    'payment_screenshot',
+    'payment_verified_at',
+    'rejection_reason',
+    'deadline',
+    'assigned_to',
+    'assigned_at',
+];
 
     protected $casts = [
+        'design_images' => 'array',
         'estimated_price' => 'decimal:2',
         'quantity' => 'integer',
         'assigned_at' => 'datetime',

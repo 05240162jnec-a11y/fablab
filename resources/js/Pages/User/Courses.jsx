@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
+import { useDialog } from '../../Components/UniformDialogManager';
 
 export default function Courses() {
+    const { showAlert, showConfirm } = useDialog();
     // API Data States
     const [courses, setCourses] = useState([]);
     const [selectedCourse, setSelectedCourse] = useState(null);
@@ -142,9 +144,14 @@ export default function Courses() {
 
     // Handle unenroll click
     const handleUnenrollClick = async (course) => {
-        if (!window.confirm(`Are you sure you want to unenroll from "${course.title}"?`)) {
-            return;
-        }
+        const confirmed = await showConfirm({
+            title: 'Confirm unenroll',
+            message: `Are you sure you want to unenroll from "${course.title}"?`,
+            confirmText: 'Unenroll',
+            cancelText: 'Cancel',
+        });
+        if (!confirmed) return;
+
 
         try {
             const authToken = localStorage.getItem('auth_token');
@@ -161,7 +168,7 @@ export default function Courses() {
                 }
             );
 
-            alert('✅ ' + response.data.message);
+            showAlert({ title: 'Success', message: '✅ ' + response.data.message });
 
             // Refresh courses and enrollments
             setCourses([]);
@@ -170,9 +177,9 @@ export default function Courses() {
         } catch (error) {
             console.error('Unenroll error:', error);
             if (error.response?.data?.message) {
-                alert('❌ ' + error.response.data.message);
+                showAlert({ title: 'Error', message: '❌ ' + error.response.data.message });
             } else {
-                alert('❌ Unenroll failed. Please try again.');
+                showAlert({ title: 'Error', message: '❌ Unenroll failed. Please try again.' });
             }
         }
     };

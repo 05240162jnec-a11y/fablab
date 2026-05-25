@@ -15,6 +15,7 @@ export default function CustomOrders() {
     const [showAssignModal, setShowAssignModal] = useState(false);
     const [showPaymentModal, setShowPaymentModal] = useState(false);
     const [showImageLightbox, setShowImageLightbox] = useState(false);
+    const [lightboxImageIndex, setLightboxImageIndex] = useState(0);
 
     // Selected Order
     const [selectedOrder, setSelectedOrder] = useState(null);
@@ -249,6 +250,12 @@ export default function CustomOrders() {
         setShowAssignModal(true);
     };
 
+    // ✅ Open lightbox with specific image index
+    const openLightbox = (index = 0) => {
+        setLightboxImageIndex(index);
+        setShowImageLightbox(true);
+    };
+
     // Get status badge color
     const getStatusBadgeClass = (status) => {
         const badges = {
@@ -278,6 +285,17 @@ export default function CustomOrders() {
             month: 'short',
             day: 'numeric',
         });
+    };
+
+    // ✅ Get all design images (handle both old and new format)
+    const getDesignImages = (order) => {
+        if (order.design_images && Array.isArray(order.design_images) && order.design_images.length > 0) {
+            return order.design_images;
+        } else if (order.design_image) {
+            // Fallback for old single-image orders
+            return [order.design_image];
+        }
+        return [];
     };
 
     return (
@@ -359,116 +377,128 @@ export default function CustomOrders() {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-200">
-                                    {orders.map((order) => (
-                                        <tr key={order.id} className="hover:bg-gray-50">
-                                            <td className="px-6 py-4">
-                                                <div className="flex items-center gap-3">
-                                                    {/* ✅ Image with lightbox trigger */}
-                                                    <div
-                                                        className="w-12 h-12 rounded-lg overflow-hidden cursor-pointer border border-gray-200 hover:border-blue-400 transition-colors"
-                                                        onClick={() => {
-                                                            setSelectedOrder(order);
-                                                            setShowImageLightbox(true);
-                                                        }}
-                                                        title="Click to view larger"
-                                                    >
-                                                        {order.design_image ? (
-                                                            <img
-                                                                src={`http://127.0.0.1:8000/storage/${order.design_image}`}
-                                                                alt={order.title}
-                                                                className="w-full h-full object-cover"
-                                                            />
-                                                        ) : (
-                                                            <div className="w-full h-full bg-gray-100 flex items-center justify-center text-gray-400 text-xs">
-                                                                No Image
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                    <div>
-                                                        <p className="font-medium text-gray-900">{order.title}</p>
-                                                        <p className="text-xs text-gray-500">{order.order_number}</p>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <p className="text-sm text-gray-900">{order.user?.name || 'Unknown'}</p>
-                                                <p className="text-xs text-gray-500">{order.user?.email || ''}</p>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <p className={`text-sm font-medium ${order.estimated_price ? 'text-green-700' : 'text-gray-400'}`}>
-                                                    {formatPrice(order.estimated_price)}
-                                                </p>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                {order.payment_screenshot ? (
-                                                    <button
-                                                        onClick={() => openPaymentModal(order)}
-                                                        className="text-sm text-blue-600 hover:text-blue-700 underline"
-                                                    >
-                                                        View Screenshot
-                                                    </button>
-                                                ) : (
-                                                    <span className="text-sm text-gray-400">Not uploaded</span>
-                                                )}
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <p className="text-sm text-gray-900">{order.assignedUser?.name || 'Unassigned'}</p>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium border ${getStatusBadgeClass(order.status)}`}>
-                                                    {order.status?.replace('_', ' ').toUpperCase()}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <div className="flex items-center gap-2">
-                                                    <button
-                                                        onClick={() => openDetailsModal(order)}
-                                                        className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                                        title="View Details"
-                                                    >
-                                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                                        </svg>
-                                                    </button>
+                                    {orders.map((order) => {
+                                        const designImages = getDesignImages(order);
 
-                                                    {/* ✅ Update Price Button (changes to Edit after first update) */}
-                                                    <button
-                                                        onClick={() => openPriceModal(order)}
-                                                        className="p-2 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                                                        title={order.estimated_price ? "Edit Price" : "Set Price"}
-                                                    >
-                                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                                        </svg>
-                                                    </button>
-
-                                                    {/* ✅ Assign Button (only if payment verified and in_progress) */}
-                                                    {order.payment_verified_at && order.status === 'in_progress' && (
+                                        return (
+                                            <tr key={order.id} className="hover:bg-gray-50">
+                                                <td className="px-6 py-4">
+                                                    <div className="flex items-center gap-3">
+                                                        {/* ✅ Image with lightbox trigger and multiple images indicator */}
+                                                        <div
+                                                            className="relative w-12 h-12 rounded-lg overflow-hidden cursor-pointer border border-gray-200 hover:border-blue-400 transition-colors"
+                                                            onClick={() => {
+                                                                setSelectedOrder(order);
+                                                                openLightbox(0);
+                                                            }}
+                                                            title="Click to view larger"
+                                                        >
+                                                            {designImages.length > 0 ? (
+                                                                <>
+                                                                    <img
+                                                                        src={`http://127.0.0.1:8000/storage/${designImages[0]}`}
+                                                                        alt={order.title}
+                                                                        className="w-full h-full object-cover"
+                                                                    />
+                                                                    {/* Multiple images indicator */}
+                                                                    {designImages.length > 1 && (
+                                                                        <div className="absolute bottom-0 right-0 bg-black/70 text-white text-[10px] px-1 rounded-tl">
+                                                                            +{designImages.length - 1}
+                                                                        </div>
+                                                                    )}
+                                                                </>
+                                                            ) : (
+                                                                <div className="w-full h-full bg-gray-100 flex items-center justify-center text-gray-400 text-xs">
+                                                                    No Image
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        <div>
+                                                            <p className="font-medium text-gray-900">{order.title}</p>
+                                                            <p className="text-xs text-gray-500">{order.order_number}</p>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <p className="text-sm text-gray-900">{order.user?.name || 'Unknown'}</p>
+                                                    <p className="text-xs text-gray-500">{order.user?.email || ''}</p>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <p className={`text-sm font-medium ${order.estimated_price ? 'text-green-700' : 'text-gray-400'}`}>
+                                                        {formatPrice(order.estimated_price)}
+                                                    </p>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    {order.payment_screenshot ? (
                                                         <button
-                                                            onClick={() => openAssignModal(order)}
-                                                            className="p-2 text-gray-600 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
-                                                            title="Assign to Production"
+                                                            onClick={() => openPaymentModal(order)}
+                                                            className="text-sm text-blue-600 hover:text-blue-700 underline"
+                                                        >
+                                                            View Screenshot
+                                                        </button>
+                                                    ) : (
+                                                        <span className="text-sm text-gray-400">Not uploaded</span>
+                                                    )}
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <p className="text-sm text-gray-900">{order.assignedUser?.name || 'Unassigned'}</p>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium border ${getStatusBadgeClass(order.status)}`}>
+                                                        {order.status?.replace('_', ' ').toUpperCase()}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <div className="flex items-center gap-2">
+                                                        <button
+                                                            onClick={() => openDetailsModal(order)}
+                                                            className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                                            title="View Details"
                                                         >
                                                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                                             </svg>
                                                         </button>
-                                                    )}
 
-                                                    <button
-                                                        onClick={() => handleDelete(order.id)}
-                                                        className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                                        title="Delete Order"
-                                                    >
-                                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                        </svg>
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
+                                                        {/* ✅ Update Price Button (changes to Edit after first update) */}
+                                                        <button
+                                                            onClick={() => openPriceModal(order)}
+                                                            className="p-2 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                                                            title={order.estimated_price ? "Edit Price" : "Set Price"}
+                                                        >
+                                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                                            </svg>
+                                                        </button>
+
+                                                        {/* ✅ Assign Button (only if payment verified and in_progress) */}
+                                                        {order.payment_verified_at && order.status === 'in_progress' && (
+                                                            <button
+                                                                onClick={() => openAssignModal(order)}
+                                                                className="p-2 text-gray-600 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                                                                title="Assign to Production"
+                                                            >
+                                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                                                                </svg>
+                                                            </button>
+                                                        )}
+
+                                                        <button
+                                                            onClick={() => handleDelete(order.id)}
+                                                            className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                            title="Delete Order"
+                                                        >
+                                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                            </svg>
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
                                 </tbody>
                             </table>
 
@@ -482,7 +512,7 @@ export default function CustomOrders() {
                 </div>
             </main>
 
-            {/* ✅ Order Details Modal */}
+            {/* ✅ Order Details Modal - UPDATED FOR MULTIPLE IMAGES */}
             {showDetailsModal && selectedOrder && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowDetailsModal(false)}>
                     <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
@@ -496,26 +526,44 @@ export default function CustomOrders() {
                         </div>
 
                         <div className="p-6 space-y-4">
-                            {/* Design Image */}
+                            {/* ✅ Design Images - Grid for multiple images */}
                             <div>
-                                <p className="text-sm font-medium text-gray-700 mb-2">Design Image</p>
-                                <div
-                                    className="w-full h-64 bg-gray-100 rounded-lg overflow-hidden cursor-pointer border-2 border-dashed border-gray-300 hover:border-blue-400 transition-colors"
-                                    onClick={() => setShowImageLightbox(true)}
-                                >
-                                    {selectedOrder.design_image ? (
-                                        <img
-                                            src={`http://127.0.0.1:8000/storage/${selectedOrder.design_image}`}
-                                            alt={selectedOrder.title}
-                                            className="w-full h-full object-contain"
-                                        />
-                                    ) : (
-                                        <div className="h-full flex items-center justify-center text-gray-400">
-                                            No image uploaded
+                                <p className="text-sm font-medium text-gray-700 mb-2">Design Images</p>
+                                {(() => {
+                                    const designImages = getDesignImages(selectedOrder);
+
+                                    if (designImages.length === 0) {
+                                        return (
+                                            <div className="w-full h-64 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400 border-2 border-dashed border-gray-300">
+                                                No images uploaded
+                                            </div>
+                                        );
+                                    }
+
+                                    return (
+                                        <div className={`grid gap-3 ${designImages.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                                            {designImages.map((img, idx) => (
+                                                <div
+                                                    key={idx}
+                                                    className="relative aspect-video bg-gray-100 rounded-lg overflow-hidden cursor-pointer border-2 border-gray-200 hover:border-blue-400 transition-colors"
+                                                    onClick={() => openLightbox(idx)}
+                                                >
+                                                    <img
+                                                        src={`http://127.0.0.1:8000/storage/${img}`}
+                                                        alt={`${selectedOrder.title} - Design ${idx + 1}`}
+                                                        className="w-full h-full object-cover"
+                                                    />
+                                                    {designImages.length > 1 && (
+                                                        <div className="absolute top-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+                                                            {idx + 1} / {designImages.length}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))}
                                         </div>
-                                    )}
-                                </div>
-                                <p className="text-xs text-gray-500 mt-1 text-center">Click to view larger</p>
+                                    );
+                                })()}
+                                <p className="text-xs text-gray-500 mt-1 text-center">Click any image to view larger</p>
                             </div>
 
                             {/* Order Info */}
@@ -819,13 +867,13 @@ export default function CustomOrders() {
                 </div>
             )}
 
-            {/* ✅ Image Lightbox Modal */}
+            {/* ✅ Image Lightbox Modal - UPDATED FOR MULTIPLE IMAGES */}
             {showImageLightbox && selectedOrder && (
                 <div
                     className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[60] p-4"
                     onClick={() => setShowImageLightbox(false)}
                 >
-                    <div className="relative max-w-4xl w-full" onClick={(e) => e.stopPropagation()}>
+                    <div className="relative max-w-5xl w-full" onClick={(e) => e.stopPropagation()}>
                         {/* Close Button */}
                         <button
                             onClick={() => setShowImageLightbox(false)}
@@ -836,19 +884,66 @@ export default function CustomOrders() {
                             </svg>
                         </button>
 
+                        {/* Navigation Arrows */}
+                        {(() => {
+                            const designImages = getDesignImages(selectedOrder);
+                            if (designImages.length <= 1) return null;
+
+                            return (
+                                <>
+                                    <button
+                                        onClick={() => setLightboxImageIndex((prev) => (prev === 0 ? designImages.length - 1 : prev - 1))}
+                                        className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/20 hover:bg-white/40 text-white p-2 rounded-full transition-colors"
+                                    >
+                                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                                        </svg>
+                                    </button>
+                                    <button
+                                        onClick={() => setLightboxImageIndex((prev) => (prev === designImages.length - 1 ? 0 : prev + 1))}
+                                        className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/20 hover:bg-white/40 text-white p-2 rounded-full transition-colors"
+                                    >
+                                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                                        </svg>
+                                    </button>
+                                </>
+                            );
+                        })()}
+
                         {/* Image Container */}
                         <div className="bg-white rounded-xl overflow-hidden shadow-2xl">
-                            <img
-                                src={`http://127.0.0.1:8000/storage/${selectedOrder.design_image}`}
-                                alt={selectedOrder.title}
-                                className="w-full h-auto max-h-[80vh] object-contain"
-                            />
+                            {(() => {
+                                const designImages = getDesignImages(selectedOrder);
+                                const currentImage = designImages[lightboxImageIndex] || designImages[0];
+
+                                return (
+                                    <img
+                                        src={`http://127.0.0.1:8000/storage/${currentImage}`}
+                                        alt={`${selectedOrder.title} - Design ${lightboxImageIndex + 1}`}
+                                        className="w-full h-auto max-h-[80vh] object-contain"
+                                    />
+                                );
+                            })()}
                         </div>
 
-                        {/* Caption */}
-                        <p className="text-center text-white text-sm mt-3">
-                            {selectedOrder.title} - {selectedOrder.order_number}
-                        </p>
+                        {/* Caption and Counter */}
+                        <div className="text-center text-white mt-3">
+                            <p className="text-sm">
+                                {selectedOrder.title} - {selectedOrder.order_number}
+                            </p>
+                            {(() => {
+                                const designImages = getDesignImages(selectedOrder);
+                                if (designImages.length > 1) {
+                                    return (
+                                        <p className="text-xs mt-1">
+                                            Image {lightboxImageIndex + 1} of {designImages.length}
+                                        </p>
+                                    );
+                                }
+                                return null;
+                            })()}
+                        </div>
                     </div>
                 </div>
             )}

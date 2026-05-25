@@ -15,16 +15,16 @@ export default function CustomOrders() {
     // Filter State
     const [filter, setFilter] = useState('all');
 
-    // Form State
+    // ✅ UPDATED: Form State for multiple images
     const [formState, setFormState] = useState({
         title: '',
         description: '',
         quantity: '1',
-        design_image: null,
+        design_images: [], // Changed from design_image (single) to design_images (array)
     });
 
-    // Image Preview State
-    const [imagePreview, setImagePreview] = useState(null);
+    // ✅ UPDATED: Image Previews State (Array)
+    const [imagePreviews, setImagePreviews] = useState([]);
 
     // Checkout State
     const [deliveryOption, setDeliveryOption] = useState('pickup'); // 'pickup' or 'shipping'
@@ -93,14 +93,18 @@ export default function CustomOrders() {
             title: '',
             description: '',
             quantity: '1',
-            design_image: null,
+            design_images: [],
         });
-        setImagePreview(null);
+        setImagePreviews([]);
         setShowCreateModal(true);
     };
 
     // Open View Modal
     const handleViewOrder = (order) => {
+        console.log('Selected Order Data:', order);
+        console.log('Design Images (array):', order.design_images);
+        console.log('Design Image (old field):', order.design_image);
+
         setSelectedOrder(order);
         setShowViewModal(true);
     };
@@ -117,16 +121,42 @@ export default function CustomOrders() {
             title: '',
             description: '',
             quantity: '1',
-            design_image: null,
+            design_images: [],
         });
         setDeliveryOption('pickup');
         setShippingAddress('');
 
-        // Clean up preview URL
-        if (imagePreview) {
-            URL.revokeObjectURL(imagePreview);
-            setImagePreview(null);
+        // Clean up preview URLs
+        imagePreviews.forEach(url => URL.revokeObjectURL(url));
+        setImagePreviews([]);
+    };
+
+    // ✅ UPDATED: Handle multiple image selection
+    const handleImageChange = (e) => {
+        const files = Array.from(e.target.files);
+        const remainingSlots = 5 - formState.design_images.length;
+        const filesToAdd = files.slice(0, remainingSlots);
+
+        if (filesToAdd.length > 0) {
+            const newImages = [...formState.design_images, ...filesToAdd];
+            const newPreviews = filesToAdd.map(file => URL.createObjectURL(file));
+            const existingPreviews = [...imagePreviews, ...newPreviews];
+
+            setFormState(prev => ({ ...prev, design_images: newImages }));
+            setImagePreviews(existingPreviews);
         }
+    };
+
+    // ✅ NEW: Remove specific image
+    const removeImage = (index) => {
+        const newImages = formState.design_images.filter((_, i) => i !== index);
+        const newPreviews = imagePreviews.filter((_, i) => i !== index);
+
+        // Revoke URL for removed image
+        URL.revokeObjectURL(imagePreviews[index]);
+
+        setFormState(prev => ({ ...prev, design_images: newImages }));
+        setImagePreviews(newPreviews);
     };
 
     // Submit New Order
@@ -134,8 +164,8 @@ export default function CustomOrders() {
         e.preventDefault();
         setSubmitting(true);
 
-        if (!formState.design_image) {
-            alert('❌ Please upload a design image');
+        if (formState.design_images.length === 0) {
+            alert('❌ Please upload at least one design image');
             setSubmitting(false);
             return;
         }
@@ -146,9 +176,11 @@ export default function CustomOrders() {
             formData.append('title', formState.title);
             formData.append('description', formState.description);
             formData.append('quantity', formState.quantity);
-            if (formState.design_image) {
-                formData.append('design_image', formState.design_image);
-            }
+
+            // Append all images
+            formState.design_images.forEach((file, index) => {
+                formData.append(`design_images[${index}]`, file);
+            });
 
             const response = await axios.post('http://127.0.0.1:8000/api/user/custom-orders', formData, {
                 headers: {
@@ -162,6 +194,8 @@ export default function CustomOrders() {
                 setShowCreateModal(false);
                 setShowSuccessModal(true);
                 fetchOrders();
+                // Clean up previews
+                imagePreviews.forEach(url => URL.revokeObjectURL(url));
             }
         } catch (err) {
             console.error('Submit order error:', err);
@@ -444,13 +478,19 @@ export default function CustomOrders() {
                         </button>
                     </div>
 
-                    {/* Orders Grid - SIMPLIFIED CARDS */}
+                    {/* Orders Grid - UPDATED WITH MORE DETAILS */}
                     {filteredOrders.length === 0 ? (
                         <div className="text-center py-12 bg-white rounded-xl border border-gray-100">
                             <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                             </svg>
                             <p className="text-gray-500 text-lg font-medium">No orders found</p>
+                            <button
+                                onClick={handleCreateOrder}
+                                className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
+                            >
+                                Create Your First Order
+                            </button>
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -458,18 +498,82 @@ export default function CustomOrders() {
                                 <div
                                     key={order.id}
                                     onClick={() => handleViewOrder(order)}
-                                    className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow cursor-pointer"
+                                    className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-all duration-200 cursor-pointer group"
                                 >
-                                    <div className="flex items-center justify-between mb-3">
-                                        <h3 className="text-lg font-bold text-gray-900 truncate flex-1">{order.title}</h3>
-                                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ml-2 flex-shrink-0 ${getStatusBadgeClass(order.status)}`}>
-                                            {getStatusIcon(order.status)}
-                                            {capitalize(order.status.replace('_', ' '))}
-                                        </span>
+                                    {/* Image Thumbnail */}
+                                    <div className="relative w-full h-40 bg-gray-100 overflow-hidden">
+                                        {/* ✅ Show first image from array or fallback */}
+                                        {order.design_images && order.design_images.length > 0 ? (
+                                            <img
+                                                src={`http://127.0.0.1:8000/storage/${order.design_images[0]}`}
+                                                alt={order.title}
+                                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                            />
+                                        ) : order.design_image ? (
+                                            /* Fallback for old single-image orders */
+                                            <img
+                                                src={`http://127.0.0.1:8000/storage/${order.design_image}`}
+                                                alt={order.title}
+                                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                            />
+                                        ) : (
+                                            <div className="w-full h-full flex items-center justify-center">
+                                                <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                </svg>
+                                            </div>
+                                        )}
+
+                                        {/* Multiple Images Indicator */}
+                                        {(order.design_images && order.design_images.length > 1) && (
+                                            <div className="absolute top-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded-full">
+                                                +{order.design_images.length - 1}
+                                            </div>
+                                        )}
+
+                                        {/* Status Badge */}
+                                        <div className="absolute bottom-2 left-2">
+                                            <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(order.status)}`}>
+                                                {getStatusIcon(order.status)}
+                                                {capitalize(order.status.replace('_', ' '))}
+                                            </span>
+                                        </div>
                                     </div>
 
-                                    <div className="text-sm text-gray-600">
-                                        <span className="font-medium">Qty:</span> {order.quantity}
+                                    {/* Card Content */}
+                                    <div className="p-4">
+                                        <h3 className="text-lg font-bold text-gray-900 mb-2 line-clamp-1">{order.title}</h3>
+
+                                        <div className="space-y-2 text-sm">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-gray-500">Quantity:</span>
+                                                <span className="font-semibold text-gray-900">{order.quantity}</span>
+                                            </div>
+
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-gray-500">Price:</span>
+                                                <span className="font-bold text-blue-600">
+                                                    {order.estimated_price ? formatCurrency(order.estimated_price) : 'Pending'}
+                                                </span>
+                                            </div>
+
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-gray-500">Submitted:</span>
+                                                <span className="text-gray-700">{formatDate(order.created_at)}</span>
+                                            </div>
+                                        </div>
+
+                                        {/* Payment Status Indicator */}
+                                        {order.payment_verified_at && (
+                                            <div className="mt-3 pt-3 border-t border-gray-100">
+                                                <span className="inline-flex items-center gap-1 text-xs text-green-600 font-medium">
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                                                    </svg>
+                                                    Payment Verified
+                                                </span>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             ))}
@@ -478,7 +582,7 @@ export default function CustomOrders() {
                 </>
             )}
 
-            {/* ===== CREATE ORDER MODAL ===== */}
+            {/* ===== CREATE ORDER MODAL - UPDATED FOR MULTIPLE IMAGES ===== */}
             {showCreateModal && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={closeAllModals}>
                     <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
@@ -508,18 +612,61 @@ export default function CustomOrders() {
                                     <label className="block text-sm font-medium text-gray-700 mb-2">Quantity *</label>
                                     <input type="number" min="1" value={formState.quantity} onChange={(e) => setFormState({ ...formState, quantity: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" required />
                                 </div>
+
+                                {/* ✅ UPDATED: Multiple Image Upload Section */}
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Design Image <span className="text-red-500">*</span></label>
-                                    <div className="border-2 border-dashed border-gray-300 rounded-lg overflow-hidden">
-                                        <input type="file" accept="image/*" onChange={(e) => { const file = e.target.files[0]; setFormState({ ...formState, design_image: file }); if (file) { setImagePreview(URL.createObjectURL(file)); } }} className="hidden" id="design-image-upload" required />
-                                        <label htmlFor="design-image-upload" className="cursor-pointer block">
-                                            {imagePreview ? (
-                                                <div className="relative"><div className="w-full h-64"><img src={imagePreview} alt="Preview" className="w-full h-full object-cover" /></div><div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white px-4 py-2"><p className="text-sm font-medium truncate">✅ {formState.design_image?.name}</p></div></div>
-                                            ) : (
-                                                <div className="p-8 text-center"><svg className="w-12 h-12 text-gray-400 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg><p className="text-sm text-gray-600 font-medium">Click to upload <span className="text-red-500">*</span></p></div>
-                                            )}
-                                        </label>
-                                    </div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Design Images <span className="text-red-500">*</span>
+                                        <span className="text-xs text-gray-500 ml-2">(Up to 5 images)</span>
+                                    </label>
+
+                                    {/* Image Preview Grid */}
+                                    {imagePreviews.length > 0 && (
+                                        <div className="grid grid-cols-3 gap-3 mb-3">
+                                            {imagePreviews.map((preview, index) => (
+                                                <div key={index} className="relative aspect-square bg-gray-100 rounded-lg overflow-hidden group">
+                                                    <img src={preview} alt={`Design ${index + 1}`} className="w-full h-full object-cover" />
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => removeImage(index)}
+                                                        className="absolute top-1 right-1 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-md"
+                                                    >
+                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                                        </svg>
+                                                    </button>
+                                                    <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs px-2 py-1">
+                                                        Image {index + 1}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {/* Upload Button */}
+                                    {formState.design_images.length < 5 && (
+                                        <div className="border-2 border-dashed border-gray-300 rounded-lg overflow-hidden hover:border-blue-400 transition-colors">
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                multiple
+                                                onChange={handleImageChange}
+                                                className="hidden"
+                                                id="design-images-upload"
+                                            />
+                                            <label htmlFor="design-images-upload" className="cursor-pointer block p-6 text-center">
+                                                <svg className="w-12 h-12 text-gray-400 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                </svg>
+                                                <p className="text-sm text-gray-600 font-medium">
+                                                    Click to upload images
+                                                </p>
+                                                <p className="text-xs text-gray-500 mt-1">
+                                                    {formState.design_images.length}/5 uploaded
+                                                </p>
+                                            </label>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
@@ -532,7 +679,7 @@ export default function CustomOrders() {
                 </div>
             )}
 
-            {/* ===== ORDER DETAILS MODAL ===== */}
+            {/* ===== ORDER DETAILS MODAL - UPDATED TO SHOW MULTIPLE IMAGES ===== */}
             {showViewModal && selectedOrder && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={closeAllModals}>
                     <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
@@ -552,9 +699,43 @@ export default function CustomOrders() {
                         </div>
 
                         <div className="overflow-y-auto flex-1 p-6 space-y-4">
-                            {selectedOrder.design_image && (
+                            {/* ✅ UPDATED: Show multiple design images if available */}
+                            {selectedOrder.design_images && selectedOrder.design_images.length > 0 ? (
+                                <div className="grid grid-cols-2 gap-3">
+                                    {selectedOrder.design_images.map((img, idx) => (
+                                        <div key={idx} className="w-full aspect-video bg-gray-100 rounded-lg overflow-hidden">
+                                            <img
+                                                src={`http://127.0.0.1:8000/storage/${img}`}
+                                                alt={`${selectedOrder.title} - Design ${idx + 1}`}
+                                                className="w-full h-full object-cover"
+                                                onError={(e) => {
+                                                    e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2YzZjRmNiIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM5Y2EzYWYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5JbWFnZSBub3QgZm91bmQ8L3RleHQ+PC9zdmc+';
+                                                }}
+                                            />
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : selectedOrder.design_image ? (
+                                /* Fallback for old single-image orders */
                                 <div className="w-full h-48 bg-gray-100 rounded-lg overflow-hidden">
-                                    <img src={`http://127.0.0.1:8000/storage/${selectedOrder.design_image}`} alt={selectedOrder.title} className="w-full h-full object-cover" />
+                                    <img
+                                        src={`http://127.0.0.1:8000/storage/${selectedOrder.design_image}`}
+                                        alt={selectedOrder.title}
+                                        className="w-full h-full object-cover"
+                                        onError={(e) => {
+                                            e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2YzZjRmNiIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM5Y2EzYWYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5JbWFnZSBub3QgZm91bmQ8L3RleHQ+PC9zdmc+';
+                                        }}
+                                    />
+                                </div>
+                            ) : (
+                                /* No image placeholder */
+                                <div className="w-full h-48 bg-gray-100 rounded-lg flex items-center justify-center">
+                                    <div className="text-center">
+                                        <svg className="w-12 h-12 text-gray-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                        </svg>
+                                        <p className="text-sm text-gray-500">No design image uploaded</p>
+                                    </div>
                                 </div>
                             )}
 
@@ -614,7 +795,7 @@ export default function CustomOrders() {
                 </div>
             )}
 
-            {/* ===== CHECKOUT MODAL (Step 1) ===== */}
+            {/* ===== CHECKOUT MODAL (Step 1) - UPDATED TO SHOW FIRST IMAGE ===== */}
             {showCheckoutModal && selectedOrder && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={closeAllModals}>
                     <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full" onClick={(e) => e.stopPropagation()}>
@@ -723,7 +904,14 @@ export default function CustomOrders() {
                                         <h4 className="font-semibold text-gray-900 mb-3">Order Summary</h4>
 
                                         <div className="flex items-center gap-3 mb-3 pb-3 border-b border-gray-200">
-                                            {selectedOrder.design_image ? (
+                                            {/* ✅ UPDATED: Show first image from array or fallback */}
+                                            {selectedOrder.design_images && selectedOrder.design_images.length > 0 ? (
+                                                <img
+                                                    src={`http://127.0.0.1:8000/storage/${selectedOrder.design_images[0]}`}
+                                                    alt={selectedOrder.title}
+                                                    className="w-12 h-12 rounded object-cover"
+                                                />
+                                            ) : selectedOrder.design_image ? (
                                                 <img
                                                     src={`http://127.0.0.1:8000/storage/${selectedOrder.design_image}`}
                                                     alt={selectedOrder.title}
@@ -780,7 +968,7 @@ export default function CustomOrders() {
                 </div>
             )}
 
-            {/* ===== PAYMENT MODAL (Step 2) ===== */}
+            {/* ===== PAYMENT MODAL (Step 2) - UPDATED TO SHOW FIRST IMAGE ===== */}
             {showPaymentModal && selectedOrder && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={closeAllModals}>
                     <form onSubmit={handleUploadPayment} className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
@@ -860,7 +1048,14 @@ export default function CustomOrders() {
                                         <h4 className="font-semibold text-gray-900 mb-3">Order Summary</h4>
 
                                         <div className="flex items-center gap-3 mb-3 pb-3 border-b border-gray-200">
-                                            {selectedOrder.design_image ? (
+                                            {/* ✅ UPDATED: Show first image from array or fallback */}
+                                            {selectedOrder.design_images && selectedOrder.design_images.length > 0 ? (
+                                                <img
+                                                    src={`http://127.0.0.1:8000/storage/${selectedOrder.design_images[0]}`}
+                                                    alt={selectedOrder.title}
+                                                    className="w-12 h-12 rounded object-cover"
+                                                />
+                                            ) : selectedOrder.design_image ? (
                                                 <img
                                                     src={`http://127.0.0.1:8000/storage/${selectedOrder.design_image}`}
                                                     alt={selectedOrder.title}

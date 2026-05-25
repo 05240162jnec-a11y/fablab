@@ -12,24 +12,24 @@ use Illuminate\Support\Str;
 class CustomOrderController extends Controller
 {
     public function index(Request $request)
-{
-    $user = Auth::user();
+    {
+        $user = Auth::user();
 
-    $query = CustomOrder::where('user_id', $user->id)
-        ->with('assignedUser');
+        $query = CustomOrder::where('user_id', $user->id)
+            ->with('assignedUser');
 
-    // Filter by status
-    if ($request->has('status') && $request->status) {
-        $query->where('status', $request->status);
+        // Filter by status
+        if ($request->has('status') && $request->status) {
+            $query->where('status', $request->status);
+        }
+
+        $orders = $query->latest()->paginate(10);
+
+        return response()->json([
+            'success' => true,
+            'data' => $orders,  // Returns { success: true, data: [...] }
+        ]);
     }
-
-    $orders = $query->latest()->paginate(10);
-
-    return response()->json([
-        'success' => true,
-        'data' => $orders,  // Returns { success: true,  [...] }
-    ]);
-}
 
     /**
      * Get single custom order details
@@ -48,30 +48,45 @@ class CustomOrderController extends Controller
     }
 
     /**
-     * Create new custom order
+     * ✅ UPDATED: Create new custom order with multiple design images
      */
     public function store(Request $request)
-    {
-        $user = Auth::user();
+{
+    $user = Auth::user();
 
-        $validated = $request->validate([
-            'title' => 'required|string|max:255',
-            'description' => 'required|string',
-            'quantity' => 'required|integer|min:1',
-            'design_image' => 'required|image|max:5120', // 5MB max
-        ]);
+    $validated = $request->validate([
+        'title' => 'required|string|max:255',
+        'description' => 'required|string',
+        'quantity' => 'required|integer|min:1',
+        'design_images.*' => 'required|image|max:5120',
+    ]);
 
-        // Generate unique order number
-        $orderNumber = 'CO-' . date('Y') . '-' . strtoupper(Str::random(6));
+    // ✅ ADD THIS DEBUG CODE:
+    \Log::info('Files received:', [
+        'has_files' => $request->hasFile('design_images'),
+        'file_count' => $request->hasFile('design_images') ? count($request->file('design_images')) : 0,
+        'all_input' => $request->all(),
+    ]);
 
-        // Handle image upload
-        if ($request->hasFile('design_image')) {
-            $validated['design_image'] = $request->file('design_image')->store('custom-orders', 'public');
+    // Generate unique order number
+    $orderNumber = 'CO-' . date('Y') . '-' . strtoupper(Str::random(6));
+
+    // Handle multiple image uploads
+    $imagePaths = [];
+    if ($request->hasFile('design_images')) {
+        foreach ($request->file('design_images') as $file) {
+            $path = $file->store('custom-orders', 'public');
+            $imagePaths[] = $path;
         }
+    }
+
+ 
 
         $validated['user_id'] = $user->id;
         $validated['order_number'] = $orderNumber;
         $validated['status'] = 'pending'; // Initial status
+        // ✅ Store image paths as JSON array
+        $validated['design_images'] = $imagePaths; // Let Laravel's cast handle JSON
 
         $order = CustomOrder::create($validated);
 

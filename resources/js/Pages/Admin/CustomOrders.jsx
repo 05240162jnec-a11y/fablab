@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useDialog } from '../../Components/UniformDialogManager';
 
 export default function CustomOrders() {
     // Data States
@@ -204,7 +205,15 @@ export default function CustomOrders() {
 
     // ✅ Delete order
     const handleDelete = async (id) => {
-        if (!window.confirm('Are you sure you want to delete this order?')) return;
+        const { showConfirm } = useDialog();
+        const confirmed = await showConfirm({
+            title: 'Confirm delete',
+            message: 'Are you sure you want to delete this order?',
+            confirmText: 'Delete',
+            cancelText: 'Cancel',
+        });
+        if (!confirmed) return;
+
 
         try {
             const authToken = localStorage.getItem('admin_token');

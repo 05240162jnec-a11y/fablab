@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useDialog } from '../../Components/UniformDialogManager';
 
 export default function CustomOrders() {
     // Modal States
@@ -29,7 +30,7 @@ export default function CustomOrders() {
     // Checkout State
     const [deliveryOption, setDeliveryOption] = useState('pickup'); // 'pickup' or 'shipping'
     const [shippingAddress, setShippingAddress] = useState('');
-    const [shippingCost] = useState(150); // Fixed shipping cost
+    const [shippingCost] = useState(150); // Fixed shipping cost (not displayed)
 
     // Form Loading State
     const [submitting, setSubmitting] = useState(false);
@@ -779,23 +780,40 @@ export default function CustomOrders() {
                         </div>
 
                         <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-100 flex-shrink-0 bg-gray-50">
+                            {/* Cancel Order Button */}
                             {!selectedOrder.payment_verified_at && selectedOrder.status !== 'completed' && selectedOrder.status !== 'cancelled' && (
                                 <button onClick={() => handleCancelOrder(selectedOrder.id)} className="px-4 py-2 text-sm font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors">
                                     Cancel Order
                                 </button>
                             )}
 
-                            {selectedOrder.estimated_price && !selectedOrder.payment_verified_at && selectedOrder.status !== 'cancelled' && (
-                                <button onClick={handleOpenCheckout} className="px-6 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors">
-                                    Make Payment
-                                </button>
+                            {/* ✅ Make Payment Button - Only show if:
+        - Price is set AND
+        - Payment NOT verified AND
+        - Order NOT cancelled AND
+        - (No payment uploaded OR Payment was rejected)
+    */}
+                            {selectedOrder.estimated_price &&
+                                !selectedOrder.payment_verified_at &&
+                                selectedOrder.status !== 'cancelled' &&
+                                (!selectedOrder.payment_screenshot || selectedOrder.status === 'rejected') && (
+                                    <button onClick={handleOpenCheckout} className="px-6 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors">
+                                        Make Payment
+                                    </button>
+                                )}
+
+                            {/* Show message if payment already uploaded */}
+                            {selectedOrder.payment_screenshot && !selectedOrder.payment_verified_at && selectedOrder.status !== 'rejected' && (
+                                <div className="text-sm text-gray-500">
+                                    Payment uploaded - awaiting verification
+                                </div>
                             )}
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* ===== CHECKOUT MODAL (Step 1) - UPDATED TO SHOW FIRST IMAGE ===== */}
+            {/* ===== CHECKOUT MODAL (Step 1) - UPDATED WITH BOTH DELIVERY OPTIONS ===== */}
             {showCheckoutModal && selectedOrder && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={closeAllModals}>
                     <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full" onClick={(e) => e.stopPropagation()}>
@@ -826,7 +844,7 @@ export default function CustomOrders() {
                         {/* Content */}
                         <div className="p-6">
                             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                                {/* Left: Delivery Options */}
+                                {/* Left: Both Delivery Options */}
                                 <div className="lg:col-span-2 space-y-4">
                                     <h4 className="font-semibold text-gray-900 mb-3">Delivery Option</h4>
 
@@ -877,7 +895,6 @@ export default function CustomOrders() {
                                                     <p className="font-medium text-gray-900">Ship to Address</p>
                                                 </div>
                                                 <p className="text-sm text-gray-600 mt-1 ml-7">We will ship your order to your provided address. Shipping cost must be bare by you</p>
-                                                <p className="text-sm font-medium text-purple-600 mt-2 ml-7">Shipping Cost: Nu. {shippingCost.toFixed(2)}</p>
                                             </div>
                                         </div>
                                     </div>
@@ -891,7 +908,7 @@ export default function CustomOrders() {
                                                 onChange={(e) => setShippingAddress(e.target.value)}
                                                 rows="3"
                                                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 resize-none"
-                                                placeholder="Enter your complete address..."
+                                                placeholder="Enter your current address"
                                                 required
                                             />
                                         </div>
@@ -904,7 +921,7 @@ export default function CustomOrders() {
                                         <h4 className="font-semibold text-gray-900 mb-3">Order Summary</h4>
 
                                         <div className="flex items-center gap-3 mb-3 pb-3 border-b border-gray-200">
-                                            {/* ✅ UPDATED: Show first image from array or fallback */}
+                                            {/* Show first image from array or fallback */}
                                             {selectedOrder.design_images && selectedOrder.design_images.length > 0 ? (
                                                 <img
                                                     src={`http://127.0.0.1:8000/storage/${selectedOrder.design_images[0]}`}
@@ -933,19 +950,9 @@ export default function CustomOrders() {
 
                                         <div className="space-y-2 text-sm">
                                             <div className="flex justify-between">
-                                                <span className="text-gray-600">Items Total:</span>
-                                                <span className="font-medium">{formatCurrency(selectedOrder.estimated_price)}</span>
-                                            </div>
-                                            {deliveryOption === 'shipping' && (
-                                                <div className="flex justify-between">
-                                                    <span className="text-gray-600">Shipping Cost:</span>
-                                                    <span className="font-medium text-purple-600">Nu. {shippingCost.toFixed(2)}</span>
-                                                </div>
-                                            )}
-                                            <div className="border-t border-gray-300 pt-2 flex justify-between">
-                                                <span className="font-semibold text-gray-900">Total:</span>
+                                                <span className="text-gray-600">Total:</span>
                                                 <span className="font-bold text-blue-600 text-lg">
-                                                    Nu. {calculateTotal().toFixed(2)}
+                                                    {formatCurrency(selectedOrder.estimated_price)}
                                                 </span>
                                             </div>
                                         </div>
@@ -1077,19 +1084,9 @@ export default function CustomOrders() {
 
                                         <div className="space-y-2 text-sm">
                                             <div className="flex justify-between">
-                                                <span className="text-gray-600">Items Total:</span>
-                                                <span className="font-medium">{formatCurrency(selectedOrder.estimated_price)}</span>
-                                            </div>
-                                            {deliveryOption === 'shipping' && (
-                                                <div className="flex justify-between">
-                                                    <span className="text-gray-600">Shipping:</span>
-                                                    <span className="font-medium text-purple-600">Nu. {shippingCost.toFixed(2)}</span>
-                                                </div>
-                                            )}
-                                            <div className="border-t border-gray-300 pt-2 flex justify-between">
-                                                <span className="font-semibold text-gray-900">Total:</span>
+                                                <span className="text-gray-600">Total:</span>
                                                 <span className="font-bold text-blue-600 text-lg">
-                                                    Nu. {calculateTotal().toFixed(2)}
+                                                    {formatCurrency(selectedOrder.estimated_price)}
                                                 </span>
                                             </div>
                                         </div>

@@ -216,6 +216,77 @@ class ProductOrderController extends Controller
     }
 
     /**
+     * ✅ NEW: Upload payment screenshot for rejected orders (re-upload)
+     */
+    public function uploadPayment(Request $request, $id)
+    {
+        try {
+            $order = ProductOrder::findOrFail($id);
+            
+            // Check if order belongs to authenticated user
+            if ($order->user_id !== Auth::id()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized'
+                ], 403);
+            }
+            
+            // Check if order is rejected and can accept re-upload
+            if ($order->status !== 'rejected') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Payment can only be uploaded for rejected orders'
+                ], 400);
+            }
+            
+            // Check if deadline has passed
+            if ($order->rejection_deadline && $order->rejection_deadline < now()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Rejection deadline has passed. Please place a new order.'
+                ], 400);
+            }
+            
+            // Validate file
+            $request->validate([
+                'payment_screenshot' => 'required|image|mimes:jpeg,png,jpg,gif|max:5120', // 5MB max
+            ]);
+            
+            // Store the screenshot
+            if ($request->hasFile('payment_screenshot')) {
+                // Delete old screenshot if exists
+                if ($order->payment_screenshot) {
+                    Storage::disk('public')->delete($order->payment_screenshot);
+                }
+                
+                $file = $request->file('payment_screenshot');
+                $path = $file->store('product_orders', 'public');
+                
+                $order->update([
+                    'payment_screenshot' => $path,
+                    'status' => 'pending', // Reset to pending for re-verification
+                    'payment_rejected_at' => null,
+                    'rejection_deadline' => null,
+                    'delivery_option' => $request->delivery_option ?? $order->delivery_option,
+                    'shipping_address' => $request->shipping_address ?? $order->shipping_address,
+                ]);
+            }
+            
+            return response()->json([
+                'success' => true,
+                'message' => 'Payment screenshot uploaded successfully. We will verify it shortly.',
+                'order' => $order
+            ]);
+            
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to upload payment: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Cancel a pending order.
      */
     public function cancel($id)

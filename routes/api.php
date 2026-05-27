@@ -32,10 +32,10 @@ Route::prefix('admin')->group(function () {
             ->only(['index']);
         Route::post('bookings/{id}/update-status', [\App\Http\Controllers\Api\Admin\BookingController::class, 'updateStatus']);
 
-        // ✅ Terminate booking for no-show (admin only) - FIXED: removed duplicate 'admin' prefix
+        // ✅ Terminate booking for no-show (admin only)
         Route::post('bookings/{id}/terminate', [\App\Http\Controllers\Api\Admin\BookingController::class, 'terminateBooking']);
 
-        // ✅ FIXED: Product Orders (Admin Management)
+        // ✅ Product Orders (Admin Management)
         Route::apiResource('product-orders', \App\Http\Controllers\Api\Admin\ProductOrderController::class)
             ->only(['index', 'show', 'destroy']);
         Route::post('product-orders/{id}/approve', [\App\Http\Controllers\Api\Admin\ProductOrderController::class, 'approve']);
@@ -49,7 +49,7 @@ Route::prefix('admin')->group(function () {
         Route::put('/products/{product}/toggle-status', [App\Http\Controllers\Api\Admin\ProductController::class, 'toggleStatus']);
         Route::delete('/products/{product}', [App\Http\Controllers\Api\Admin\ProductController::class, 'destroy']);
 
-        // ✅ Custom Orders (Admin Management) - UPDATED
+        // ✅ Custom Orders (Admin Management)
         Route::get('/custom-orders', [\App\Http\Controllers\Api\Admin\CustomOrderController::class, 'index']);
         Route::get('/custom-orders/production-team', [\App\Http\Controllers\Api\Admin\CustomOrderController::class, 'getProductionTeam']);
         Route::get('/custom-orders/{id}', [\App\Http\Controllers\Api\Admin\CustomOrderController::class, 'show']);
@@ -111,7 +111,7 @@ Route::prefix('admin')->group(function () {
         Route::put('/faq/{id}', [App\Http\Controllers\Api\FAQController::class, 'update']);
         Route::delete('/faq/{id}', [App\Http\Controllers\Api\FAQController::class, 'destroy']);
 
-        // ✅ CORRECT: Just use /profile since we're already in admin prefix
+        // ✅ Profile routes (admin)
         Route::get('/profile', [\App\Http\Controllers\Api\Admin\ProfileController::class, 'show']);
         Route::post('/profile/update', [\App\Http\Controllers\Api\Admin\ProfileController::class, 'update']);
         Route::post('/profile/change-password', [\App\Http\Controllers\Api\Admin\ProfileController::class, 'changePassword']);
@@ -152,30 +152,36 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user/my-bookings', [App\Http\Controllers\Api\UserBookingController::class, 'myBookings']);
     Route::post('/user/bookings/{id}/cancel', [App\Http\Controllers\Api\UserBookingController::class, 'cancel']);
     
-    // ✅ Custom Orders (User) - UPDATED
+    // ✅ Custom Orders (User)
     Route::get('/user/custom-orders', [\App\Http\Controllers\Api\User\CustomOrderController::class, 'index']);
     Route::post('/user/custom-orders', [\App\Http\Controllers\Api\User\CustomOrderController::class, 'store']);
     Route::get('/user/custom-orders/{id}', [\App\Http\Controllers\Api\User\CustomOrderController::class, 'show']);
     
-    // ✅ NEW: Upload payment screenshot
+    // ✅ NEW: Upload payment screenshot for custom orders
     Route::post('/user/custom-orders/{id}/upload-payment', [\App\Http\Controllers\Api\User\CustomOrderController::class, 'uploadPayment']);
     
-    // ✅ NEW: Cancel order (before payment verified)
+    // ✅ NEW: Cancel custom order (before payment verified)
     Route::post('/user/custom-orders/{id}/cancel', [\App\Http\Controllers\Api\User\CustomOrderController::class, 'cancel']);
     
     // ✅ Get production team for display
     Route::get('/user/custom-orders/production-team', [\App\Http\Controllers\Api\User\CustomOrderController::class, 'getProductionTeam']);
 
-    // ✅ Product Orders (Shop)
+    // ✅ Product Orders (Shop) - FIXED: Use correct controller namespace
     Route::get('/user/product-orders', [\App\Http\Controllers\Api\User\ProductOrderController::class, 'index']);
     Route::post('/user/product-orders', [\App\Http\Controllers\Api\User\ProductOrderController::class, 'store']);
     Route::get('/user/product-orders/{id}', [\App\Http\Controllers\Api\User\ProductOrderController::class, 'show']);
     
-    // ✅ Cancel and screenshot
+    // ✅ NEW: Upload payment screenshot for rejected product orders (re-upload)
+    Route::post('/user/product-orders/{id}/upload-payment', [\App\Http\Controllers\Api\User\ProductOrderController::class, 'uploadPayment']);
+    
+    // ✅ Cancel product order
     Route::post('/user/product-orders/{id}/cancel', [\App\Http\Controllers\Api\User\ProductOrderController::class, 'cancel']);
+    
+    // ✅ Get payment screenshot URL
     Route::get('/user/product-orders/{id}/screenshot', [\App\Http\Controllers\Api\User\ProductOrderController::class, 'screenshot']);
     
 });
+
 // ==========================================
 // ✅ PRODUCTION TEAM ROUTES (Authenticated)
 // ==========================================

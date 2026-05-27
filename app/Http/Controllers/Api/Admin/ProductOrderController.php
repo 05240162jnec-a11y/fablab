@@ -89,9 +89,13 @@ class ProductOrderController extends Controller
             'rejection_reason' => 'required|string|min:10'
         ]);
         
+        // ✅ UPDATED: Add 24-hour rejection deadline tracking
         $order->update([
             'status' => 'rejected',
-            'rejection_reason' => $request->rejection_reason
+            'rejection_reason' => $request->rejection_reason,
+            'payment_rejected_at' => now(),
+            'rejection_deadline' => now()->addHours(24),
+            'permanently_rejected' => false,
         ]);
         
         // ✅ Send rejection email
@@ -105,7 +109,11 @@ class ProductOrderController extends Controller
             // Don't fail the rejection if email fails
         }
         
-        return response()->json(['success' => true, 'message' => 'Rejected', 'order' => $order]);
+        return response()->json([
+            'success' => true, 
+            'message' => 'Rejected. User has 24 hours to re-upload payment.', 
+            'order' => $order
+        ]);
         
     } catch (\Exception $e) {
         return response()->json([

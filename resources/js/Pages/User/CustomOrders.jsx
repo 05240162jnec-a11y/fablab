@@ -1126,7 +1126,7 @@ export default function CustomOrders() {
                             </svg>
                         </div>
                         <h3 className="text-xl font-bold text-gray-900 mb-2">Success!</h3>
-                        <p className="text-gray-600 text-sm mb-6">Your payment has been submitted. We will verify it shortly.</p>
+                        <p className="text-gray-600 text-sm mb-6">Thank you for your order. We are verifying your payment details and will update you soon.</p>
                         <button onClick={closeAllModals} className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Close</button>
                     </div>
                 </div>

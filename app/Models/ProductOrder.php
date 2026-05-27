@@ -21,12 +21,17 @@ class ProductOrder extends Model
         'payment_screenshot',
         'status',
         'rejection_reason',
+        'payment_rejected_at',   // ✅ ADD THIS
+        'rejection_deadline',    // ✅ ADD THIS
+        'permanently_rejected',  // ✅ ADD THIS
     ];
 
     protected $casts = [
         'items' => 'array',
         'total_amount' => 'decimal:2',
-        'shipping_cost' => 'decimal:2',
+        'payment_rejected_at' => 'datetime',
+        'rejection_deadline' => 'datetime',
+        'permanently_rejected' => 'boolean',
     ];
 
     public function user(): BelongsTo

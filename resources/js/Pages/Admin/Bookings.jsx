@@ -1,10 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react'; // ✅ Added useRef
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 
 export default function Bookings() {
     const [activeTab, setActiveTab] = useState('machine-bookings');
-    // ✅ ADD THESE:
     const [admin, setAdmin] = useState(null);
     const [showDropdown, setShowDropdown] = useState(false);
     const dropdownRef = useRef(null);
@@ -50,14 +49,20 @@ export default function Bookings() {
         sessionStorage.clear();
         navigate('/login', { replace: true });
     };
+
     // Filter States
     const [searchTerm, setSearchTerm] = useState('');
-    // ✅ REMOVED: machineFilter, bookingStatusFilter (simplified UI)
     const [orderStatusFilter, setOrderStatusFilter] = useState('all');
     const [dateFilter, setDateFilter] = useState('');
 
+    // ✅ NEW: Custom Dialog States
+    const [showApproveDialog, setShowApproveDialog] = useState(false);
+    const [showRejectDialog, setShowRejectDialog] = useState(false);
+    const [rejectionReason, setRejectionReason] = useState('');
+
     // Modal States
     const [showScreenshotModal, setShowScreenshotModal] = useState(false);
+    const [showImageLightbox, setShowImageLightbox] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState(null);
 
     // ✅ NEW: Booking Details Modal
@@ -92,7 +97,6 @@ export default function Bookings() {
                     'Authorization': `Bearer ${token}`,
                 },
                 params: {
-                    // ✅ REMOVED: machine, status filters (simplified)
                     date: dateFilter || null,
                     search: searchTerm || null,
                 }
@@ -162,7 +166,6 @@ export default function Bookings() {
 
     // ✅ UPDATED: Simplified status badge (only Booked/Cancelled)
     const getBookingStatusBadgeClass = (status) => {
-        // Map internal statuses to simple display
         const displayStatus = status === 'confirmed' || status === 'upcoming' ? 'Booked' :
             status === 'cancelled' ? 'Cancelled' :
                 status === 'terminated' ? 'Terminated' : 'Booked';
@@ -232,8 +235,8 @@ export default function Bookings() {
             );
 
             setActionMessage('✅ Booking terminated. User notified via email.');
-            fetchData(); // Refresh list
-            setShowBookingDetailsModal(false); // Close modal
+            fetchData();
+            setShowBookingDetailsModal(false);
         } catch (err) {
             console.error('Terminate error:', err);
             alert('❌ Failed to terminate booking: ' + (err.response?.data?.message || err.message));
@@ -276,26 +279,41 @@ export default function Bookings() {
         }
     };
 
-    const handleApproveOrder = async (order) => {
-        if (approveLoading) return;
-        const confirmed = window.confirm(`Are you sure you want to approve order ${order.order_number}?`);
-        if (!confirmed) return;
+    // ✅ UPDATED: Show custom approve dialog
+    const handleApproveOrder = (order) => {
+        setSelectedOrder(order);
+        setShowApproveDialog(true);
+    };
+
+    // ✅ UPDATED: Show custom reject dialog
+    const handleRejectOrder = (order) => {
+        setSelectedOrder(order);
+        setRejectionReason('');
+        setShowRejectDialog(true);
+    };
+
+    // ✅ NEW: Confirm approve action
+    const confirmApproveOrder = async () => {
+        if (!selectedOrder) return;
+
         setApproveLoading(true);
         try {
             const token = localStorage.getItem('admin_token');
-            await axios.post(`http://127.0.0.1:8000/api/admin/product-orders/${order.id}/approve`, {}, {
+            await axios.post(`http://127.0.0.1:8000/api/admin/product-orders/${selectedOrder.id}/approve`, {}, {
                 headers: { 'Accept': 'application/json', 'Authorization': `Bearer ${token}` }
             });
-            setActionMessage(`✅ Order ${order.order_number} approved!`);
+            setActionMessage(`✅ Order ${selectedOrder.order_number} approved!`);
             fetchData();
             setShowScreenshotModal(false);
+            setShowApproveDialog(false);
             setSelectedOrder(null);
         } catch (err) {
             console.error('Approve error:', err);
             if (err.response?.data?.message?.includes('not pending')) {
-                setActionMessage(`✅ Order ${order.order_number} was already approved!`);
+                setActionMessage(`✅ Order ${selectedOrder.order_number} was already approved!`);
                 fetchData();
                 setShowScreenshotModal(false);
+                setShowApproveDialog(false);
                 setSelectedOrder(null);
             } else {
                 alert('❌ Failed to approve order');
@@ -305,28 +323,34 @@ export default function Bookings() {
         }
     };
 
-    const handleRejectOrder = async (order) => {
-        if (rejectLoading) return;
-        const reason = prompt('Enter rejection reason:');
-        if (!reason) return;
-        const confirmed = window.confirm(`Are you sure you want to reject order ${order.order_number}?\n\nReason: ${reason}`);
-        if (!confirmed) return;
+    // ✅ NEW: Confirm reject action
+    const confirmRejectOrder = async () => {
+        if (!selectedOrder || !rejectionReason.trim()) {
+            alert('Please enter a rejection reason');
+            return;
+        }
+
         setRejectLoading(true);
         try {
             const token = localStorage.getItem('admin_token');
-            await axios.post(`http://127.0.0.1:8000/api/admin/product-orders/${order.id}/reject`, { rejection_reason: reason }, {
+            await axios.post(`http://127.0.0.1:8000/api/admin/product-orders/${selectedOrder.id}/reject`, {
+                rejection_reason: rejectionReason
+            }, {
                 headers: { 'Accept': 'application/json', 'Authorization': `Bearer ${token}` }
             });
-            setActionMessage(`✅ Order ${order.order_number} rejected!`);
+            setActionMessage(`✅ Order ${selectedOrder.order_number} rejected!`);
             fetchData();
             setShowScreenshotModal(false);
+            setShowRejectDialog(false);
             setSelectedOrder(null);
+            setRejectionReason('');
         } catch (err) {
             console.error('Reject error:', err);
             if (err.response?.data?.message?.includes('not pending')) {
-                setActionMessage(`✅ Order ${order.order_number} was already rejected!`);
+                setActionMessage(`✅ Order ${selectedOrder.order_number} was already rejected!`);
                 fetchData();
                 setShowScreenshotModal(false);
+                setShowRejectDialog(false);
                 setSelectedOrder(null);
             } else {
                 alert('❌ Failed to reject order');
@@ -365,6 +389,7 @@ export default function Bookings() {
 
     const closeAllModals = () => {
         setShowScreenshotModal(false);
+        setShowImageLightbox(false);
         setSelectedOrder(null);
         setShowBookingDetailsModal(false);
         setSelectedBooking(null);
@@ -375,8 +400,8 @@ export default function Bookings() {
             <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
                 <div className="flex items-center justify-between px-6 py-4">
                     <div>
-                        <h2 className="text-xl font-semibold text-gray-800">Page Title</h2>
-                        <p className="text-sm text-gray-600">Description</p>
+                        <h2 className="text-xl font-semibold text-gray-800">Bookings & Orders</h2>
+                        <p className="text-sm text-gray-600">Manage Machine Bookings and Product orders</p>
                     </div>
 
                     {/* ✅ Right Side - Profile Dropdown */}
@@ -469,7 +494,6 @@ export default function Bookings() {
                             </div>
                             <div className="flex flex-col sm:flex-row gap-3">
                                 <input type="date" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)} className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                                {/* ✅ REMOVED: Machine & Status dropdowns */}
                                 <div className="relative">
                                     <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
                                     <input type="text" placeholder="Search by machine or user..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} onKeyDown={handleSearchKeyDown} className="pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:w-64" />
@@ -490,7 +514,6 @@ export default function Bookings() {
                                 </thead>
                                 <tbody className="divide-y divide-gray-100">
                                     {filteredBookings.map((booking) => (
-                                        // ✅ CLICKABLE ROW
                                         <tr
                                             key={booking.id}
                                             className="hover:bg-gray-50 transition-colors cursor-pointer"
@@ -499,9 +522,7 @@ export default function Bookings() {
                                             <td className="py-4 px-4 text-sm font-medium text-gray-900">{booking.machine?.name}</td>
                                             <td className="py-4 px-4 text-sm text-gray-600">{booking.user?.name}</td>
                                             <td className="py-4 px-4 text-sm text-gray-600">{formatDate(booking.booking_date)}</td>
-                                            {/* ✅ REAL TIME SLOT */}
                                             <td className="py-4 px-4 text-sm text-gray-600">{formatTimeSlot(booking.start_time, booking.end_time)}</td>
-                                            {/* ✅ SIMPLIFIED STATUS (read-only display) */}
                                             <td className="py-4 px-4">
                                                 <span className={`px-3 py-1 rounded-full text-xs font-medium border ${getBookingStatusBadgeClass(booking.status)}`}>
                                                     {booking.status === 'confirmed' || booking.status === 'upcoming' ? 'Booked' :
@@ -525,7 +546,7 @@ export default function Bookings() {
                     </div>
                 )}
 
-                {/* ✅ PRODUCT ORDERS TAB (unchanged) */}
+                {/* ✅ PRODUCT ORDERS TAB */}
                 {!initialLoading && !error && activeTab === 'product-orders' && (
                     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
                         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
@@ -570,7 +591,14 @@ export default function Bookings() {
                                         <p className="text-2xl font-bold text-blue-600">Nu. {parseFloat(order.total_amount || 0).toFixed(2)}</p>
                                     </div>
                                     <div className="mb-4 flex-1">
-                                        <img src={getScreenshotUrl(order)} alt={getProductName(order)} className="w-full h-48 object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity" onClick={() => handleViewScreenshot(order)} onError={(e) => { e.target.src = 'https://via.placeholder.com/400x300?text=No+Image'; }} />
+                                        {/* ✅ UPDATED: Smaller thumbnail + clickable for full view */}
+                                        <img
+                                            src={getScreenshotUrl(order)}
+                                            alt={getProductName(order)}
+                                            className="w-full h-32 object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
+                                            onClick={() => handleViewScreenshot(order)}
+                                            onError={(e) => { e.target.src = 'https://via.placeholder.com/400x300?text=No+Image'; }}
+                                        />
                                         <p className="text-xs text-gray-500 mt-2 text-center">Click to view details</p>
                                     </div>
                                     <button onClick={() => handleDeleteOrder(order)} disabled={actionLoading} className="w-full py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm font-medium disabled:opacity-50">
@@ -591,7 +619,7 @@ export default function Bookings() {
                 )}
             </main>
 
-            {/* ✅ Screenshot Modal (unchanged) */}
+            {/* ✅ Screenshot Modal - CORRECTED */}
             {showScreenshotModal && selectedOrder && (
                 <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onClick={closeAllModals}>
                     <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
@@ -605,8 +633,18 @@ export default function Bookings() {
                             </button>
                         </div>
                         <div className="p-6 overflow-y-auto flex-1 bg-gray-50">
-                            <img src={selectedOrder.image} alt={getProductName(selectedOrder)} className="w-full h-auto rounded-lg shadow-md" />
-                            <div className="mt-6 grid grid-cols-2 gap-4">
+                            {/* ✅ UPDATED: Smaller image + clickable for full view */}
+                            <div className="mb-6">
+                                <p className="text-sm text-gray-500 mb-2">Payment Screenshot</p>
+                                <img
+                                    src={selectedOrder.image}
+                                    alt={getProductName(selectedOrder)}
+                                    className="w-full h-64 object-contain rounded-lg cursor-pointer hover:opacity-90 transition-opacity border border-gray-200"
+                                    onClick={() => setShowImageLightbox(true)}
+                                />
+                                <p className="text-xs text-gray-500 mt-2 text-center">Click image to view full size</p>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
                                 <div className="bg-white p-4 rounded-lg border border-gray-200">
                                     <p className="text-sm text-gray-500 mb-1">Order Number</p>
                                     <p className="font-semibold text-gray-900">{selectedOrder.order_number}</p>
@@ -640,12 +678,7 @@ export default function Bookings() {
                                             <span className="text-gray-600">Products Total:</span>
                                             <span className="font-medium">Nu. {(parseFloat(selectedOrder.total_amount || 0) - parseFloat(selectedOrder.shipping_cost || 0)).toFixed(2)}</span>
                                         </div>
-                                        {selectedOrder.delivery_option === 'shipping' && selectedOrder.shipping_cost > 0 && (
-                                            <div className="flex justify-between text-sm">
-                                                <span className="text-gray-600">Shipping Cost (Fixed):</span>
-                                                <span className="font-medium text-purple-600">Nu. {parseFloat(selectedOrder.shipping_cost || 0).toFixed(2)}</span>
-                                            </div>
-                                        )}
+                                        {/* ✅ REMOVED: Shipping Cost line */}
                                         <div className="flex justify-between text-base pt-2 border-t border-blue-200">
                                             <span className="font-semibold text-gray-900">Total Paid:</span>
                                             <span className="font-bold text-blue-600">Nu. {parseFloat(selectedOrder.total_amount || 0).toFixed(2)}</span>
@@ -668,7 +701,12 @@ export default function Bookings() {
                         <div className="px-6 py-4 border-t border-gray-200 sticky bottom-0 bg-white rounded-b-2xl">
                             {selectedOrder.status === 'pending' ? (
                                 <div className="flex gap-3">
-                                    <button onClick={() => handleApproveOrder(selectedOrder)} disabled={approveLoading} className={`flex-1 py-3 rounded-lg transition-colors flex items-center justify-center gap-2 font-semibold ${approveLoading ? 'bg-gray-400 text-gray-200 cursor-not-allowed' : 'bg-green-600 text-white hover:bg-green-700'}`}>
+                                    {/* ✅ UPDATED: Approve Button - Shows Custom Dialog */}
+                                    <button
+                                        onClick={() => handleApproveOrder(selectedOrder)}
+                                        disabled={approveLoading}
+                                        className={`flex-1 py-3 rounded-lg transition-colors flex items-center justify-center gap-2 font-semibold ${approveLoading ? 'bg-gray-400 text-gray-200 cursor-not-allowed' : 'bg-green-600 text-white hover:bg-green-700'}`}
+                                    >
                                         {approveLoading ? (<>
                                             <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                                             Processing...
@@ -677,7 +715,12 @@ export default function Bookings() {
                                             Approve Order
                                         </>)}
                                     </button>
-                                    <button onClick={() => handleRejectOrder(selectedOrder)} disabled={rejectLoading} className={`flex-1 py-3 rounded-lg transition-colors flex items-center justify-center gap-2 font-semibold ${rejectLoading ? 'bg-gray-400 text-gray-200 cursor-not-allowed' : 'bg-red-600 text-white hover:bg-red-700'}`}>
+                                    {/* ✅ UPDATED: Reject Button - Shows Custom Dialog */}
+                                    <button
+                                        onClick={() => handleRejectOrder(selectedOrder)}
+                                        disabled={rejectLoading}
+                                        className={`flex-1 py-3 rounded-lg transition-colors flex items-center justify-center gap-2 font-semibold ${rejectLoading ? 'bg-gray-400 text-gray-200 cursor-not-allowed' : 'bg-red-600 text-white hover:bg-red-700'}`}
+                                    >
                                         {rejectLoading ? (<>
                                             <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                                             Processing...
@@ -695,6 +738,121 @@ export default function Bookings() {
                                     )}
                                 </div>
                             )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ✅ NEW: Full-Size Image Lightbox */}
+            {showImageLightbox && selectedOrder && (
+                <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-[60] p-4" onClick={() => setShowImageLightbox(false)}>
+                    <div className="relative max-w-5xl w-full" onClick={(e) => e.stopPropagation()}>
+                        <button
+                            onClick={() => setShowImageLightbox(false)}
+                            className="absolute -top-10 right-0 text-white hover:text-gray-300 transition-colors"
+                        >
+                            <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                        <img
+                            src={selectedOrder.image}
+                            alt={getProductName(selectedOrder)}
+                            className="w-full h-auto max-h-[85vh] object-contain rounded-lg"
+                        />
+                    </div>
+                </div>
+            )}
+
+            {/* ✅ NEW: Custom Approve Dialog - Green Theme */}
+            {showApproveDialog && selectedOrder && (
+                <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[70] p-4" onClick={() => setShowApproveDialog(false)}>
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+                        {/* Success Icon */}
+                        <div className="flex justify-center pt-8 pb-4">
+                            <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center">
+                                <svg className="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                                </svg>
+                            </div>
+                        </div>
+
+                        {/* Content */}
+                        <div className="px-6 pb-6 text-center">
+                            <h3 className="text-2xl font-bold text-gray-900 mb-2">Approve Order?</h3>
+                            <p className="text-gray-600 mb-2">{selectedOrder.order_number}</p>
+                            <p className="text-sm text-gray-500">This will confirm the payment and notify the user via email.</p>
+                        </div>
+
+                        {/* Buttons */}
+                        <div className="px-6 pb-6 flex gap-3">
+                            <button
+                                onClick={() => setShowApproveDialog(false)}
+                                className="flex-1 px-4 py-3 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-semibold"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={confirmApproveOrder}
+                                disabled={approveLoading}
+                                className={`flex-1 px-4 py-3 rounded-xl transition-colors font-semibold text-white ${approveLoading ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'}`}
+                            >
+                                {approveLoading ? 'Processing...' : 'Approve Order'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ✅ NEW: Custom Reject Dialog - Red Theme */}
+            {showRejectDialog && selectedOrder && (
+                <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[70] p-4" onClick={() => setShowRejectDialog(false)}>
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+                        {/* Warning Icon */}
+                        <div className="flex justify-center pt-8 pb-4">
+                            <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center">
+                                <svg className="w-10 h-10 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </div>
+                        </div>
+
+                        {/* Content */}
+                        <div className="px-6 pb-6">
+                            <h3 className="text-2xl font-bold text-gray-900 mb-2 text-center">Reject Order</h3>
+                            <p className="text-gray-600 mb-4 text-center">{selectedOrder.order_number}</p>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Rejection Reason *</label>
+                                <textarea
+                                    value={rejectionReason}
+                                    onChange={(e) => setRejectionReason(e.target.value)}
+                                    placeholder="Enter reason for rejection..."
+                                    rows="4"
+                                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 resize-none"
+                                    autoFocus
+                                />
+                            </div>
+                        </div>
+
+                        {/* Buttons */}
+                        <div className="px-6 pb-6 flex gap-3">
+                            <button
+                                onClick={() => {
+                                    setShowRejectDialog(false);
+                                    setRejectionReason('');
+                                }}
+                                className="flex-1 px-4 py-3 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-semibold"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={confirmRejectOrder}
+                                disabled={rejectLoading || !rejectionReason.trim()}
+                                className={`flex-1 px-4 py-3 rounded-xl transition-colors font-semibold text-white ${rejectLoading || !rejectionReason.trim() ? 'bg-gray-400 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700'}`}
+                            >
+                                {rejectLoading ? 'Processing...' : 'Reject Order'}
+                            </button>
                         </div>
                     </div>
                 </div>

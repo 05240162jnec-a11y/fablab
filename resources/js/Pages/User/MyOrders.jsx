@@ -19,7 +19,20 @@ export default function MyOrders() {
     // Modal States
     const [showDetailsModal, setShowDetailsModal] = useState(false);
     const [showScreenshotModal, setShowScreenshotModal] = useState(false);
+    const [showPaymentModal, setShowPaymentModal] = useState(false);
+    const [showSuccessModal, setShowSuccessModal] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState(null);
+
+    // Checkout State
+    const [deliveryOption, setDeliveryOption] = useState('pickup');
+    const [shippingAddress, setShippingAddress] = useState('');
+    const [shippingCost] = useState(150);
+
+    // Form Loading State
+    const [submitting, setSubmitting] = useState(false);
+
+    // ✅ NEW: Countdown timer state (updates every minute)
+    const [currentTime, setCurrentTime] = useState(new Date());
 
     // Separate close functions
     const closeDetailsModal = () => {
@@ -29,14 +42,23 @@ export default function MyOrders() {
 
     const closeScreenshotModal = () => {
         setShowScreenshotModal(false);
-        // Keep selectedOrder for details modal
     };
 
     const closeAllModals = () => {
         setShowDetailsModal(false);
         setShowScreenshotModal(false);
+        setShowPaymentModal(false);
+        setShowSuccessModal(false);
         setSelectedOrder(null);
     };
+
+    // ✅ NEW: Update current time every minute for countdown
+    useEffect(() => {
+        const timer = setInterval(() => {
+            setCurrentTime(new Date());
+        }, 60000); // Update every minute
+        return () => clearInterval(timer);
+    }, []);
 
     // Fetch orders from API
     const fetchOrders = async () => {
@@ -184,6 +206,80 @@ export default function MyOrders() {
 
         // ✅ Add /storage/ prefix
         return `http://127.0.0.1:8000/storage/${imagePath}`;
+    };
+
+    // ✅ NEW: Calculate time remaining for rejection deadline
+    const getTimeRemaining = (deadline) => {
+        if (!deadline) return null;
+        const total = Date.parse(deadline) - currentTime.getTime();
+        if (total <= 0) return { expired: true };
+        const hours = Math.floor((total / (1000 * 60 * 60)) % 24);
+        const minutes = Math.floor((total / 1000 / 60) % 60);
+        return { expired: false, hours, minutes, total };
+    };
+
+    // ✅ NEW: Check if order can re-upload payment
+    const canReuploadPayment = (order) => {
+        if (order.status !== 'rejected') return false;
+        if (order.permanently_rejected) return false;
+        if (!order.rejection_deadline) return false;
+        const remaining = getTimeRemaining(order.rejection_deadline);
+        return !remaining?.expired;
+    };
+
+    // ✅ NEW: Open payment upload modal
+    const handleOpenPaymentModal = (order) => {
+        setSelectedOrder(order);
+        setDeliveryOption(order.delivery_option || 'pickup');
+        setShippingAddress(order.shipping_address || '');
+        setShowDetailsModal(false);
+        setShowPaymentModal(true);
+    };
+
+    // ✅ NEW: Upload payment screenshot
+    const handleUploadPayment = async (e) => {
+        e.preventDefault();
+        const fileInput = e.target.querySelector('input[type="file"]');
+        const file = fileInput.files[0];
+
+        if (!file) {
+            alert('❌ Please select payment screenshot');
+            return;
+        }
+
+        setSubmitting(true);
+
+        try {
+            const token = localStorage.getItem('auth_token');
+            const formData = new FormData();
+            formData.append('payment_screenshot', file);
+            formData.append('delivery_option', deliveryOption);
+            if (deliveryOption === 'shipping') {
+                formData.append('shipping_address', shippingAddress);
+            }
+
+            const response = await axios.post(
+                `http://127.0.0.1:8000/api/user/product-orders/${selectedOrder.id}/upload-payment`,
+                formData,
+                {
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'multipart/form-data',
+                        'Authorization': `Bearer ${token}`,
+                    }
+                }
+            );
+
+            setShowPaymentModal(false);
+            setShowSuccessModal(true);
+            await fetchOrders();
+        } catch (err) {
+            console.error('Upload payment error:', err);
+            const message = err.response?.data?.message || 'Failed to upload payment';
+            alert('❌ ' + message);
+        } finally {
+            setSubmitting(false);
+        }
     };
 
     // View order details
@@ -450,7 +546,6 @@ export default function MyOrders() {
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Product</th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
-                                        {/* ✅ STATUS COLUMN REMOVED */}
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100">
@@ -461,45 +556,49 @@ export default function MyOrders() {
                                             </td>
                                         </tr>
                                     ) : (
-                                        filteredOrders.map((order) => (
-                                            <tr
-                                                key={order.id}
-                                                onClick={() => handleViewDetails(order)}
-                                                className="hover:bg-blue-50 transition-colors cursor-pointer"
-                                            >
-                                                <td className="px-6 py-4">
-                                                    <span className="text-sm font-medium text-blue-600 hover:text-blue-700">
-                                                        {order.order_number}
-                                                    </span>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-12 h-12 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
-                                                            {getProductImage(order) ? (
-                                                                <img src={getProductImage(order)} alt={getProductName(order)} className="w-full h-full object-cover" />
-                                                            ) : (
-                                                                <div className="w-full h-full flex items-center justify-center">
-                                                                    <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                                                    </svg>
-                                                                </div>
-                                                            )}
+                                        filteredOrders.map((order) => {
+                                            // ✅ Check if permanently rejected
+                                            const isPermanentlyRejected = order.status === 'rejected' && order.permanently_rejected;
+
+                                            return (
+                                                <tr
+                                                    key={order.id}
+                                                    onClick={() => handleViewDetails(order)}
+                                                    className={`hover:bg-blue-50 transition-colors cursor-pointer ${isPermanentlyRejected ? 'opacity-60' : ''}`}
+                                                >
+                                                    <td className="px-6 py-4">
+                                                        <span className="text-sm font-medium text-blue-600 hover:text-blue-700">
+                                                            {order.order_number}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-12 h-12 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
+                                                                {getProductImage(order) ? (
+                                                                    <img src={getProductImage(order)} alt={getProductName(order)} className="w-full h-full object-cover" />
+                                                                ) : (
+                                                                    <div className="w-full h-full flex items-center justify-center">
+                                                                        <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                                        </svg>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                            <div>
+                                                                <p className="text-sm font-medium text-gray-900">{getProductName(order)}</p>
+                                                                <p className="text-xs text-gray-500">Qty: {order.items?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0}</p>
+                                                            </div>
                                                         </div>
-                                                        <div>
-                                                            <p className="text-sm font-medium text-gray-900">{getProductName(order)}</p>
-                                                            <p className="text-xs text-gray-500">Qty: {order.items?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0}</p>
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <span className="text-sm text-gray-600">{formatDate(order.created_at)}</span>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <span className="text-sm font-semibold text-gray-900">{formatCurrency(order.total_amount)}</span>
-                                                </td>
-                                                {/* ✅ STATUS COLUMN REMOVED */}
-                                            </tr>
-                                        ))
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <span className="text-sm text-gray-600">{formatDate(order.created_at)}</span>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <span className="text-sm font-semibold text-gray-900">{formatCurrency(order.total_amount)}</span>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })
                                     )}
                                 </tbody>
                             </table>
@@ -639,6 +738,55 @@ export default function MyOrders() {
                                 </div>
                             </div>
 
+                            {/* ✅ NEW: Rejection Deadline Countdown */}
+                            {selectedOrder.status === 'rejected' && !selectedOrder.permanently_rejected && selectedOrder.rejection_deadline && (
+                                <div className="mb-6 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                                    <div className="flex items-start gap-3">
+                                        <svg className="w-6 h-6 text-orange-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        <div>
+                                            <p className="text-sm font-semibold text-orange-900">⏰ Time Remaining to Re-upload Payment</p>
+                                            {(() => {
+                                                const remaining = getTimeRemaining(selectedOrder.rejection_deadline);
+                                                if (remaining?.expired) {
+                                                    return (
+                                                        <p className="text-xs text-red-600 mt-1">
+                                                            ⚠️ Deadline has passed. Order will be permanently rejected soon.
+                                                        </p>
+                                                    );
+                                                }
+                                                return (
+                                                    <p className="text-xs text-orange-700 mt-1">
+                                                        {remaining?.hours}h {remaining?.minutes}m remaining
+                                                    </p>
+                                                );
+                                            })()}
+                                            <p className="text-xs text-orange-600 mt-1">
+                                                If you don't re-upload payment within 24 hours, your order will be permanently rejected and items returned to stock.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* ✅ NEW: Permanent Rejection Message */}
+                            {selectedOrder.status === 'rejected' && selectedOrder.permanently_rejected && (
+                                <div className="mb-6 p-4 bg-gray-100 border border-gray-300 rounded-lg">
+                                    <div className="flex items-start gap-3">
+                                        <svg className="w-6 h-6 text-gray-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                        </svg>
+                                        <div>
+                                            <p className="text-sm font-semibold text-gray-900">❌ Order Permanently Rejected</p>
+                                            <p className="text-xs text-gray-600 mt-1">
+                                                This order has been permanently rejected. Items have been returned to stock. Please place a new order.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
                             {/* Rejection Reason (if applicable) */}
                             {selectedOrder.status === 'rejected' && selectedOrder.rejection_reason && (
                                 <div className="mb-6">
@@ -654,7 +802,6 @@ export default function MyOrders() {
                                 <div>
                                     <h4 className="text-lg font-semibold text-gray-900 mb-4">Payment Proof</h4>
                                     <div className="bg-gray-50 rounded-lg p-4 flex justify-center">
-                                        {/* ✅ Medium-sized image (w-48 = 12rem = 192px) - CENTERED */}
                                         <img
                                             src={`http://127.0.0.1:8000/storage/${selectedOrder.payment_screenshot}`}
                                             alt="Payment Screenshot"
@@ -668,6 +815,21 @@ export default function MyOrders() {
 
                             {/* Action Buttons */}
                             <div className="text-center mt-6 flex gap-3 justify-center">
+                                {/* ✅ Make Payment Button - Only for rejected orders with active deadline */}
+                                {selectedOrder.status === 'rejected' &&
+                                    !selectedOrder.permanently_rejected &&
+                                    canReuploadPayment(selectedOrder) && (
+                                        <button
+                                            onClick={() => handleOpenPaymentModal(selectedOrder)}
+                                            className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold flex items-center gap-2"
+                                        >
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                            </svg>
+                                            Make Payment
+                                        </button>
+                                    )}
+
                                 {/* Cancel Button - Only for pending orders */}
                                 {selectedOrder.status === 'pending' && (
                                     <button
@@ -690,6 +852,141 @@ export default function MyOrders() {
                                 </button>
                             </div>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ✅ Payment Upload Modal */}
+            {showPaymentModal && selectedOrder && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={closeAllModals}>
+                    <form onSubmit={handleUploadPayment} className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+                        {/* Header */}
+                        <div className="flex items-center justify-between p-6 border-b border-gray-100 flex-shrink-0">
+                            <div>
+                                <h3 className="text-xl font-bold text-gray-900">Upload Payment</h3>
+                                <p className="text-sm text-gray-500 mt-1">Order: {selectedOrder.order_number}</p>
+                            </div>
+                            <button type="button" onClick={closeAllModals} className="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100">
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        {/* Scrollable Content */}
+                        <div className="overflow-y-auto flex-1 p-6">
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                {/* Left: Bank Details & Upload */}
+                                <div className="lg:col-span-2 space-y-6">
+                                    {/* Bank Details */}
+                                    <div className="bg-gray-50 rounded-lg p-4">
+                                        <h4 className="font-semibold text-gray-900 mb-3">Bank Transfer Details</h4>
+                                        <div className="space-y-2 text-sm">
+                                            <div className="flex justify-between">
+                                                <span className="text-gray-600">Bank Name:</span>
+                                                <span className="font-medium">BOB Bank</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span className="text-gray-600">Account Name:</span>
+                                                <span className="font-medium">JNEC Fab Lab</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span className="text-gray-600">Account Number:</span>
+                                                <span className="font-medium">200123456789</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Upload Screenshot */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">Upload Payment Screenshot *</label>
+                                        <div className="border-2 border-dashed border-blue-300 rounded-lg p-8 text-center hover:border-blue-400 transition-colors bg-blue-50">
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                className="hidden"
+                                                id="payment-screenshot-upload"
+                                                required
+                                            />
+                                            <label htmlFor="payment-screenshot-upload" className="cursor-pointer block">
+                                                <svg className="w-16 h-16 text-blue-400 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                                </svg>
+                                                <p className="text-sm font-medium text-gray-700">Click to upload screenshot</p>
+                                                <p className="text-xs text-gray-500 mt-1">PNG, JPG up to 5MB</p>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Right: Order Summary */}
+                                <div className="lg:col-span-1">
+                                    <div className="bg-gray-50 rounded-lg p-4">
+                                        <h4 className="font-semibold text-gray-900 mb-3">Order Summary</h4>
+                                        <div className="flex items-center gap-3 mb-3 pb-3 border-b border-gray-200">
+                                            {getProductImage(selectedOrder) ? (
+                                                <img
+                                                    src={getProductImage(selectedOrder)}
+                                                    alt={getProductName(selectedOrder)}
+                                                    className="w-12 h-12 rounded object-cover"
+                                                />
+                                            ) : (
+                                                <div className="w-12 h-12 bg-gray-200 rounded flex items-center justify-center">
+                                                    <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                    </svg>
+                                                </div>
+                                            )}
+                                            <div className="flex-1">
+                                                <p className="text-sm font-medium text-gray-900 truncate">{getProductName(selectedOrder)}</p>
+                                                <p className="text-xs text-gray-500">Qty: {selectedOrder.items?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0}</p>
+                                            </div>
+                                            <p className="text-sm font-medium text-gray-900">{formatCurrency(selectedOrder.total_amount)}</p>
+                                        </div>
+                                        <div className="space-y-2 text-sm">
+                                            <div className="flex justify-between">
+                                                <span className="text-gray-600">Total:</span>
+                                                <span className="font-bold text-blue-600 text-lg">{formatCurrency(selectedOrder.total_amount)}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Footer */}
+                        <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-100 flex-shrink-0 bg-gray-50">
+                            <button
+                                type="button"
+                                onClick={closeAllModals}
+                                className="px-6 py-2 border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50"
+                            >
+                                Back
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={submitting}
+                                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 font-medium"
+                            >
+                                {submitting ? 'Submitting...' : 'Submit Payment'}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            )}
+
+            {/* ✅ Success Modal */}
+            {showSuccessModal && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={closeAllModals}>
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center" onClick={(e) => e.stopPropagation()}>
+                        <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                            </svg>
+                        </div>
+                        <h3 className="text-xl font-bold text-gray-900 mb-2">Success!</h3>
+                        <p className="text-gray-600 text-sm mb-6">Your payment has been submitted. We will verify it shortly.</p>
+                        <button onClick={closeAllModals} className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Close</button>
                     </div>
                 </div>
             )}

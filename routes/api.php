@@ -83,8 +83,16 @@ Route::prefix('admin')->group(function () {
         // Duplicate course for new semester
         Route::post('courses/{id}/duplicate', [\App\Http\Controllers\Api\Admin\CourseController::class, 'duplicate']);
 
-        // Inventory routes
+        // ✅ Inventory routes - FIXED & COMPLETE
         Route::get('inventory', [\App\Http\Controllers\Api\Admin\InventoryController::class, 'index']);
+        
+        // ✅ NEW: Get team members for dropdown
+        Route::get('inventory/team-members', [\App\Http\Controllers\Api\Admin\InventoryController::class, 'getTeamMembers']);
+        
+        // ✅ Add material to master list
+        Route::post('inventory/materials', [\App\Http\Controllers\Api\Admin\InventoryController::class, 'addMaterial']);
+        
+        // ✅ Received/Issued operations
         Route::post('inventory/received', [\App\Http\Controllers\Api\Admin\InventoryController::class, 'addReceived']);
         Route::post('inventory/issued', [\App\Http\Controllers\Api\Admin\InventoryController::class, 'issueMaterial']);
         Route::delete('inventory/received/{id}', [\App\Http\Controllers\Api\Admin\InventoryController::class, 'deleteReceived']);
@@ -156,6 +164,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user/custom-orders', [\App\Http\Controllers\Api\User\CustomOrderController::class, 'index']);
     Route::post('/user/custom-orders', [\App\Http\Controllers\Api\User\CustomOrderController::class, 'store']);
     Route::get('/user/custom-orders/{id}', [\App\Http\Controllers\Api\User\CustomOrderController::class, 'show']);
+    
+    // ✅ NEW: Update custom order (PUT method for editing)
+    Route::put('/user/custom-orders/{id}', [\App\Http\Controllers\Api\User\CustomOrderController::class, 'update']);
     
     // ✅ NEW: Upload payment screenshot for custom orders
     Route::post('/user/custom-orders/{id}/upload-payment', [\App\Http\Controllers\Api\User\CustomOrderController::class, 'uploadPayment']);

@@ -11,38 +11,17 @@ class Material extends Model
 
     protected $fillable = [
         'name',
-        'description',
-        'quantity',
-        'rate',
     ];
 
-    protected $casts = [
-        'rate' => 'decimal:2',
-        'quantity' => 'integer',
-    ];
-
-    // ← ADD THIS: Include accessors in JSON response
-    protected $appends = ['received', 'issued'];
-
-    // Relationship
-    public function transactions()
+    // Relationship: One Material can have many Received records
+    public function receivedRecords()
     {
-        return $this->hasMany(InventoryTransaction::class);
+        return $this->hasMany(InventoryReceived::class, 'material_id');
     }
 
-    // Helper: Get total received quantity
-    public function getReceivedAttribute()
+    // Relationship: One Material can have many Issued records
+    public function issuedRecords()
     {
-        return $this->transactions()
-            ->where('type', 'received')
-            ->sum('quantity');
-    }
-
-    // Helper: Get total issued quantity  
-    public function getIssuedAttribute()
-    {
-        return $this->transactions()
-            ->where('type', 'issued')
-            ->sum('quantity');
+        return $this->hasMany(InventoryIssued::class, 'material_id');
     }
 }

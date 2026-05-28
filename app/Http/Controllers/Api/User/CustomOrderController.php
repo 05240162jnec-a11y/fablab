@@ -27,7 +27,7 @@ class CustomOrderController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $orders,  // Returns { success: true, data: [...] }
+            'data' => $orders,
         ]);
     }
 
@@ -51,42 +51,32 @@ class CustomOrderController extends Controller
      * ✅ UPDATED: Create new custom order with multiple design images
      */
     public function store(Request $request)
-{
-    $user = Auth::user();
+    {
+        $user = Auth::user();
 
-    $validated = $request->validate([
-        'title' => 'required|string|max:255',
-        'description' => 'required|string',
-        'quantity' => 'required|integer|min:1',
-        'design_images.*' => 'required|image|max:5120',
-    ]);
+        $validated = $request->validate([
+            'title' => 'required|string|max:255',
+            'description' => 'required|string',
+            'quantity' => 'required|integer|min:1',
+            'design_images.*' => 'required|image|max:5120',
+        ]);
 
-    // ✅ ADD THIS DEBUG CODE:
-    \Log::info('Files received:', [
-        'has_files' => $request->hasFile('design_images'),
-        'file_count' => $request->hasFile('design_images') ? count($request->file('design_images')) : 0,
-        'all_input' => $request->all(),
-    ]);
+        // Generate unique order number
+        $orderNumber = 'CO-' . date('Y') . '-' . strtoupper(Str::random(6));
 
-    // Generate unique order number
-    $orderNumber = 'CO-' . date('Y') . '-' . strtoupper(Str::random(6));
-
-    // Handle multiple image uploads
-    $imagePaths = [];
-    if ($request->hasFile('design_images')) {
-        foreach ($request->file('design_images') as $file) {
-            $path = $file->store('custom-orders', 'public');
-            $imagePaths[] = $path;
+        // Handle multiple image uploads
+        $imagePaths = [];
+        if ($request->hasFile('design_images')) {
+            foreach ($request->file('design_images') as $file) {
+                $path = $file->store('custom-orders', 'public');
+                $imagePaths[] = $path;
+            }
         }
-    }
-
- 
 
         $validated['user_id'] = $user->id;
         $validated['order_number'] = $orderNumber;
-        $validated['status'] = 'pending'; // Initial status
-        // ✅ Store image paths as JSON array
-        $validated['design_images'] = $imagePaths; // Let Laravel's cast handle JSON
+        $validated['status'] = 'pending';
+        $validated['design_images'] = $imagePaths;
 
         $order = CustomOrder::create($validated);
 
@@ -96,6 +86,60 @@ class CustomOrderController extends Controller
             'data' => $order,
         ], 201);
     }
+
+    /**
+ * ✅ NEW: Update existing custom order (Edit functionality)
+ */
+public function update(Request $request, $id)
+{
+    $user = Auth::user();
+    $order = CustomOrder::where('user_id', $user->id)->findOrFail($id);
+
+    // Check if order can be edited
+    if ($order->estimated_price) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Cannot edit order after admin has set the price.',
+        ], 422);
+    }
+
+    // ✅ UPDATED: Use 'sometimes' instead of 'required'
+    // This allows saving even if fields aren't changed
+    $validated = $request->validate([
+        'title' => 'sometimes|string|max:255',
+        'description' => 'sometimes|string',
+        'quantity' => 'sometimes|integer|min:1',
+        'design_images.*' => 'nullable|image|max:5120',
+    ]);
+
+    // Handle new image uploads (if any)
+    $imagePaths = $order->design_images ?? [];
+    
+    if ($request->hasFile('design_images')) {
+        // Delete old images
+        if (!empty($imagePaths)) {
+            foreach ($imagePaths as $oldPath) {
+                Storage::disk('public')->delete($oldPath);
+            }
+        }
+        
+        // Upload new images
+        $imagePaths = [];
+        foreach ($request->file('design_images') as $file) {
+            $path = $file->store('custom-orders', 'public');
+            $imagePaths[] = $path;
+        }
+    }
+
+    // ✅ Only update fields that were actually sent
+    $order->update(array_filter($validated));
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Custom order updated successfully!',
+        'data' => $order,
+    ]);
+}
 
     /**
      * ✅ NEW: Upload payment screenshot
@@ -121,7 +165,7 @@ class CustomOrderController extends Controller
         }
 
         $validated = $request->validate([
-            'payment_screenshot' => 'required|image|max:5120', // 5MB max
+            'payment_screenshot' => 'required|image|max:5120',
         ]);
 
         // Delete old screenshot if exists
@@ -131,7 +175,7 @@ class CustomOrderController extends Controller
 
         // Upload new screenshot
         $validated['payment_screenshot'] = $request->file('payment_screenshot')->store('custom-orders-payment', 'public');
-        $validated['status'] = 'pending'; // Reset to pending for admin review
+        $validated['status'] = 'pending';
 
         $order->update($validated);
 

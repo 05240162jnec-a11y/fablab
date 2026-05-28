@@ -4,168 +4,277 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Material;
-use App\Models\InventoryTransaction;
+use App\Models\InventoryReceived;
+use App\Models\InventoryIssued;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class InventoryController extends Controller
 {
-    // Get all inventory data
-    public function index()
+    /**
+     * Display a listing of the inventory.
+     */
+    public function index(Request $request)
     {
-        $materials = Material::with('transactions')->get();
-        $received = InventoryTransaction::where('type', 'received')->with('material')->latest()->get();
-        $issued = InventoryTransaction::where('type', 'issued')->with('material')->latest()->get();
+        try {
+            // Get all materials
+            $materials = Material::select('id', 'name')->get();
+
+            // Get all received records with material relationship
+            $received = InventoryReceived::with('material')->latest()->get();
+
+            // Get all issued records with material relationship
+            $issued = InventoryIssued::with('material')->latest()->get();
+
+            // Calculate Stock for each material
+            $stockData = [];
+            foreach ($materials as $material) {
+                $totalReceived = InventoryReceived::where('material_id', $material->id)->sum('quantity');
+                $totalIssued = InventoryIssued::where('material_id', $material->id)->sum('quantity');
+                
+                $stockData[] = [
+                    'id' => $material->id,
+                    'name' => $material->name,
+                    'quantity' => $totalReceived - $totalIssued,
+                ];
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'materials' => $materials,
+                    'received' => $received,
+                    'issued' => $issued,
+                    'materials' => $stockData, // Returning calculated stock
+                ],
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch inventory data.',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Add a new material to the Master List.
+     */
+    public function addMaterial(Request $request)
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|unique:materials,name',
+        ]);
+
+        $material = Material::create($validated);
 
         return response()->json([
             'success' => true,
-            'data' => [
-                'materials' => $materials,
-                'received' => $received,
-                'issued' => $issued,
-            ]
+            'message' => 'Material added successfully.',
+            'data' => $material,
         ]);
     }
 
-    // Add received material
+    /**
+     * Add received material.
+     */
     public function addReceived(Request $request)
     {
         $validated = $request->validate([
-            'name' => 'required|string|max:255',
+            'name' => 'required|string',
             'description' => 'nullable|string',
             'quantity' => 'required|integer|min:1',
             'rate' => 'required|numeric|min:0',
             'transaction_date' => 'required|date',
+            'received_by' => 'required|string',
         ]);
 
-        // Find or create material
-        $material = Material::firstOrCreate(
-            ['name' => $validated['name']],
-            [
+        try {
+            DB::beginTransaction();
+
+            // Find or create the material
+            $material = Material::firstOrCreate(
+                ['name' => $validated['name']]
+            );
+
+            // Create the received record
+            InventoryReceived::create([
+                'material_id' => $material->id,
+                'name' => $material->name, // Store name for backward compatibility/ease
                 'description' => $validated['description'],
+                'quantity' => $validated['quantity'],
                 'rate' => $validated['rate'],
-                'quantity' => 0,
-            ]
-        );
+                'transaction_date' => $validated['transaction_date'],
+                'received_by' => $validated['received_by'],
+            ]);
 
-        // Update material rate if different
-        if ($material->rate != $validated['rate']) {
-            $material->rate = $validated['rate'];
-            $material->save();
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Material received successfully.',
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to add received material.',
+                'error' => $e->getMessage()
+            ], 500);
         }
-
-        // Add to quantity
-        $material->quantity += $validated['quantity'];
-        $material->save();
-
-        // Create transaction
-        $transaction = InventoryTransaction::create([
-            'material_id' => $material->id,
-            'type' => 'received',
-            'quantity' => $validated['quantity'],
-            'rate' => $validated['rate'],
-            'transaction_date' => $validated['transaction_date'],
-        ]);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Material received successfully',
-            'data' => $transaction
-        ], 201);
     }
 
-    // Issue material
+    /**
+     * Issue material.
+     */
     public function issueMaterial(Request $request)
     {
         $validated = $request->validate([
-            'name' => 'required|string|max:255',
+            'name' => 'required|string',
             'quantity' => 'required|integer|min:1',
             'transaction_date' => 'required|date',
+            'issued_to' => 'required|string',
             'reason' => 'nullable|string',
+            'issued_by' => 'required|string',
         ]);
 
-        $material = Material::where('name', $validated['name'])->first();
-        
-        if (!$material) {
+        try {
+            DB::beginTransaction();
+
+            // Find or create the material
+            $material = Material::firstOrCreate(
+                ['name' => $validated['name']]
+            );
+
+            // Check Stock
+            $totalReceived = InventoryReceived::where('material_id', $material->id)->sum('quantity');
+            $totalIssued = InventoryIssued::where('material_id', $material->id)->sum('quantity');
+            $currentStock = $totalReceived - $totalIssued;
+
+            if ($currentStock < $validated['quantity']) {
+                DB::rollBack();
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Insufficient stock. Current stock: ' . $currentStock,
+                ], 422);
+            }
+
+            // Create issued record
+            InventoryIssued::create([
+                'material_id' => $material->id,
+                'name' => $material->name,
+                'quantity' => $validated['quantity'],
+                'transaction_date' => $validated['transaction_date'],
+                'issued_to' => $validated['issued_to'],
+                'reason' => $validated['reason'],
+                'issued_by' => $validated['issued_by'],
+            ]);
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Material issued successfully.',
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
             return response()->json([
                 'success' => false,
-                'message' => 'Material not found'
-            ], 404);
+                'message' => 'Failed to issue material.',
+                'error' => $e->getMessage()
+            ], 500);
         }
-
-        if ($material->quantity < $validated['quantity']) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Insufficient stock! Current stock: ' . $material->quantity
-            ], 422);
-        }
-
-        // Deduct from quantity
-        $material->quantity -= $validated['quantity'];
-        $material->save();
-
-        // Create transaction
-        $transaction = InventoryTransaction::create([
-            'material_id' => $material->id,
-            'type' => 'issued',
-            'quantity' => $validated['quantity'],
-            'transaction_date' => $validated['transaction_date'],
-            'reason' => $validated['reason'] ?? null,
-        ]);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Material issued successfully',
-            'data' => $transaction
-        ], 201);
     }
 
-    // Delete received transaction
+    /**
+     * Delete received record.
+     */
     public function deleteReceived($id)
     {
-        $transaction = InventoryTransaction::findOrFail($id);
-        
-        if ($transaction->type !== 'received') {
+        try {
+            $record = InventoryReceived::findOrFail($id);
+            $record->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Record deleted successfully.',
+            ]);
+        } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Can only delete received transactions'
-            ], 422);
+                'message' => 'Failed to delete record.',
+                'error' => $e->getMessage()
+            ], 500);
         }
-
-        // Remove from material quantity
-        $material = $transaction->material;
-        $material->quantity -= $transaction->quantity;
-        $material->save();
-
-        $transaction->delete();
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Received record deleted successfully'
-        ]);
     }
 
-    // Delete issued transaction
+    /**
+     * Delete issued record.
+     */
     public function deleteIssued($id)
     {
-        $transaction = InventoryTransaction::findOrFail($id);
-        
-        if ($transaction->type !== 'issued') {
+        try {
+            $record = InventoryIssued::findOrFail($id);
+            $record->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Issued record deleted successfully.',
+            ]);
+        } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Can only delete issued transactions'
-            ], 422);
+                'message' => 'Failed to delete issued record.',
+                'error' => $e->getMessage()
+            ], 500);
         }
+    }
 
-        // Add back to material quantity
-        $material = $transaction->material;
-        $material->quantity += $transaction->quantity;
-        $material->save();
+        /**
+     * Get Admin and Production Team members for dropdown
+     */
+    public function getTeamMembers()
+    {
+        try {
+            // ✅ Fetch users with roles: admin, production, production_team, staff
+            // Adjust these role names to match exactly what is in your database
+            $roles = ['admin', 'production', 'production_team', 'staff'];
+            
+            $users = \App\Models\User::whereIn('role', $roles)
+                ->select('id', 'name', 'role')
+                ->get()
+                ->map(function ($user) {
+                    // Format the role for display
+                    $roleDisplay = 'Member';
+                    if ($user->role === 'admin') {
+                        $roleDisplay = 'Admin';
+                    } elseif (in_array($user->role, ['production', 'production_team'])) {
+                        $roleDisplay = 'Production Team member';
+                    } elseif ($user->role === 'staff') {
+                        $roleDisplay = 'Staff';
+                    }
 
-        $transaction->delete();
+                    return [
+                        'id' => $user->id,
+                        'name' => $user->name . ' (' . $roleDisplay . ')',
+                        'value' => $user->name, // Store just the name for saving
+                    ];
+                });
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Issued record deleted successfully'
-        ]);
+            return response()->json([
+                'success' => true,
+                'data' => $users,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch team members.',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 }

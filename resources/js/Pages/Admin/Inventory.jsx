@@ -17,18 +17,12 @@ const INITIAL_MATERIALS = [
     "Led Light (Warm White)"
 ];
 
-const INITIAL_USERS = [
-    "Admin User", "Dorji Gyeltshen", "Karma Wangmo", "Tenzin Dorji", "Sonam Wangchuk",
-    "Sonam Tshering", "Yeshey Dorji", "Yeshey Lhamo", "Kinley Yangchen", "Pema Choden"
-];
-
 const EMPTY_ADD_FORM = {
     itemName: '',
     itemDesc: '',
     itemQty: '',
     itemRate: '',
     itemDate: new Date().toISOString().split('T')[0],
-    receivedBy: '',
 };
 
 const EMPTY_ISSUE_FORM = {
@@ -36,12 +30,14 @@ const EMPTY_ISSUE_FORM = {
     issueQty: '',
     issueDate: new Date().toISOString().split('T')[0],
     issuedTo: '',
+    issuedToDepartment: '',
+    issuedToEmail: '',
     issueReason: '',
     issuedBy: '',
 };
 
 /* ─────────────────────────────────────────────
-   Searchable Dropdown (reusable)
+   Searchable Dropdown (reusable) - FIXED
 ───────────────────────────────────────────── */
 function SearchableDropdown({ value, onChange, options, placeholder, allowNew = false }) {
     const [open, setOpen] = useState(false);
@@ -69,9 +65,18 @@ function SearchableDropdown({ value, onChange, options, placeholder, allowNew = 
             <div className="relative">
                 <input
                     type="text"
-                    value={value}
-                    onChange={e => { onChange(e.target.value); setSearch(e.target.value); setOpen(true); }}
-                    onFocus={() => { setSearch(''); setOpen(true); }}
+                    value={open ? search : value}
+                    onChange={e => {
+                        setSearch(e.target.value);
+                        if (allowNew) {
+                            onChange(e.target.value);
+                        }
+                        setOpen(true);
+                    }}
+                    onFocus={() => {
+                        setSearch(value);
+                        setOpen(true);
+                    }}
                     placeholder={placeholder}
                     autoComplete="off"
                     className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm bg-white pr-12 transition-all"
@@ -204,9 +209,16 @@ function Toast({ message, visible }) {
 /* ─────────────────────────────────────────────
    Delete icon button
 ───────────────────────────────────────────── */
-function DeleteBtn({ onClick }) {
+function DeleteBtn({ onClick, disabled = false }) {
     return (
-        <button onClick={onClick} className="text-red-500 hover:text-red-700 p-2 rounded-lg hover:bg-red-50 transition-all">
+        <button
+            onClick={onClick}
+            disabled={disabled}
+            className={`p-2 rounded-lg transition-all ${disabled
+                    ? 'text-gray-300 cursor-not-allowed'
+                    : 'text-red-500 hover:text-red-700 hover:bg-red-50'
+                }`}
+        >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
                     d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -215,7 +227,7 @@ function DeleteBtn({ onClick }) {
     );
 }
 
-/* ─────────────────────────────────────────────
+/* ────────────────────────────────────────────
    Format Date Helper
 ───────────────────────────────────────────── */
 const formatDate = (dateString) => {
@@ -237,13 +249,11 @@ const exportToCSV = (data, filename) => {
         return;
     }
 
-    // Get headers from first object
     const headers = Object.keys(data[0]);
     const csvContent = [
         headers.join(','),
         ...data.map(row => headers.map(field => {
             const value = row[field];
-            // Escape commas and quotes in values
             return `"${String(value).replace(/"/g, '""')}"`;
         }).join(','))
     ].join('\n');
@@ -260,9 +270,20 @@ const exportToCSV = (data, filename) => {
 };
 
 /* ─────────────────────────────────────────────
+   Format Role Helper
+───────────────────────────────────────────── */
+const formatRole = (role) => {
+    if (!role) return '-';
+    if (role === 'admin') return 'Admin';
+    if (role === 'production' || role === 'production_team') return 'Production Team member';
+    if (role === 'staff') return 'Staff';
+    return role.charAt(0).toUpperCase() + role.slice(1);
+};
+
+/* ─────────────────────────────────────────────
    Main Component
 ───────────────────────────────────────────── */
-export default function ProductionTeamInventory() {
+export default function AdminInventory() {
     const [activeTab, setActiveTab] = useState('materials');
     const [showAddModal, setShowAddModal] = useState(false);
     const [showIssueModal, setShowIssueModal] = useState(false);
@@ -276,6 +297,29 @@ export default function ProductionTeamInventory() {
     const [receivedRecords, setReceivedRecords] = useState([]);
     const [issuedRecords, setIssuedRecords] = useState([]);
     const [stockData, setStockData] = useState([]);
+
+    // ✅ NEW: Current user state
+    const [currentUser, setCurrentUser] = useState(null);
+
+    // ✅ NEW: Search states for each tab
+    const [searchMaterials, setSearchMaterials] = useState('');
+    const [searchReceived, setSearchReceived] = useState('');
+    const [searchStock, setSearchStock] = useState('');
+    const [searchIssued, setSearchIssued] = useState('');
+
+    // ✅ NEW: Stock alert threshold state
+    const [stockThreshold, setStockThreshold] = useState(10);
+    const [thresholdLoading, setThresholdLoading] = useState(false);
+    const [thresholdError, setThresholdError] = useState(null);
+
+    // ✅ NEW: Department and users for issued material
+    const [departments, setDepartments] = useState([]);
+    const [usersByDepartment, setUsersByDepartment] = useState([]);
+    const [allUsers, setAllUsers] = useState([]);
+
+    // ✅ NEW: Issue type (User or Production Team)
+    const [issueType, setIssueType] = useState('user');
+    const [productionTeamMembers, setProductionTeamMembers] = useState([]);
 
     // Bulk selection
     const [selectedReceived, setSelectedReceived] = useState(new Set());
@@ -344,6 +388,7 @@ export default function ProductionTeamInventory() {
                     rate: parseFloat(record.rate),
                     date: record.transaction_date,
                     receivedBy: record.received_by || '',
+                    receivedByRole: record.received_by_role || '',
                     total: record.quantity * parseFloat(record.rate),
                 })));
 
@@ -354,15 +399,28 @@ export default function ProductionTeamInventory() {
                     qty: record.quantity,
                     date: record.transaction_date,
                     issuedTo: record.issued_to || '',
+                    issuedToEmail: record.issued_to_email || '',
+                    issuedToDepartment: record.issued_to_department || '',
                     reason: record.reason || '',
                     issuedBy: record.issued_by || '',
                 })));
 
-                setStockData(data.materials.map((material, index) => ({
+                const sortedStock = [...data.materials].sort((a, b) => {
+                    const dateA = a.updated_at ? new Date(a.updated_at).getTime() : 0;
+                    const dateB = b.updated_at ? new Date(b.updated_at).getTime() : 0;
+                    return dateB - dateA;
+                }).map((material, index) => ({
                     slNo: index + 1,
                     name: material.name,
                     currentStock: material.quantity,
-                })));
+                    updated_at: material.updated_at,
+                }));
+
+                setStockData(sortedStock);
+
+                if (data.threshold !== undefined) {
+                    setStockThreshold(data.threshold);
+                }
 
                 setError(null);
             }
@@ -374,7 +432,189 @@ export default function ProductionTeamInventory() {
         }
     };
 
-    useEffect(() => { fetchInventory(); }, []);
+    /* ── Fetch Current User ── */
+    const fetchCurrentUser = async () => {
+        try {
+            const token = localStorage.getItem('auth_token');
+            const response = await axios.get('http://127.0.0.1:8000/api/admin/profile', {
+                headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
+            });
+
+            let userData = null;
+
+            if (response.data?.data) {
+                userData = response.data.data;
+            } else if (response.data?.user) {
+                userData = response.data.user;
+            } else if (response.data) {
+                userData = response.data;
+            }
+
+            if (userData) {
+                setCurrentUser(userData);
+                localStorage.setItem('user', JSON.stringify(userData));
+            } else {
+                throw new Error('No user data in response');
+            }
+        } catch (err) {
+            console.error('Failed to fetch current user:', err);
+
+            const storedUser = localStorage.getItem('user');
+            if (storedUser) {
+                const parsed = JSON.parse(storedUser);
+                setCurrentUser(parsed);
+            } else {
+                showDialog('Error', 'Unable to load user profile. Please refresh the page.', 'error');
+            }
+        }
+    };
+
+    /* ── Fetch Stock Alert Threshold ─ */
+    const fetchStockThreshold = async () => {
+        try {
+            setThresholdLoading(true);
+            const token = localStorage.getItem('auth_token');
+            const response = await axios.get('http://127.0.0.1:8000/api/admin/inventory/threshold', {
+                headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
+            });
+            if (response.data.success) {
+                setStockThreshold(response.data.data.threshold);
+            }
+        } catch (err) {
+            console.error('Failed to fetch threshold:', err);
+            setThresholdError('Failed to load threshold. Using default.');
+        } finally {
+            setThresholdLoading(false);
+        }
+    };
+
+    /* ── Fetch Departments and Users ── */
+    const fetchDepartmentsAndUsers = async () => {
+        try {
+            const token = localStorage.getItem('auth_token');
+            const response = await axios.get('http://127.0.0.1:8000/api/admin/inventory/departments-users', {
+                headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
+            });
+            if (response.data.success) {
+                setDepartments(response.data.data.departments);
+                setAllUsers(response.data.data.users);
+            }
+        } catch (err) {
+            console.error('Failed to fetch departments and users:', err);
+        }
+    };
+
+    /* ── Fetch Production Team Members ─ */
+    const fetchProductionTeamMembers = async () => {
+        try {
+            const token = localStorage.getItem('auth_token');
+            const response = await axios.get('http://127.0.0.1:8000/api/admin/inventory/team-members', {
+                headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
+            });
+            if (response.data.success) {
+                setProductionTeamMembers(response.data.data);
+            }
+        } catch (err) {
+            console.error('Failed to fetch production team:', err);
+        }
+    };
+
+    /* ── Filter Users by Department ── */
+    const handleDepartmentChange = (department) => {
+        setIssueForm(p => ({ ...p, issuedToDepartment: department, issuedTo: '', issuedToEmail: '' }));
+        
+        if (department) {
+            const filteredUsers = allUsers.filter(u => u.department === department);
+            setUsersByDepartment(filteredUsers);
+        } else {
+            setUsersByDepartment([]);
+        }
+    };
+
+    /* ── Handle User Selection ── */
+    const handleUserSelect = (userDisplay) => {
+        console.log('🔍 DEBUG handleUserSelect called with:', userDisplay);
+        console.log('🔍 usersByDepartment:', usersByDepartment);
+        console.log('🔍 allUsers:', allUsers);
+        
+        // ✅ Search in the currently displayed department list first
+        let user = usersByDepartment.find(u => {
+            const match = u.display === userDisplay;
+            console.log(`🔍 Checking user: ${u.display} === ${userDisplay} ? ${match}`);
+            return match;
+        });
+        
+        // Fallback to all users if not found
+        if (!user) {
+            console.log('⚠️ User not found in department list, searching all users...');
+            user = allUsers.find(u => u.display === userDisplay);
+        }
+
+        if (user) {
+            console.log('✅ User found:', user);
+            setIssueForm(p => ({
+                ...p,
+                issuedTo: user.name,
+                issuedToEmail: user.email,
+                issuedToDepartment: user.department,
+            }));
+            console.log('✅ Form updated. issuedTo:', user.name);
+        } else {
+            console.error('❌ User NOT found for display:', userDisplay);
+            console.error('❌ Available users in department:', usersByDepartment.map(u => u.display));
+        }
+    };
+
+    /* ── Handle Production Team Selection ── */
+    const handleProductionTeamSelect = (memberName) => {
+        const name = memberName.split(' (')[0];
+        setIssueForm(p => ({
+            ...p,
+            issuedTo: name,
+            issuedToEmail: '',
+            issuedToDepartment: 'Production Team',
+        }));
+    };
+
+    /* ── Handle Issue Type Change ── */
+    const handleIssueTypeChange = (type) => {
+        setIssueType(type);
+        setIssueForm(p => ({
+            ...p,
+            issuedTo: '',
+            issuedToEmail: '',
+            issuedToDepartment: '',
+        }));
+    };
+
+    /* ── Update Stock Alert Threshold ── */
+    const updateStockThreshold = async (newThreshold) => {
+        try {
+            setThresholdLoading(true);
+            const token = localStorage.getItem('auth_token');
+            await axios.post('http://127.0.0.1:8000/api/admin/inventory/threshold', {
+                threshold: newThreshold,
+            }, {
+                headers: { Accept: 'application/json', 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            });
+            setStockThreshold(newThreshold);
+            showToast('✅ Stock alert threshold updated!');
+        } catch (err) {
+            console.error('Failed to update threshold:', err);
+            setThresholdError('Failed to update threshold.');
+            showDialog('Error', 'Failed to save threshold. Please try again.', 'error');
+        } finally {
+            setThresholdLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchInventory();
+        fetchCurrentUser();
+        fetchStockThreshold();
+        fetchDepartmentsAndUsers();
+        fetchProductionTeamMembers();
+    }, []);
 
     /* ── Stock helpers ── */
     const getLocalStock = (name) => {
@@ -444,7 +684,7 @@ export default function ProductionTeamInventory() {
         );
     };
 
-    /* ── Export Material List to CSV ── */
+    /* ─ Export Functions ── */
     const exportMaterials = () => {
         const exportData = materials.map((name, index) => ({
             'Sl.No': index + 1,
@@ -454,50 +694,86 @@ export default function ProductionTeamInventory() {
         showToast('📥 Material list exported successfully!');
     };
 
+    const exportReceived = () => {
+        const exportData = receivedRecords.map(r => ({
+            'Sl.No': r.slNo,
+            'Item Name': r.name,
+            'Description': r.desc,
+            'Qty': r.qty,
+            'Rate (Nu.)': r.rate.toFixed(2),
+            'Date': r.date,
+            'Received By': r.receivedBy,
+            'Role': formatRole(r.receivedByRole),
+            'Total (Nu.)': r.total.toFixed(2),
+        }));
+        exportToCSV(exportData, 'received-records');
+        showToast('📥 Received records exported successfully!');
+    };
+
+    const exportStock = () => {
+        const exportData = stockData.map(s => ({
+            'Sl.No': s.slNo,
+            'Material Name': s.name,
+            'Current Stock': s.currentStock,
+        }));
+        exportToCSV(exportData, 'current-stock');
+        showToast('📥 Stock data exported successfully!');
+    };
+
+    const exportIssued = () => {
+        const exportData = issuedRecords.map(r => ({
+            'Sl.No': r.slNo,
+            'Item Name': r.name,
+            'Qty Issued': r.qty,
+            'Issued To': r.issuedTo,
+            'Department': r.issuedToDepartment,
+            'Reason': r.reason,
+            'Date': r.date,
+            'Issued By': r.issuedBy,
+        }));
+        exportToCSV(exportData, 'issued-records');
+        showToast('📥 Issued records exported successfully!');
+    };
+
     /* ── Add Received ── */
     const addToTable = async (e) => {
         e.preventDefault();
-        const { itemName, itemDesc, itemQty, itemRate, itemDate, receivedBy } = addForm;
-        if (!itemName || !itemQty || !itemRate || !receivedBy) {
-            showDialog('Validation Error', 'Please fill in Item Name, Quantity, Rate, and Received By.', 'error');
+        const { itemName, itemDesc, itemQty, itemRate, itemDate } = addForm;
+
+        if (!itemName || !itemQty || !itemRate) {
+            showDialog('Validation Error', 'Please fill in Item Name, Quantity, and Rate.', 'error');
             return;
         }
 
+        if (!currentUser) {
+            showDialog('Validation Error', 'User not loaded. Please wait a moment and try again.', 'error');
+            return;
+        }
+
+        const userRole = currentUser.role || 'admin';
+
         try {
             const token = localStorage.getItem('auth_token');
-            await axios.post('http://127.0.0.1:8000/api/admin/inventory/received', {
+
+            const payload = {
                 name: itemName,
                 description: itemDesc,
                 quantity: parseInt(itemQty),
                 rate: parseFloat(itemRate),
                 transaction_date: itemDate,
-                received_by: receivedBy,
-            }, {
+                received_by: currentUser.name,
+                received_by_role: userRole,
+            };
+
+            await axios.post('http://127.0.0.1:8000/api/admin/inventory/received', payload, {
                 headers: { Accept: 'application/json', 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
             });
             fetchInventory();
             showToast('✅ Material received successfully!');
-        } catch {
-            const qty = parseInt(itemQty);
-            const rate = parseFloat(itemRate);
-            const newRecord = {
-                id: Date.now(),
-                slNo: receivedRecords.length + 1,
-                name: itemName,
-                desc: itemDesc,
-                qty,
-                rate,
-                date: itemDate,
-                receivedBy,
-                total: qty * rate,
-            };
-            setReceivedRecords(prev => [...prev, newRecord]);
-            updateLocalStock(itemName, qty);
-
-            if (!materials.some(m => m.toLowerCase() === itemName.toLowerCase())) {
-                setMaterials(prev => [...prev, itemName].sort((a, b) => a.localeCompare(b)));
-            }
-            showToast('✅ Material received successfully!');
+        } catch (err) {
+            console.error('Save error:', err);
+            console.error('Error response:', err.response?.data);
+            showDialog('Error', err.response?.data?.message || 'Failed to save record. Please try again.', 'error');
         }
 
         setAddForm({ ...EMPTY_ADD_FORM, itemDate: new Date().toISOString().split('T')[0] });
@@ -507,9 +783,30 @@ export default function ProductionTeamInventory() {
     /* ── Issue Material ── */
     const issueMaterial = async (e) => {
         e.preventDefault();
-        const { itemName, issueQty, issueDate, issuedTo, issueReason, issuedBy } = issueForm;
-        if (!itemName || !issueQty || !issuedBy) {
-            showDialog('Validation Error', 'Please fill in Item Name, Quantity, and Issued By.', 'error');
+        
+        // ✅ FIX: Auto-fill issuedBy from currentUser if it's empty
+        if (!issueForm.issuedBy && currentUser?.name) {
+            setIssueForm(p => ({ ...p, issuedBy: currentUser.name }));
+        }
+        
+        const { itemName, issueQty, issueDate, issuedTo, issuedToEmail, issuedToDepartment, issueReason, issuedBy } = issueForm;
+        
+        // ✅ DEBUG: Check each field
+        console.log('🔍 Validation Check:');
+        console.log('  - itemName:', itemName, '✓' + (itemName ? '' : ' MISSING'));
+        console.log('  - issueQty:', issueQty, '✓' + (issueQty ? '' : ' MISSING'));
+        console.log('  - issuedTo:', issuedTo, '✓' + (issuedTo ? '' : ' MISSING'));
+        console.log('  - issuedBy:', issuedBy, '✓' + (issuedBy ? '' : ' MISSING'));
+        console.log('  - currentUser:', currentUser);
+        
+        if (!itemName || !issueQty || !issuedTo || !issuedBy) {
+            const missingFields = [];
+            if (!itemName) missingFields.push('Item Name');
+            if (!issueQty) missingFields.push('Quantity');
+            if (!issuedTo) missingFields.push('Issued To');
+            if (!issuedBy) missingFields.push('Issued By');
+            
+            showDialog('Validation Error', `Missing fields: ${missingFields.join(', ')}. Please fill them in.`, 'error');
             return;
         }
 
@@ -522,35 +819,40 @@ export default function ProductionTeamInventory() {
 
         try {
             const token = localStorage.getItem('auth_token');
-            await axios.post('http://127.0.0.1:8000/api/admin/inventory/issued', {
+            
+            const payload = {
                 name: itemName,
                 quantity: qty,
                 transaction_date: issueDate,
                 issued_to: issuedTo,
+                issued_to_email: issuedToEmail,
+                issued_to_department: issuedToDepartment,
                 reason: issueReason,
                 issued_by: issuedBy,
-            }, {
-                headers: { Accept: 'application/json', 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            };
+            
+            console.log('📤 Sending payload:', payload);
+            
+            await axios.post('http://127.0.0.1:8000/api/admin/inventory/issued', payload, {
+                headers: { 
+                    Accept: 'application/json', 
+                    'Content-Type': 'application/json', 
+                    Authorization: `Bearer ${token}` 
+                },
             });
+            
+            console.log('✅ Response received');
             fetchInventory();
             showToast('✅ Material issued successfully!');
-        } catch {
-            const newRecord = {
-                id: Date.now(),
-                slNo: issuedRecords.length + 1,
-                name: itemName,
-                qty,
-                date: issueDate,
-                issuedTo,
-                reason: issueReason,
-                issuedBy,
-            };
-            setIssuedRecords(prev => [...prev, newRecord]);
-            updateLocalStock(itemName, -qty);
-            showToast('✅ Material issued successfully!');
+        } catch (err) {
+            console.error('❌ Save error:', err);
+            console.error('❌ Error response:', err.response?.data);
+            console.error('❌ Error status:', err.response?.status);
+            showDialog('Error', err.response?.data?.message || 'Failed to save record. Please try again.', 'error');
         }
 
         setIssueForm({ ...EMPTY_ISSUE_FORM, issueDate: new Date().toISOString().split('T')[0] });
+        setIssueType('user');
         setShowIssueModal(false);
     };
 
@@ -663,6 +965,35 @@ export default function ProductionTeamInventory() {
         return (qty * rate).toFixed(2);
     };
 
+    /* ── Filter helpers ── */
+    const filterMaterials = (list, search) => {
+        if (!search) return list;
+        return list.filter(item => item.toLowerCase().includes(search.toLowerCase()));
+    };
+
+    const filterReceived = (list, search) => {
+        if (!search) return list;
+        return list.filter(item =>
+            item.name.toLowerCase().includes(search.toLowerCase()) ||
+            item.desc?.toLowerCase().includes(search.toLowerCase()) ||
+            item.receivedBy?.toLowerCase().includes(search.toLowerCase())
+        );
+    };
+
+    const filterStock = (list, search) => {
+        if (!search) return list;
+        return list.filter(item => item.name.toLowerCase().includes(search.toLowerCase()));
+    };
+
+    const filterIssued = (list, search) => {
+        if (!search) return list;
+        return list.filter(item =>
+            item.name.toLowerCase().includes(search.toLowerCase()) ||
+            item.issuedTo?.toLowerCase().includes(search.toLowerCase()) ||
+            item.reason?.toLowerCase().includes(search.toLowerCase())
+        );
+    };
+
     /* ── Tabs config ── */
     const tabs = [
         { id: 'materials', label: 'Material List' },
@@ -727,7 +1058,13 @@ export default function ProductionTeamInventory() {
                                 <p className="text-sm text-slate-500 mt-1">Master list of all materials</p>
                             </div>
                             <div className="flex items-center gap-3">
-                                {/* ✅ Export Buttons */}
+                                <input
+                                    type="text"
+                                    placeholder="Search materials..."
+                                    value={searchMaterials}
+                                    onChange={(e) => setSearchMaterials(e.target.value)}
+                                    className="px-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 w-48"
+                                />
                                 <button
                                     onClick={exportMaterials}
                                     className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white text-sm font-semibold rounded-xl hover:bg-emerald-700 transition-all shadow-sm"
@@ -749,15 +1086,14 @@ export default function ProductionTeamInventory() {
                             </div>
                         </div>
 
-                        {materials.length === 0 ? (
+                        {filterMaterials(materials, searchMaterials).length === 0 ? (
                             <div className="py-20 text-center">
                                 <div className="inline-flex items-center justify-center w-20 h-20 bg-slate-100 rounded-full mb-5">
                                     <svg className="w-10 h-10 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                                     </svg>
                                 </div>
-                                <p className="text-slate-600 font-semibold text-lg">No materials yet</p>
-                                <p className="text-slate-400 text-sm mt-2">Add your first material to get started</p>
+                                <p className="text-slate-600 font-semibold text-lg">No materials found</p>
                             </div>
                         ) : (
                             <div className="overflow-x-auto">
@@ -770,7 +1106,7 @@ export default function ProductionTeamInventory() {
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
-                                        {materials.map((material, index) => (
+                                        {filterMaterials(materials, searchMaterials).map((material, index) => (
                                             <tr key={index} className="hover:bg-slate-50 transition-colors">
                                                 <td className="px-8 py-5 text-sm text-slate-600">{index + 1}</td>
                                                 <td className="px-8 py-5 text-sm font-semibold text-slate-900">{material}</td>
@@ -795,6 +1131,13 @@ export default function ProductionTeamInventory() {
                                 <p className="text-sm text-slate-500 mt-1">Material receiving history</p>
                             </div>
                             <div className="flex items-center gap-3">
+                                <input
+                                    type="text"
+                                    placeholder="Search records..."
+                                    value={searchReceived}
+                                    onChange={(e) => setSearchReceived(e.target.value)}
+                                    className="px-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 w-48"
+                                />
                                 {selectedReceived.size > 0 && (
                                     <button
                                         onClick={bulkDeleteReceived}
@@ -807,6 +1150,15 @@ export default function ProductionTeamInventory() {
                                     </button>
                                 )}
                                 <button
+                                    onClick={exportReceived}
+                                    className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white text-sm font-semibold rounded-xl hover:bg-emerald-700 transition-all shadow-sm"
+                                >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                    </svg>
+                                    Export CSV
+                                </button>
+                                <button
                                     onClick={() => { setShowAddModal(true); setAddForm({ ...EMPTY_ADD_FORM, itemDate: new Date().toISOString().split('T')[0] }); }}
                                     className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 transition-all shadow-sm hover:shadow-md"
                                 >
@@ -818,14 +1170,14 @@ export default function ProductionTeamInventory() {
                             </div>
                         </div>
 
-                        {receivedRecords.length === 0 ? (
+                        {filterReceived(receivedRecords, searchReceived).length === 0 ? (
                             <div className="py-20 text-center">
                                 <div className="inline-flex items-center justify-center w-20 h-20 bg-slate-100 rounded-full mb-5">
                                     <svg className="w-10 h-10 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
                                     </svg>
                                 </div>
-                                <p className="text-slate-600 font-semibold text-lg">No received records yet</p>
+                                <p className="text-slate-600 font-semibold text-lg">No received records found</p>
                             </div>
                         ) : (
                             <div className="overflow-x-auto">
@@ -840,13 +1192,13 @@ export default function ProductionTeamInventory() {
                                                     onChange={e => toggleSelectAllReceived(e.target.checked)}
                                                 />
                                             </th>
-                                            {['Sl.No', 'Item Name', 'Description', 'Qty', 'Rate (Nu.)', 'Date', 'Received By', 'Total (Nu.)', 'Action'].map((h, i) => (
+                                            {['Sl.No', 'Item Name', 'Description', 'Qty', 'Rate (Nu.)', 'Date', 'Received By', 'Role', 'Total (Nu.)'].map((h, i) => (
                                                 <th key={i} className={`px-6 py-4 text-xs font-semibold text-slate-600 uppercase tracking-wider ${['Qty', 'Rate (Nu.)', 'Total (Nu.)'].includes(h) ? 'text-right' : ['Action'].includes(h) ? 'text-center' : 'text-left'}`}>{h}</th>
                                             ))}
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
-                                        {receivedRecords.map((record) => (
+                                        {filterReceived(receivedRecords, searchReceived).map((record) => (
                                             <tr key={record.id} className="hover:bg-slate-50 transition-colors">
                                                 <td className="px-6 py-5">
                                                     <input
@@ -861,13 +1213,10 @@ export default function ProductionTeamInventory() {
                                                 <td className="px-6 py-5 text-sm text-slate-600">{record.desc || '-'}</td>
                                                 <td className="px-6 py-5 text-sm font-semibold text-slate-900 text-right">{record.qty}</td>
                                                 <td className="px-6 py-5 text-sm text-slate-600 text-right">Nu. {record.rate.toFixed(2)}</td>
-                                                {/* ✅ Formatted Date */}
                                                 <td className="px-6 py-5 text-sm text-slate-600">{formatDate(record.date)}</td>
                                                 <td className="px-6 py-5 text-sm font-medium text-slate-900">{record.receivedBy || '-'}</td>
+                                                <td className="px-6 py-5 text-sm text-slate-600">{formatRole(record.receivedByRole)}</td>
                                                 <td className="px-6 py-5 text-sm font-bold text-slate-900 text-right">Nu. {record.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
-                                                <td className="px-6 py-5 text-center">
-                                                    <DeleteBtn onClick={() => deleteRecord(record.id, record.qty, record.name)} />
-                                                </td>
                                             </tr>
                                         ))}
                                     </tbody>
@@ -880,9 +1229,52 @@ export default function ProductionTeamInventory() {
                 {/* ── CURRENT STOCK TAB ── */}
                 {!loading && !error && activeTab === 'stock' && (
                     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                        <div className="px-8 py-6 border-b border-slate-100">
-                            <h2 className="text-xl font-bold text-slate-900">Current Stock</h2>
-                            <p className="text-sm text-slate-500 mt-1">Highlighted in red if stock &lt; 10 units</p>
+                        <div className="px-8 py-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div>
+                                <h2 className="text-xl font-bold text-slate-900">Current Stock</h2>
+                                <p className="text-sm text-slate-500 mt-1">Stocks with stock below this value will be highlighted</p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <input
+                                    type="text"
+                                    placeholder="Search stock..."
+                                    value={searchStock}
+                                    onChange={(e) => setSearchStock(e.target.value)}
+                                    className="px-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 w-48"
+                                />
+                                <div className="flex items-center gap-2">
+                                    <label className="text-sm font-medium text-slate-700 whitespace-nowrap">Stock Alert Threshold:</label>
+                                    <div className="relative">
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            value={stockThreshold}
+                                            onChange={(e) => setStockThreshold(parseInt(e.target.value) || 0)}
+                                            onBlur={() => updateStockThreshold(stockThreshold)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') {
+                                                    updateStockThreshold(stockThreshold);
+                                                    e.target.blur();
+                                                }
+                                            }}
+                                            disabled={thresholdLoading}
+                                            className="w-20 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                        />
+                                    </div>
+                                    {thresholdLoading && (
+                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600" />
+                                    )}
+                                </div>
+                                <button
+                                    onClick={exportStock}
+                                    className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white text-sm font-semibold rounded-xl hover:bg-emerald-700 transition-all shadow-sm"
+                                >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                    </svg>
+                                    Export CSV
+                                </button>
+                            </div>
                         </div>
                         <div className="overflow-x-auto">
                             <table className="w-full">
@@ -891,29 +1283,41 @@ export default function ProductionTeamInventory() {
                                         <th className="px-8 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Sl.No</th>
                                         <th className="px-8 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Material Name</th>
                                         <th className="px-8 py-4 text-right text-xs font-semibold text-slate-600 uppercase tracking-wider">Current Stock</th>
+                                        <th className="px-8 py-4 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider">Action</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
-                                    {stockData.length === 0 ? (
+                                    {filterStock(stockData, searchStock).length === 0 ? (
                                         <tr>
-                                            <td colSpan={3} className="px-8 py-16 text-center text-slate-400 font-medium">No stock data available</td>
+                                            <td colSpan={4} className="px-8 py-16 text-center text-slate-400 font-medium">No stock data found</td>
                                         </tr>
                                     ) : (
-                                        stockData.map((stock, index) => (
-                                            <tr
-                                                key={index}
-                                                className={`transition-colors ${stock.currentStock < 10
-                                                    ? 'bg-red-100 border-l-4 border-red-500'
-                                                    : 'hover:bg-slate-50'
-                                                    }`}
-                                            >
-                                                <td className="px-8 py-5 text-sm text-slate-600">{stock.slNo}</td>
-                                                <td className="px-8 py-5 text-sm font-semibold text-slate-900">{stock.name}</td>
-                                                <td className={`px-8 py-5 text-sm font-bold text-right ${stock.currentStock < 10 ? 'text-red-700' : 'text-slate-900'}`}>
-                                                    {stock.currentStock} units
-                                                </td>
-                                            </tr>
-                                        ))
+                                        filterStock(stockData, searchStock).map((stock, index) => {
+                                            const isLowStock = stock.currentStock < stockThreshold;
+                                            const canDelete = stock.currentStock <= 0;
+                                            
+                                            return (
+                                                <tr
+                                                    key={index}
+                                                    className={`transition-colors ${isLowStock
+                                                        ? 'bg-red-100 border-l-4 border-red-500'
+                                                        : 'hover:bg-slate-50'
+                                                        }`}
+                                                >
+                                                    <td className="px-8 py-5 text-sm text-slate-600">{stock.slNo}</td>
+                                                    <td className="px-8 py-5 text-sm font-semibold text-slate-900">{stock.name}</td>
+                                                    <td className={`px-8 py-5 text-sm font-bold text-right ${isLowStock ? 'text-red-700' : 'text-slate-900'}`}>
+                                                        {stock.currentStock} units
+                                                    </td>
+                                                    <td className="px-8 py-5 text-center">
+                                                        <DeleteBtn 
+                                                            onClick={() => deleteMaterial(stock.name)}
+                                                            disabled={!canDelete}
+                                                        />
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })
                                     )}
                                 </tbody>
                             </table>
@@ -930,6 +1334,13 @@ export default function ProductionTeamInventory() {
                                 <p className="text-sm text-slate-500 mt-1">Material issuance history</p>
                             </div>
                             <div className="flex items-center gap-3">
+                                <input
+                                    type="text"
+                                    placeholder="Search issued..."
+                                    value={searchIssued}
+                                    onChange={(e) => setSearchIssued(e.target.value)}
+                                    className="px-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 w-48"
+                                />
                                 {selectedIssued.size > 0 && (
                                     <button
                                         onClick={bulkDeleteIssued}
@@ -942,6 +1353,15 @@ export default function ProductionTeamInventory() {
                                     </button>
                                 )}
                                 <button
+                                    onClick={exportIssued}
+                                    className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white text-sm font-semibold rounded-xl hover:bg-emerald-700 transition-all shadow-sm"
+                                >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                    </svg>
+                                    Export CSV
+                                </button>
+                                <button
                                     onClick={() => { setShowIssueModal(true); setIssueForm({ ...EMPTY_ISSUE_FORM, issueDate: new Date().toISOString().split('T')[0] }); }}
                                     className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 transition-all shadow-sm hover:shadow-md"
                                 >
@@ -953,14 +1373,14 @@ export default function ProductionTeamInventory() {
                             </div>
                         </div>
 
-                        {issuedRecords.length === 0 ? (
+                        {filterIssued(issuedRecords, searchIssued).length === 0 ? (
                             <div className="py-20 text-center">
                                 <div className="inline-flex items-center justify-center w-20 h-20 bg-slate-100 rounded-full mb-5">
                                     <svg className="w-10 h-10 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                     </svg>
                                 </div>
-                                <p className="text-slate-600 font-semibold text-lg">No issued records yet</p>
+                                <p className="text-slate-600 font-semibold text-lg">No issued records found</p>
                             </div>
                         ) : (
                             <div className="overflow-x-auto">
@@ -975,13 +1395,13 @@ export default function ProductionTeamInventory() {
                                                     onChange={e => toggleSelectAllIssued(e.target.checked)}
                                                 />
                                             </th>
-                                            {['Sl.No', 'Item Name', 'Qty Issued', 'Issued To', 'Reason', 'Date', 'Issued By', 'Action'].map((h, i) => (
-                                                <th key={i} className={`px-6 py-4 text-xs font-semibold text-slate-600 uppercase tracking-wider ${h === 'Qty Issued' ? 'text-right' : h === 'Action' ? 'text-center' : 'text-left'}`}>{h}</th>
+                                            {['Sl.No', 'Item Name', 'Qty Issued', 'Issued To', 'Department', 'Reason', 'Date', 'Issued By'].map((h, i) => (
+                                                <th key={i} className={`px-6 py-4 text-xs font-semibold text-slate-600 uppercase tracking-wider ${h === 'Qty Issued' ? 'text-right' : 'text-left'}`}>{h}</th>
                                             ))}
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
-                                        {issuedRecords.map((record) => (
+                                        {filterIssued(issuedRecords, searchIssued).map((record) => (
                                             <tr key={record.id} className="hover:bg-slate-50 transition-colors">
                                                 <td className="px-6 py-5">
                                                     <input
@@ -993,16 +1413,12 @@ export default function ProductionTeamInventory() {
                                                 </td>
                                                 <td className="px-6 py-5 text-sm text-slate-600">{record.slNo}</td>
                                                 <td className="px-6 py-5 text-sm font-semibold text-slate-900">{record.name}</td>
-                                                {/* ✅ Positive quantity display (no negative sign) */}
                                                 <td className="px-6 py-5 text-sm font-semibold text-red-600 text-right">{record.qty}</td>
                                                 <td className="px-6 py-5 text-sm text-slate-600">{record.issuedTo || '-'}</td>
+                                                <td className="px-6 py-5 text-sm text-slate-600">{record.issuedToDepartment || '-'}</td>
                                                 <td className="px-6 py-5 text-sm text-slate-600">{record.reason || '-'}</td>
-                                                {/* ✅ Formatted Date */}
                                                 <td className="px-6 py-5 text-sm text-slate-600">{formatDate(record.date)}</td>
                                                 <td className="px-6 py-5 text-sm font-medium text-slate-900">{record.issuedBy || '-'}</td>
-                                                <td className="px-6 py-5 text-center">
-                                                    <DeleteBtn onClick={() => deleteIssuedRecord(record.id, record.qty, record.name)} />
-                                                </td>
                                             </tr>
                                         ))}
                                     </tbody>
@@ -1068,7 +1484,6 @@ export default function ProductionTeamInventory() {
                         </div>
 
                         <form onSubmit={addToTable} className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            {/* Item Name */}
                             <div className="md:col-span-2">
                                 <label className="block text-sm font-semibold text-slate-700 mb-2">Item Name <span className="text-red-500">*</span></label>
                                 <SearchableDropdown
@@ -1080,7 +1495,6 @@ export default function ProductionTeamInventory() {
                                 />
                             </div>
 
-                            {/* Description */}
                             <div className="md:col-span-2">
                                 <label className="block text-sm font-semibold text-slate-700 mb-2">Description</label>
                                 <input
@@ -1092,7 +1506,6 @@ export default function ProductionTeamInventory() {
                                 />
                             </div>
 
-                            {/* Qty */}
                             <div>
                                 <label className="block text-sm font-semibold text-slate-700 mb-2">Qty <span className="text-red-500">*</span></label>
                                 <input
@@ -1104,7 +1517,6 @@ export default function ProductionTeamInventory() {
                                 />
                             </div>
 
-                            {/* Rate */}
                             <div>
                                 <label className="block text-sm font-semibold text-slate-700 mb-2">Rate (Nu.) <span className="text-red-500">*</span></label>
                                 <input
@@ -1116,7 +1528,6 @@ export default function ProductionTeamInventory() {
                                 />
                             </div>
 
-                            {/* Date */}
                             <div>
                                 <label className="block text-sm font-semibold text-slate-700 mb-2">Date</label>
                                 <input
@@ -1127,18 +1538,19 @@ export default function ProductionTeamInventory() {
                                 />
                             </div>
 
-                            {/* Received By */}
-                            <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-2">Received By <span className="text-red-500">*</span></label>
-                                <SearchableDropdown
-                                    value={addForm.receivedBy}
-                                    onChange={v => setAddForm(p => ({ ...p, receivedBy: v }))}
-                                    options={INITIAL_USERS}
-                                    placeholder="Select staff member..."
-                                />
+                            <div className="md:col-span-2">
+                                <label className="block text-sm font-semibold text-slate-700 mb-2">Received By</label>
+                                <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3">
+                                    {currentUser ? (
+                                        <span className="text-slate-900 font-medium">
+                                            {currentUser.name} ({formatRole(currentUser.role || 'admin')})
+                                        </span>
+                                    ) : (
+                                        <span className="text-slate-400">Loading...</span>
+                                    )}
+                                </div>
                             </div>
 
-                            {/* Total */}
                             <div className="md:col-span-2">
                                 <label className="block text-sm font-semibold text-slate-700 mb-2">Total Amount</label>
                                 <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 font-bold text-lg">
@@ -1146,7 +1558,6 @@ export default function ProductionTeamInventory() {
                                 </div>
                             </div>
 
-                            {/* Actions */}
                             <div className="md:col-span-2 flex justify-end gap-3 pt-6 border-t border-slate-100">
                                 <button type="button" onClick={() => setShowAddModal(false)} className="px-6 py-3 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-all">Cancel</button>
                                 <button type="submit" className="px-8 py-3 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 transition-all shadow-lg hover:shadow-xl">Save Record</button>
@@ -1172,9 +1583,8 @@ export default function ProductionTeamInventory() {
                             </button>
                         </div>
 
-                        <form onSubmit={issueMaterial} className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            {/* Item Name */}
-                            <div className="md:col-span-2">
+                        <form onSubmit={issueMaterial} className="space-y-6">
+                            <div>
                                 <label className="block text-sm font-semibold text-slate-700 mb-2">Item Name <span className="text-red-500">*</span></label>
                                 <SearchableDropdown
                                     value={issueForm.itemName}
@@ -1184,43 +1594,104 @@ export default function ProductionTeamInventory() {
                                 />
                             </div>
 
-                            {/* Qty */}
+                            <div className="grid grid-cols-2 gap-6">
+                                <div>
+                                    <label className="block text-sm font-semibold text-slate-700 mb-2">Qty to Issue <span className="text-red-500">*</span></label>
+                                    <input
+                                        type="number"
+                                        value={issueForm.issueQty}
+                                        onChange={e => setIssueForm(p => ({ ...p, issueQty: e.target.value }))}
+                                        placeholder="0"
+                                        className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm transition-all"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-semibold text-slate-700 mb-2">Date <span className="text-red-500">*</span></label>
+                                    <input
+                                        type="date"
+                                        value={issueForm.issueDate}
+                                        onChange={e => setIssueForm(p => ({ ...p, issueDate: e.target.value }))}
+                                        min={new Date().toISOString().split('T')[0]}
+                                        className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm transition-all"
+                                    />
+                                </div>
+                            </div>
+
                             <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-2">Qty to Issue <span className="text-red-500">*</span></label>
-                                <input
-                                    type="number"
-                                    value={issueForm.issueQty}
-                                    onChange={e => setIssueForm(p => ({ ...p, issueQty: e.target.value }))}
-                                    placeholder="0"
-                                    className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm transition-all"
-                                />
+                                <label className="block text-sm font-semibold text-slate-700 mb-3">Issue To <span className="text-red-500">*</span></label>
+                                <div className="flex gap-4">
+                                    <label className="flex items-center cursor-pointer">
+                                        <input
+                                            type="radio"
+                                            value="user"
+                                            checked={issueType === 'user'}
+                                            onChange={e => handleIssueTypeChange(e.target.value)}
+                                            className="w-4 h-4 text-indigo-600 border-slate-300 focus:ring-indigo-500"
+                                        />
+                                        <span className="ml-2 text-sm font-medium text-slate-700">User</span>
+                                    </label>
+                                    <label className="flex items-center cursor-pointer">
+                                        <input
+                                            type="radio"
+                                            value="production_team"
+                                            checked={issueType === 'production_team'}
+                                            onChange={e => handleIssueTypeChange(e.target.value)}
+                                            className="w-4 h-4 text-indigo-600 border-slate-300 focus:ring-indigo-500"
+                                        />
+                                        <span className="ml-2 text-sm font-medium text-slate-700">Production Team</span>
+                                    </label>
+                                </div>
                             </div>
 
-                            {/* Date */}
+                            {issueType === 'user' ? (
+                                <>
+                                    <div>
+                                        <label className="block text-sm font-semibold text-slate-700 mb-2">Department <span className="text-red-500">*</span></label>
+                                        <select
+                                            value={issueForm.issuedToDepartment}
+                                            onChange={e => handleDepartmentChange(e.target.value)}
+                                            className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm transition-all"
+                                        >
+                                            <option value="">Select Department</option>
+                                            {departments.map((dept, index) => (
+                                                <option key={index} value={dept}>{dept}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-semibold text-slate-700 mb-2">Issued To (User) <span className="text-red-500">*</span></label>
+                                        <select
+                                            value={issueForm.issuedTo && issueForm.issuedToEmail ? `${issueForm.issuedTo} - ${issueForm.issuedToEmail}` : ''}
+                                            onChange={e => handleUserSelect(e.target.value)}
+                                            disabled={!issueForm.issuedToDepartment}
+                                            className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm transition-all disabled:bg-slate-100 disabled:cursor-not-allowed"
+                                        >
+                                            <option value="">{issueForm.issuedToDepartment ? 'Select User' : 'Select Department First'}</option>
+                                            {usersByDepartment.map((user, index) => (
+                                                <option key={index} value={user.display}>{user.display}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </>
+                            ) : (
+                                <div>
+                                    <label className="block text-sm font-semibold text-slate-700 mb-2">Production Team Member <span className="text-red-500">*</span></label>
+                                    <select
+                                        value={issueForm.issuedTo}
+                                        onChange={e => handleProductionTeamSelect(e.target.value)}
+                                        className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm transition-all"
+                                    >
+                                        <option value="">Select Production Team Member</option>
+                                        {productionTeamMembers.map((member, index) => (
+                                            <option key={index} value={member.name}>{member.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
+
                             <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-2">Date</label>
-                                <input
-                                    type="date"
-                                    value={issueForm.issueDate}
-                                    onChange={e => setIssueForm(p => ({ ...p, issueDate: e.target.value }))}
-                                    className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm transition-all"
-                                />
-                            </div>
-
-                            {/* Issued To */}
-                            <div className="md:col-span-2">
-                                <label className="block text-sm font-semibold text-slate-700 mb-2">Issued To <span className="text-red-500">*</span></label>
-                                <input
-                                    type="text"
-                                    value={issueForm.issuedTo}
-                                    onChange={e => setIssueForm(p => ({ ...p, issuedTo: e.target.value }))}
-                                    placeholder="e.g., Sonam Tshering, Project Alpha"
-                                    className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm transition-all"
-                                />
-                            </div>
-
-                            {/* Reason */}
-                            <div className="md:col-span-2">
                                 <label className="block text-sm font-semibold text-slate-700 mb-2">Reason</label>
                                 <input
                                     type="text"
@@ -1231,19 +1702,20 @@ export default function ProductionTeamInventory() {
                                 />
                             </div>
 
-                            {/* Issued By */}
-                            <div className="md:col-span-2">
-                                <label className="block text-sm font-semibold text-slate-700 mb-2">Issued By <span className="text-red-500">*</span></label>
-                                <SearchableDropdown
-                                    value={issueForm.issuedBy}
-                                    onChange={v => setIssueForm(p => ({ ...p, issuedBy: v }))}
-                                    options={INITIAL_USERS}
-                                    placeholder="Select staff member..."
-                                />
+                            <div>
+                                <label className="block text-sm font-semibold text-slate-700 mb-2">Issued By</label>
+                                <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3">
+                                    {currentUser ? (
+                                        <span className="text-slate-900 font-medium">
+                                            {currentUser.name} ({formatRole(currentUser.role || 'admin')})
+                                        </span>
+                                    ) : (
+                                        <span className="text-slate-400">Loading...</span>
+                                    )}
+                                </div>
                             </div>
 
-                            {/* Actions */}
-                            <div className="md:col-span-2 flex justify-end gap-3 pt-6 border-t border-slate-100">
+                            <div className="flex justify-end gap-3 pt-6 border-t border-slate-100">
                                 <button type="button" onClick={() => setShowIssueModal(false)} className="px-6 py-3 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-all">Cancel</button>
                                 <button type="submit" className="px-8 py-3 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 transition-all shadow-lg hover:shadow-xl">Issue Material</button>
                             </div>

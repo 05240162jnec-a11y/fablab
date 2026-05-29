@@ -23,7 +23,6 @@ const EMPTY_ADD_FORM = {
     itemQty: '',
     itemRate: '',
     itemDate: new Date().toISOString().split('T')[0],
-    receivedBy: '',
 };
 
 const EMPTY_ISSUE_FORM = {
@@ -36,7 +35,7 @@ const EMPTY_ISSUE_FORM = {
 };
 
 /* ─────────────────────────────────────────────
-   Searchable Dropdown (reusable)
+   Searchable Dropdown (reusable) - FIXED
 ───────────────────────────────────────────── */
 function SearchableDropdown({ value, onChange, options, placeholder, allowNew = false }) {
     const [open, setOpen] = useState(false);
@@ -61,12 +60,22 @@ function SearchableDropdown({ value, onChange, options, placeholder, allowNew = 
 
     return (
         <div className="relative" ref={wrapRef}>
+            {/* ✅ Single input field - used for both display and search */}
             <div className="relative">
                 <input
                     type="text"
-                    value={value}
-                    onChange={e => { onChange(e.target.value); setSearch(e.target.value); setOpen(true); }}
-                    onFocus={() => { setSearch(''); setOpen(true); }}
+                    value={open ? search : value}
+                    onChange={e => {
+                        setSearch(e.target.value);
+                        if (allowNew) {
+                            onChange(e.target.value); // Allow typing new values
+                        }
+                        setOpen(true);
+                    }}
+                    onFocus={() => {
+                        setSearch(value); // Start with current value
+                        setOpen(true);
+                    }}
                     placeholder={placeholder}
                     autoComplete="off"
                     className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm bg-white pr-12 transition-all"
@@ -84,6 +93,7 @@ function SearchableDropdown({ value, onChange, options, placeholder, allowNew = 
 
             {open && (
                 <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-50 max-h-64 overflow-hidden flex flex-col">
+                    {/* ✅ Search inside dropdown */}
                     <div className="p-3 border-b border-slate-100 bg-slate-50 flex-shrink-0">
                         <input
                             type="text"
@@ -253,6 +263,17 @@ const exportToCSV = (data, filename) => {
 };
 
 /* ─────────────────────────────────────────────
+   Format Role Helper
+───────────────────────────────────────────── */
+const formatRole = (role) => {
+    if (!role) return '-';
+    if (role === 'admin') return 'Admin';
+    if (role === 'production' || role === 'production_team') return 'Production Team member';
+    if (role === 'staff') return 'Staff';
+    return role.charAt(0).toUpperCase() + role.slice(1);
+};
+
+/* ─────────────────────────────────────────────
    Main Component
 ───────────────────────────────────────────── */
 export default function ProductionTeamInventory() {
@@ -270,8 +291,14 @@ export default function ProductionTeamInventory() {
     const [issuedRecords, setIssuedRecords] = useState([]);
     const [stockData, setStockData] = useState([]);
 
-    // ✅ NEW: Dynamic team members for dropdown (MOVED INSIDE COMPONENT)
-    const [teamMembers, setTeamMembers] = useState([]);
+    // ✅ NEW: Current user state
+    const [currentUser, setCurrentUser] = useState(null);
+
+    // ✅ NEW: Search states for each tab
+    const [searchMaterials, setSearchMaterials] = useState('');
+    const [searchReceived, setSearchReceived] = useState('');
+    const [searchStock, setSearchStock] = useState('');
+    const [searchIssued, setSearchIssued] = useState('');
 
     // Bulk selection
     const [selectedReceived, setSelectedReceived] = useState(new Set());
@@ -318,25 +345,13 @@ export default function ProductionTeamInventory() {
         try {
             setLoading(true);
             const token = localStorage.getItem('auth_token');
+            const response = await axios.get('http://127.0.0.1:8000/api/admin/inventory', {
+                headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
+            });
 
-            // ✅ Fetch inventory data AND team members in parallel
-            const [inventoryRes, teamRes] = await Promise.all([
-                axios.get('http://127.0.0.1:8000/api/admin/inventory', {
-                    headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
-                }),
-                axios.get('http://127.0.0.1:8000/api/admin/inventory/team-members', {
-                    headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
-                })
-            ]);
+            if (response.data.success) {
+                const data = response.data.data;
 
-            if (inventoryRes.data.success && teamRes.data.success) {
-                const data = inventoryRes.data.data;
-                const members = teamRes.data.data;
-
-                // ✅ Set dynamic team members for dropdowns
-                setTeamMembers(members);
-
-                // ... rest of your existing inventory data handling ...
                 const fetchedMaterialNames = data.materials.map(m => m.name);
                 setMaterials(prev => {
                     const merged = [...new Set([...prev, ...fetchedMaterialNames])];
@@ -352,6 +367,7 @@ export default function ProductionTeamInventory() {
                     rate: parseFloat(record.rate),
                     date: record.transaction_date,
                     receivedBy: record.received_by || '',
+                    receivedByRole: record.received_by_role || '',
                     total: record.quantity * parseFloat(record.rate),
                 })));
 
@@ -382,7 +398,58 @@ export default function ProductionTeamInventory() {
         }
     };
 
-    useEffect(() => { fetchInventory(); }, []);
+    /* ── Fetch Current User ── */
+    const fetchCurrentUser = async () => {
+        try {
+            const token = localStorage.getItem('auth_token');
+            const response = await axios.get('http://127.0.0.1:8000/api/admin/profile', {
+                headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
+            });
+
+            console.log('Full API response:', response); // ✅ See the full structure
+            console.log('Response data:', response.data); // ✅ See what's inside
+
+            // ✅ Try different possible structures
+            let userData = null;
+
+            if (response.data?.data) {
+                userData = response.data.data;
+            } else if (response.data?.user) {
+                userData = response.data.user;
+            } else if (response.data) {
+                userData = response.data;
+            }
+
+            console.log('Extracted user data:', userData); // ✅ Confirm what we got
+
+            if (userData) {
+                setCurrentUser(userData);
+                // Also save to localStorage for backup
+                localStorage.setItem('user', JSON.stringify(userData));
+            } else {
+                throw new Error('No user data in response');
+            }
+        } catch (err) {
+            console.error('Failed to fetch current user:', err);
+            console.error('Error response:', err.response?.data); // ✅ See error details
+
+            // Fallback: try localStorage
+            const storedUser = localStorage.getItem('user');
+            if (storedUser) {
+                const parsed = JSON.parse(storedUser);
+                console.log('Using stored user:', parsed);
+                setCurrentUser(parsed);
+            } else {
+                // Last resort: show error
+                showDialog('Error', 'Unable to load user profile. Please refresh the page.', 'error');
+            }
+        }
+    };
+
+    useEffect(() => {
+        fetchInventory();
+        fetchCurrentUser();
+    }, []);
 
     /* ── Stock helpers ── */
     const getLocalStock = (name) => {
@@ -452,7 +519,7 @@ export default function ProductionTeamInventory() {
         );
     };
 
-    /* ── Export Material List to CSV ── */
+    /* ── Export Functions ── */
     const exportMaterials = () => {
         const exportData = materials.map((name, index) => ({
             'Sl.No': index + 1,
@@ -462,53 +529,91 @@ export default function ProductionTeamInventory() {
         showToast('📥 Material list exported successfully!');
     };
 
+    const exportReceived = () => {
+        const exportData = receivedRecords.map(r => ({
+            'Sl.No': r.slNo,
+            'Item Name': r.name,
+            'Description': r.desc,
+            'Qty': r.qty,
+            'Rate (Nu.)': r.rate.toFixed(2),
+            'Date': r.date,
+            'Received By': r.receivedBy,
+            'Role': formatRole(r.receivedByRole),
+            'Total (Nu.)': r.total.toFixed(2),
+        }));
+        exportToCSV(exportData, 'received-records');
+        showToast('📥 Received records exported successfully!');
+    };
+
+    const exportStock = () => {
+        const exportData = stockData.map(s => ({
+            'Sl.No': s.slNo,
+            'Material Name': s.name,
+            'Current Stock': s.currentStock,
+        }));
+        exportToCSV(exportData, 'current-stock');
+        showToast('📥 Stock data exported successfully!');
+    };
+
+    const exportIssued = () => {
+        const exportData = issuedRecords.map(r => ({
+            'Sl.No': r.slNo,
+            'Item Name': r.name,
+            'Qty Issued': r.qty,
+            'Issued To': r.issuedTo,
+            'Reason': r.reason,
+            'Date': r.date,
+            'Issued By': r.issuedBy,
+        }));
+        exportToCSV(exportData, 'issued-records');
+        showToast('📥 Issued records exported successfully!');
+    };
+
+    /* ── Add Received ── */
     const addToTable = async (e) => {
         e.preventDefault();
-        const { itemName, itemDesc, itemQty, itemRate, itemDate, receivedBy } = addForm;
+        const { itemName, itemDesc, itemQty, itemRate, itemDate } = addForm;
 
-        // ✅ Extract just the name from "Name (Role)" format
-        const receivedByName = receivedBy.split(' (')[0];
-
-        if (!itemName || !itemQty || !itemRate || !receivedByName) {
-            showDialog('Validation Error', 'Please fill in Item Name, Quantity, Rate, and Received By.', 'error');
+        // ✅ Use currentUser data with fallback
+        if (!itemName || !itemQty || !itemRate) {
+            showDialog('Validation Error', 'Please fill in Item Name, Quantity, and Rate.', 'error');
             return;
         }
 
+        if (!currentUser) {
+            showDialog('Validation Error', 'User not loaded. Please wait a moment and try again.', 'error');
+            return;
+        }
+
+        // ✅ Determine role - use from user object or fallback to 'admin'
+        const userRole = currentUser.role || 'admin'; // ✅ Fallback to 'admin'
+
+        console.log('Using role:', userRole); // ✅ Debug log
+
         try {
             const token = localStorage.getItem('auth_token');
-            await axios.post('http://127.0.0.1:8000/api/admin/inventory/received', {
+
+            const payload = {
                 name: itemName,
                 description: itemDesc,
                 quantity: parseInt(itemQty),
                 rate: parseFloat(itemRate),
                 transaction_date: itemDate,
-                received_by: receivedByName, // ✅ Save just the name
-            }, {
+                received_by: currentUser.name,
+                received_by_role: userRole, // ✅ Use the determined role
+            };
+
+            console.log('Sending payload:', payload);
+
+            await axios.post('http://127.0.0.1:8000/api/admin/inventory/received', payload, {
                 headers: { Accept: 'application/json', 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
             });
             fetchInventory();
             showToast('✅ Material received successfully!');
-        } catch {
-            const qty = parseInt(itemQty);
-            const rate = parseFloat(itemRate);
-            const newRecord = {
-                id: Date.now(),
-                slNo: receivedRecords.length + 1,
-                name: itemName,
-                desc: itemDesc,
-                qty,
-                rate,
-                date: itemDate,
-                receivedBy,
-                total: qty * rate,
-            };
-            setReceivedRecords(prev => [...prev, newRecord]);
-            updateLocalStock(itemName, qty);
-
-            if (!materials.some(m => m.toLowerCase() === itemName.toLowerCase())) {
-                setMaterials(prev => [...prev, itemName].sort((a, b) => a.localeCompare(b)));
-            }
-            showToast('✅ Material received successfully!');
+        } catch (err) {
+            console.error('Save error:', err);
+            console.error('Error response:', err.response?.data);
+            showDialog('Error', err.response?.data?.message || 'Failed to save record. Please try again.', 'error');
         }
 
         setAddForm({ ...EMPTY_ADD_FORM, itemDate: new Date().toISOString().split('T')[0] });
@@ -519,11 +624,7 @@ export default function ProductionTeamInventory() {
     const issueMaterial = async (e) => {
         e.preventDefault();
         const { itemName, issueQty, issueDate, issuedTo, issueReason, issuedBy } = issueForm;
-
-        // ✅ Extract just the name from "Name (Role)" format
-        const issuedByName = issuedBy.split(' (')[0];
-
-        if (!itemName || !issueQty || !issuedByName) {
+        if (!itemName || !issueQty || !issuedBy) {
             showDialog('Validation Error', 'Please fill in Item Name, Quantity, and Issued By.', 'error');
             return;
         }
@@ -543,7 +644,7 @@ export default function ProductionTeamInventory() {
                 transaction_date: issueDate,
                 issued_to: issuedTo,
                 reason: issueReason,
-                issued_by: issuedByName, // ✅ Save just the name
+                issued_by: issuedBy,
             }, {
                 headers: { Accept: 'application/json', 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
             });
@@ -678,6 +779,35 @@ export default function ProductionTeamInventory() {
         return (qty * rate).toFixed(2);
     };
 
+    /* ── Filter helpers ── */
+    const filterMaterials = (list, search) => {
+        if (!search) return list;
+        return list.filter(item => item.toLowerCase().includes(search.toLowerCase()));
+    };
+
+    const filterReceived = (list, search) => {
+        if (!search) return list;
+        return list.filter(item =>
+            item.name.toLowerCase().includes(search.toLowerCase()) ||
+            item.desc?.toLowerCase().includes(search.toLowerCase()) ||
+            item.receivedBy?.toLowerCase().includes(search.toLowerCase())
+        );
+    };
+
+    const filterStock = (list, search) => {
+        if (!search) return list;
+        return list.filter(item => item.name.toLowerCase().includes(search.toLowerCase()));
+    };
+
+    const filterIssued = (list, search) => {
+        if (!search) return list;
+        return list.filter(item =>
+            item.name.toLowerCase().includes(search.toLowerCase()) ||
+            item.issuedTo?.toLowerCase().includes(search.toLowerCase()) ||
+            item.reason?.toLowerCase().includes(search.toLowerCase())
+        );
+    };
+
     /* ── Tabs config ── */
     const tabs = [
         { id: 'materials', label: 'Material List' },
@@ -742,7 +872,15 @@ export default function ProductionTeamInventory() {
                                 <p className="text-sm text-slate-500 mt-1">Master list of all materials</p>
                             </div>
                             <div className="flex items-center gap-3">
-                                {/* ✅ Export Buttons */}
+                                {/* ✅ Search Bar */}
+                                <input
+                                    type="text"
+                                    placeholder="Search materials..."
+                                    value={searchMaterials}
+                                    onChange={(e) => setSearchMaterials(e.target.value)}
+                                    className="px-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 w-48"
+                                />
+                                {/* ✅ Export Button */}
                                 <button
                                     onClick={exportMaterials}
                                     className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white text-sm font-semibold rounded-xl hover:bg-emerald-700 transition-all shadow-sm"
@@ -764,15 +902,14 @@ export default function ProductionTeamInventory() {
                             </div>
                         </div>
 
-                        {materials.length === 0 ? (
+                        {filterMaterials(materials, searchMaterials).length === 0 ? (
                             <div className="py-20 text-center">
                                 <div className="inline-flex items-center justify-center w-20 h-20 bg-slate-100 rounded-full mb-5">
                                     <svg className="w-10 h-10 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                                     </svg>
                                 </div>
-                                <p className="text-slate-600 font-semibold text-lg">No materials yet</p>
-                                <p className="text-slate-400 text-sm mt-2">Add your first material to get started</p>
+                                <p className="text-slate-600 font-semibold text-lg">No materials found</p>
                             </div>
                         ) : (
                             <div className="overflow-x-auto">
@@ -785,7 +922,7 @@ export default function ProductionTeamInventory() {
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
-                                        {materials.map((material, index) => (
+                                        {filterMaterials(materials, searchMaterials).map((material, index) => (
                                             <tr key={index} className="hover:bg-slate-50 transition-colors">
                                                 <td className="px-8 py-5 text-sm text-slate-600">{index + 1}</td>
                                                 <td className="px-8 py-5 text-sm font-semibold text-slate-900">{material}</td>
@@ -810,6 +947,14 @@ export default function ProductionTeamInventory() {
                                 <p className="text-sm text-slate-500 mt-1">Material receiving history</p>
                             </div>
                             <div className="flex items-center gap-3">
+                                {/* ✅ Search Bar */}
+                                <input
+                                    type="text"
+                                    placeholder="Search records..."
+                                    value={searchReceived}
+                                    onChange={(e) => setSearchReceived(e.target.value)}
+                                    className="px-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 w-48"
+                                />
                                 {selectedReceived.size > 0 && (
                                     <button
                                         onClick={bulkDeleteReceived}
@@ -821,6 +966,16 @@ export default function ProductionTeamInventory() {
                                         Delete Selected ({selectedReceived.size})
                                     </button>
                                 )}
+                                {/* ✅ Export Button */}
+                                <button
+                                    onClick={exportReceived}
+                                    className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white text-sm font-semibold rounded-xl hover:bg-emerald-700 transition-all shadow-sm"
+                                >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                    </svg>
+                                    Export CSV
+                                </button>
                                 <button
                                     onClick={() => { setShowAddModal(true); setAddForm({ ...EMPTY_ADD_FORM, itemDate: new Date().toISOString().split('T')[0] }); }}
                                     className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 transition-all shadow-sm hover:shadow-md"
@@ -833,14 +988,14 @@ export default function ProductionTeamInventory() {
                             </div>
                         </div>
 
-                        {receivedRecords.length === 0 ? (
+                        {filterReceived(receivedRecords, searchReceived).length === 0 ? (
                             <div className="py-20 text-center">
                                 <div className="inline-flex items-center justify-center w-20 h-20 bg-slate-100 rounded-full mb-5">
                                     <svg className="w-10 h-10 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
                                     </svg>
                                 </div>
-                                <p className="text-slate-600 font-semibold text-lg">No received records yet</p>
+                                <p className="text-slate-600 font-semibold text-lg">No received records found</p>
                             </div>
                         ) : (
                             <div className="overflow-x-auto">
@@ -855,13 +1010,13 @@ export default function ProductionTeamInventory() {
                                                     onChange={e => toggleSelectAllReceived(e.target.checked)}
                                                 />
                                             </th>
-                                            {['Sl.No', 'Item Name', 'Description', 'Qty', 'Rate (Nu.)', 'Date', 'Received By', 'Total (Nu.)', 'Action'].map((h, i) => (
+                                            {['Sl.No', 'Item Name', 'Description', 'Qty', 'Rate (Nu.)', 'Date', 'Received By', 'Role', 'Total (Nu.)'].map((h, i) => (
                                                 <th key={i} className={`px-6 py-4 text-xs font-semibold text-slate-600 uppercase tracking-wider ${['Qty', 'Rate (Nu.)', 'Total (Nu.)'].includes(h) ? 'text-right' : ['Action'].includes(h) ? 'text-center' : 'text-left'}`}>{h}</th>
                                             ))}
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
-                                        {receivedRecords.map((record) => (
+                                        {filterReceived(receivedRecords, searchReceived).map((record) => (
                                             <tr key={record.id} className="hover:bg-slate-50 transition-colors">
                                                 <td className="px-6 py-5">
                                                     <input
@@ -876,13 +1031,11 @@ export default function ProductionTeamInventory() {
                                                 <td className="px-6 py-5 text-sm text-slate-600">{record.desc || '-'}</td>
                                                 <td className="px-6 py-5 text-sm font-semibold text-slate-900 text-right">{record.qty}</td>
                                                 <td className="px-6 py-5 text-sm text-slate-600 text-right">Nu. {record.rate.toFixed(2)}</td>
-                                                {/* ✅ Formatted Date */}
                                                 <td className="px-6 py-5 text-sm text-slate-600">{formatDate(record.date)}</td>
                                                 <td className="px-6 py-5 text-sm font-medium text-slate-900">{record.receivedBy || '-'}</td>
+                                                {/* ✅ NEW: Role column */}
+                                                <td className="px-6 py-5 text-sm text-slate-600">{formatRole(record.receivedByRole)}</td>
                                                 <td className="px-6 py-5 text-sm font-bold text-slate-900 text-right">Nu. {record.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
-                                                <td className="px-6 py-5 text-center">
-                                                    <DeleteBtn onClick={() => deleteRecord(record.id, record.qty, record.name)} />
-                                                </td>
                                             </tr>
                                         ))}
                                     </tbody>
@@ -895,9 +1048,31 @@ export default function ProductionTeamInventory() {
                 {/* ── CURRENT STOCK TAB ── */}
                 {!loading && !error && activeTab === 'stock' && (
                     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                        <div className="px-8 py-6 border-b border-slate-100">
-                            <h2 className="text-xl font-bold text-slate-900">Current Stock</h2>
-                            <p className="text-sm text-slate-500 mt-1">Highlighted in red if stock &lt; 10 units</p>
+                        <div className="px-8 py-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div>
+                                <h2 className="text-xl font-bold text-slate-900">Current Stock</h2>
+                                <p className="text-sm text-slate-500 mt-1">Highlighted in red if stock &lt; 10 units</p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                {/* ✅ Search Bar */}
+                                <input
+                                    type="text"
+                                    placeholder="Search stock..."
+                                    value={searchStock}
+                                    onChange={(e) => setSearchStock(e.target.value)}
+                                    className="px-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 w-48"
+                                />
+                                {/* ✅ Export Button */}
+                                <button
+                                    onClick={exportStock}
+                                    className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white text-sm font-semibold rounded-xl hover:bg-emerald-700 transition-all shadow-sm"
+                                >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                    </svg>
+                                    Export CSV
+                                </button>
+                            </div>
                         </div>
                         <div className="overflow-x-auto">
                             <table className="w-full">
@@ -909,12 +1084,12 @@ export default function ProductionTeamInventory() {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
-                                    {stockData.length === 0 ? (
+                                    {filterStock(stockData, searchStock).length === 0 ? (
                                         <tr>
-                                            <td colSpan={3} className="px-8 py-16 text-center text-slate-400 font-medium">No stock data available</td>
+                                            <td colSpan={3} className="px-8 py-16 text-center text-slate-400 font-medium">No stock data found</td>
                                         </tr>
                                     ) : (
-                                        stockData.map((stock, index) => (
+                                        filterStock(stockData, searchStock).map((stock, index) => (
                                             <tr
                                                 key={index}
                                                 className={`transition-colors ${stock.currentStock < 10
@@ -945,6 +1120,14 @@ export default function ProductionTeamInventory() {
                                 <p className="text-sm text-slate-500 mt-1">Material issuance history</p>
                             </div>
                             <div className="flex items-center gap-3">
+                                {/* ✅ Search Bar */}
+                                <input
+                                    type="text"
+                                    placeholder="Search issued..."
+                                    value={searchIssued}
+                                    onChange={(e) => setSearchIssued(e.target.value)}
+                                    className="px-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 w-48"
+                                />
                                 {selectedIssued.size > 0 && (
                                     <button
                                         onClick={bulkDeleteIssued}
@@ -956,6 +1139,16 @@ export default function ProductionTeamInventory() {
                                         Delete Selected ({selectedIssued.size})
                                     </button>
                                 )}
+                                {/* ✅ Export Button */}
+                                <button
+                                    onClick={exportIssued}
+                                    className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white text-sm font-semibold rounded-xl hover:bg-emerald-700 transition-all shadow-sm"
+                                >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                    </svg>
+                                    Export CSV
+                                </button>
                                 <button
                                     onClick={() => { setShowIssueModal(true); setIssueForm({ ...EMPTY_ISSUE_FORM, issueDate: new Date().toISOString().split('T')[0] }); }}
                                     className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 transition-all shadow-sm hover:shadow-md"
@@ -968,14 +1161,14 @@ export default function ProductionTeamInventory() {
                             </div>
                         </div>
 
-                        {issuedRecords.length === 0 ? (
+                        {filterIssued(issuedRecords, searchIssued).length === 0 ? (
                             <div className="py-20 text-center">
                                 <div className="inline-flex items-center justify-center w-20 h-20 bg-slate-100 rounded-full mb-5">
                                     <svg className="w-10 h-10 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                     </svg>
                                 </div>
-                                <p className="text-slate-600 font-semibold text-lg">No issued records yet</p>
+                                <p className="text-slate-600 font-semibold text-lg">No issued records found</p>
                             </div>
                         ) : (
                             <div className="overflow-x-auto">
@@ -996,7 +1189,7 @@ export default function ProductionTeamInventory() {
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
-                                        {issuedRecords.map((record) => (
+                                        {filterIssued(issuedRecords, searchIssued).map((record) => (
                                             <tr key={record.id} className="hover:bg-slate-50 transition-colors">
                                                 <td className="px-6 py-5">
                                                     <input
@@ -1008,11 +1201,9 @@ export default function ProductionTeamInventory() {
                                                 </td>
                                                 <td className="px-6 py-5 text-sm text-slate-600">{record.slNo}</td>
                                                 <td className="px-6 py-5 text-sm font-semibold text-slate-900">{record.name}</td>
-                                                {/* ✅ Positive quantity display (no negative sign) */}
                                                 <td className="px-6 py-5 text-sm font-semibold text-red-600 text-right">{record.qty}</td>
                                                 <td className="px-6 py-5 text-sm text-slate-600">{record.issuedTo || '-'}</td>
                                                 <td className="px-6 py-5 text-sm text-slate-600">{record.reason || '-'}</td>
-                                                {/* ✅ Formatted Date */}
                                                 <td className="px-6 py-5 text-sm text-slate-600">{formatDate(record.date)}</td>
                                                 <td className="px-6 py-5 text-sm font-medium text-slate-900">{record.issuedBy || '-'}</td>
                                                 <td className="px-6 py-5 text-center">
@@ -1142,15 +1333,18 @@ export default function ProductionTeamInventory() {
                                 />
                             </div>
 
-                            {/* Received By */}
-                            <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-2">Received By <span className="text-red-500">*</span></label>
-                                <SearchableDropdown
-                                    value={addForm.receivedBy}
-                                    onChange={v => setAddForm(p => ({ ...p, receivedBy: v }))}
-                                    options={teamMembers.map(m => m.name)} // ✅ Use dynamic names
-                                    placeholder="Select staff member..."
-                                />
+                            {/* ✅ Received By - Auto-filled with current user */}
+                            <div className="md:col-span-2">
+                                <label className="block text-sm font-semibold text-slate-700 mb-2">Received By</label>
+                                <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3">
+                                    {currentUser ? (
+                                        <span className="text-slate-900 font-medium">
+                                            {currentUser.name} ({formatRole(currentUser.role || 'admin')})
+                                        </span>
+                                    ) : (
+                                        <span className="text-slate-400">Loading...</span>
+                                    )}
+                                </div>
                             </div>
 
                             {/* Total */}
@@ -1252,7 +1446,7 @@ export default function ProductionTeamInventory() {
                                 <SearchableDropdown
                                     value={issueForm.issuedBy}
                                     onChange={v => setIssueForm(p => ({ ...p, issuedBy: v }))}
-                                    options={teamMembers.map(m => m.name)} // ✅ Use dynamic names
+                                    options={materials}
                                     placeholder="Select staff member..."
                                 />
                             </div>

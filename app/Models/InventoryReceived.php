@@ -20,6 +20,7 @@ class InventoryReceived extends Model
         'rate',
         'transaction_date',
         'received_by',
+        'received_by_role',
     ];
 
     public function material()

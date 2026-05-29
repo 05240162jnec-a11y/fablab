@@ -98,6 +98,13 @@ Route::prefix('admin')->group(function () {
         Route::delete('inventory/received/{id}', [\App\Http\Controllers\Api\Admin\InventoryController::class, 'deleteReceived']);
         Route::delete('inventory/issued/{id}', [\App\Http\Controllers\Api\Admin\InventoryController::class, 'deleteIssued']);
         
+        
+        // ✅ Stock Alert Threshold
+        Route::get('inventory/threshold', [\App\Http\Controllers\Api\Admin\InventoryController::class, 'getStockAlertThreshold']);
+        Route::post('inventory/threshold', [\App\Http\Controllers\Api\Admin\InventoryController::class, 'updateStockAlertThreshold']);
+                // ✅ Get departments and users for issued material
+        Route::get('inventory/departments-users', [\App\Http\Controllers\Api\Admin\InventoryController::class, 'getDepartmentsAndUsers']);
+        
         // Projects Management (Admin)
         Route::get('/projects', [App\Http\Controllers\Api\ProjectController::class, 'index']);
         Route::get('/projects/{id}', [App\Http\Controllers\Api\ProjectController::class, 'show']);

@@ -387,19 +387,21 @@ export default function Register() {
                                 <select name="department" value={formData.department} onChange={handleChange}
                                     className={`reg-select ${errors.department ? 'err' : ''}`}>
                                     <option value="" disabled>Select Department</option>
-                                    <option value="civil">Department of Civil Engineering &amp; Surveying</option>
-                                    <option value="eee">Department Electrical and Electronics Engineering</option>
-                                    <option value="mech">Department Mechanical Engineering</option>
-                                    <option value="it">Department Information Technology</option>
-                                    <option value="hum">Department Humanities and Management</option>
+                                    <option value="Department of Civil Engineering &amp; Surveying">Department of Civil Engineering &amp; Surveying</option>
+                                    <option value="Department of Electrical Engineering">Department of Electrical Engineering</option>
+                                    <option value="Department of Mechanical Engineering">Department of Mechanical Engineering</option>
+                                    <option value="Department of Information Technology">Department of Information Technology</option>
+                                    <option value="Department of Humanities and Management">Department of Humanities and Management</option>
+                                    <option value="Department of Electronics & Communication Egineering">Department of Electronics & Communication Egineering</option>
+
                                 </select>
                                 <i className="fas fa-chevron-down chev" />
                                 {errors.department && <p className="err-txt">{Array.isArray(errors.department) ? errors.department[0] : errors.department}</p>}
                             </div>
                         )}
 
-                        {/* Year — only for student / faculty */}
-                        {(formData.role === 'student' || formData.role === 'faculty') && (
+                        {/* Year — only for student */}
+                        {formData.role === 'student' && (
                             <div className="field sel-wrap">
                                 <select name="year_of_study" value={formData.year_of_study} onChange={handleChange}
                                     className={`reg-select ${errors.year_of_study ? 'err' : ''}`}>

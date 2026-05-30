@@ -12,10 +12,10 @@ use Illuminate\Support\Facades\DB;
 
 class InventoryController extends Controller
 {
-    /**
+        /**
      * Display a listing of the inventory.
      */
-        public function index(Request $request)
+    public function index(Request $request)
     {
         try {
             // Get all materials
@@ -24,8 +24,13 @@ class InventoryController extends Controller
             // Get all received records with material relationship
             $received = InventoryReceived::with('material')->latest()->get();
 
-            // Get all issued records with material relationship
-            $issued = InventoryIssued::with('material')->latest()->get();
+            // ✅ Get all issued records - explicitly select all needed columns including new ones
+            $issued = InventoryIssued::with('material')
+                ->select('id', 'material_id', 'name', 'quantity', 'transaction_date', 
+                         'issued_to', 'issued_to_email', 'issued_to_department', 
+                         'reason', 'issued_by', 'created_at', 'updated_at')
+                ->latest()
+                ->get();
 
             // Get threshold setting
             $thresholdSetting = \App\Models\Setting::where('key', 'stock_alert_threshold')->first();
@@ -60,9 +65,9 @@ class InventoryController extends Controller
                 'data' => [
                     'materials' => $materials,
                     'received' => $received,
-                    'issued' => $issued,
+                    'issued' => $issued, // ✅ Now includes issued_to_email and issued_to_department
                     'materials' => $stockData,
-                    'threshold' => $threshold, // ✅ Include threshold
+                    'threshold' => $threshold,
                 ],
             ]);
 
@@ -356,7 +361,7 @@ class InventoryController extends Controller
         }
     }
 
-        /**
+            /**
      * Get departments and users for issued material dropdown
      */
     public function getDepartmentsAndUsers()
@@ -370,9 +375,9 @@ class InventoryController extends Controller
                 ->filter()
                 ->values();
 
-            // ✅ Get all users with student/faculty roles
-            $users = \App\Models\User::whereIn('role', ['student', 'faculty'])
-                ->select('id', 'name', 'email', 'department')
+            // ✅ Get all users with student/faculty/production roles - explicitly select role
+            $users = \App\Models\User::whereIn('role', ['student', 'faculty', 'production', 'production_team'])
+                ->select('id', 'name', 'email', 'department', 'role') // ✅ Explicitly select role
                 ->get()
                 ->map(function ($user) {
                     return [
@@ -380,6 +385,7 @@ class InventoryController extends Controller
                         'name' => $user->name,
                         'email' => $user->email,
                         'department' => $user->department,
+                        'role' => $user->role, // ✅ Include role in response
                         'display' => $user->name . ' - ' . $user->email,
                     ];
                 });

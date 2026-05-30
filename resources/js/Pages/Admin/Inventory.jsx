@@ -37,7 +37,7 @@ const EMPTY_ISSUE_FORM = {
 };
 
 /* ─────────────────────────────────────────────
-   Searchable Dropdown (reusable) - FIXED
+   Searchable Dropdown (reusable)
 ───────────────────────────────────────────── */
 function SearchableDropdown({ value, onChange, options, placeholder, allowNew = false }) {
     const [open, setOpen] = useState(false);
@@ -215,8 +215,8 @@ function DeleteBtn({ onClick, disabled = false }) {
             onClick={onClick}
             disabled={disabled}
             className={`p-2 rounded-lg transition-all ${disabled
-                    ? 'text-gray-300 cursor-not-allowed'
-                    : 'text-red-500 hover:text-red-700 hover:bg-red-50'
+                ? 'text-gray-300 cursor-not-allowed'
+                : 'text-red-500 hover:text-red-700 hover:bg-red-50'
                 }`}
         >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -298,37 +298,26 @@ export default function AdminInventory() {
     const [issuedRecords, setIssuedRecords] = useState([]);
     const [stockData, setStockData] = useState([]);
 
-    // ✅ NEW: Current user state
     const [currentUser, setCurrentUser] = useState(null);
-
-    // ✅ NEW: Search states for each tab
     const [searchMaterials, setSearchMaterials] = useState('');
     const [searchReceived, setSearchReceived] = useState('');
     const [searchStock, setSearchStock] = useState('');
     const [searchIssued, setSearchIssued] = useState('');
-
-    // ✅ NEW: Stock alert threshold state
     const [stockThreshold, setStockThreshold] = useState(10);
     const [thresholdLoading, setThresholdLoading] = useState(false);
     const [thresholdError, setThresholdError] = useState(null);
-
-    // ✅ NEW: Department and users for issued material
     const [departments, setDepartments] = useState([]);
     const [usersByDepartment, setUsersByDepartment] = useState([]);
     const [allUsers, setAllUsers] = useState([]);
-
-    // ✅ NEW: Issue type (User or Production Team)
     const [issueType, setIssueType] = useState('user');
     const [productionTeamMembers, setProductionTeamMembers] = useState([]);
 
-    // Bulk selection
     const [selectedReceived, setSelectedReceived] = useState(new Set());
     const [selectedIssued, setSelectedIssued] = useState(new Set());
 
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    // Custom Dialog State
     const [dialog, setDialog] = useState({
         visible: false,
         title: '',
@@ -337,7 +326,6 @@ export default function AdminInventory() {
         onConfirm: null,
     });
 
-    // Toast
     const [toast, setToast] = useState({ visible: false, message: '' });
     const toastTimer = useRef(null);
 
@@ -361,7 +349,6 @@ export default function AdminInventory() {
         setDialog({ visible: false, title: '', message: '', type: 'info', onConfirm: null });
     };
 
-    /* ── API Fetch ── */
     const fetchInventory = async () => {
         try {
             setLoading(true);
@@ -432,7 +419,6 @@ export default function AdminInventory() {
         }
     };
 
-    /* ── Fetch Current User ── */
     const fetchCurrentUser = async () => {
         try {
             const token = localStorage.getItem('auth_token');
@@ -469,7 +455,6 @@ export default function AdminInventory() {
         }
     };
 
-    /* ── Fetch Stock Alert Threshold ─ */
     const fetchStockThreshold = async () => {
         try {
             setThresholdLoading(true);
@@ -488,7 +473,6 @@ export default function AdminInventory() {
         }
     };
 
-    /* ── Fetch Departments and Users ── */
     const fetchDepartmentsAndUsers = async () => {
         try {
             const token = localStorage.getItem('auth_token');
@@ -504,25 +488,40 @@ export default function AdminInventory() {
         }
     };
 
-    /* ── Fetch Production Team Members ─ */
     const fetchProductionTeamMembers = async () => {
         try {
             const token = localStorage.getItem('auth_token');
-            const response = await axios.get('http://127.0.0.1:8000/api/admin/inventory/team-members', {
+            const response = await axios.get('http://127.0.0.1:8000/api/admin/inventory/departments-users', {
                 headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
             });
+
             if (response.data.success) {
-                setProductionTeamMembers(response.data.data);
+                console.log('📥 All users from API:', response.data.data.users);
+
+                const productionMembers = response.data.data.users
+                    .filter(user => {
+                        const isProduction = user.role === 'production' || user.role === 'production_team';
+                        console.log(`User: ${user.name}, Role: ${user.role}, Is Production: ${isProduction}`);
+                        return isProduction;
+                    })
+                    .map(user => ({
+                        id: user.id,
+                        name: user.name + ' (Production Team member)',
+                        email: user.email,
+                        display: `${user.name} - ${user.email}`,
+                    }));
+
+                console.log('✅ Production team members:', productionMembers);
+                setProductionTeamMembers(productionMembers);
             }
         } catch (err) {
-            console.error('Failed to fetch production team:', err);
+            console.error('❌ Failed to fetch production team:', err);
         }
     };
 
-    /* ── Filter Users by Department ── */
     const handleDepartmentChange = (department) => {
         setIssueForm(p => ({ ...p, issuedToDepartment: department, issuedTo: '', issuedToEmail: '' }));
-        
+
         if (department) {
             const filteredUsers = allUsers.filter(u => u.department === department);
             setUsersByDepartment(filteredUsers);
@@ -531,52 +530,36 @@ export default function AdminInventory() {
         }
     };
 
-    /* ── Handle User Selection ── */
     const handleUserSelect = (userDisplay) => {
-        console.log('🔍 DEBUG handleUserSelect called with:', userDisplay);
-        console.log('🔍 usersByDepartment:', usersByDepartment);
-        console.log('🔍 allUsers:', allUsers);
-        
-        // ✅ Search in the currently displayed department list first
-        let user = usersByDepartment.find(u => {
-            const match = u.display === userDisplay;
-            console.log(`🔍 Checking user: ${u.display} === ${userDisplay} ? ${match}`);
-            return match;
-        });
-        
-        // Fallback to all users if not found
+        let user = usersByDepartment.find(u => u.display === userDisplay);
+
         if (!user) {
-            console.log('⚠️ User not found in department list, searching all users...');
             user = allUsers.find(u => u.display === userDisplay);
         }
 
         if (user) {
-            console.log('✅ User found:', user);
             setIssueForm(p => ({
                 ...p,
                 issuedTo: user.name,
                 issuedToEmail: user.email,
                 issuedToDepartment: user.department,
             }));
-            console.log('✅ Form updated. issuedTo:', user.name);
-        } else {
-            console.error('❌ User NOT found for display:', userDisplay);
-            console.error('❌ Available users in department:', usersByDepartment.map(u => u.display));
         }
     };
 
-    /* ── Handle Production Team Selection ── */
-    const handleProductionTeamSelect = (memberName) => {
-        const name = memberName.split(' (')[0];
+    const handleProductionTeamSelect = (memberDisplay) => {
+        const parts = memberDisplay.split(' - ');
+        const name = parts[0];
+        const email = parts[1] || '';
+
         setIssueForm(p => ({
             ...p,
             issuedTo: name,
-            issuedToEmail: '',
+            issuedToEmail: email,
             issuedToDepartment: 'Production Team',
         }));
     };
 
-    /* ── Handle Issue Type Change ── */
     const handleIssueTypeChange = (type) => {
         setIssueType(type);
         setIssueForm(p => ({
@@ -587,7 +570,6 @@ export default function AdminInventory() {
         }));
     };
 
-    /* ── Update Stock Alert Threshold ── */
     const updateStockThreshold = async (newThreshold) => {
         try {
             setThresholdLoading(true);
@@ -616,7 +598,6 @@ export default function AdminInventory() {
         fetchProductionTeamMembers();
     }, []);
 
-    /* ── Stock helpers ── */
     const getLocalStock = (name) => {
         const entry = stockData.find(s => s.name.toLowerCase() === name.toLowerCase());
         return entry ? entry.currentStock : 0;
@@ -638,7 +619,6 @@ export default function AdminInventory() {
         });
     };
 
-    /* ── Add Material to Master List ── */
     const addMaterial = (e) => {
         e.preventDefault();
         if (!materialForm.name.trim()) {
@@ -658,7 +638,6 @@ export default function AdminInventory() {
         setShowMaterialModal(false);
     };
 
-    /* ── Delete Material from Master List ── */
     const deleteMaterial = (name) => {
         const usedInReceived = receivedRecords.some(r => r.name === name);
         const usedInIssued = issuedRecords.some(r => r.name === name);
@@ -684,7 +663,6 @@ export default function AdminInventory() {
         );
     };
 
-    /* ─ Export Functions ── */
     const exportMaterials = () => {
         const exportData = materials.map((name, index) => ({
             'Sl.No': index + 1,
@@ -735,7 +713,6 @@ export default function AdminInventory() {
         showToast('📥 Issued records exported successfully!');
     };
 
-    /* ── Add Received ── */
     const addToTable = async (e) => {
         e.preventDefault();
         const { itemName, itemDesc, itemQty, itemRate, itemDate } = addForm;
@@ -780,32 +757,23 @@ export default function AdminInventory() {
         setShowAddModal(false);
     };
 
-    /* ── Issue Material ── */
     const issueMaterial = async (e) => {
         e.preventDefault();
-        
-        // ✅ FIX: Auto-fill issuedBy from currentUser if it's empty
-        if (!issueForm.issuedBy && currentUser?.name) {
-            setIssueForm(p => ({ ...p, issuedBy: currentUser.name }));
+
+        let finalIssuedBy = issueForm.issuedBy;
+        if (!finalIssuedBy && currentUser?.name) {
+            finalIssuedBy = currentUser.name;
         }
-        
-        const { itemName, issueQty, issueDate, issuedTo, issuedToEmail, issuedToDepartment, issueReason, issuedBy } = issueForm;
-        
-        // ✅ DEBUG: Check each field
-        console.log('🔍 Validation Check:');
-        console.log('  - itemName:', itemName, '✓' + (itemName ? '' : ' MISSING'));
-        console.log('  - issueQty:', issueQty, '✓' + (issueQty ? '' : ' MISSING'));
-        console.log('  - issuedTo:', issuedTo, '✓' + (issuedTo ? '' : ' MISSING'));
-        console.log('  - issuedBy:', issuedBy, '✓' + (issuedBy ? '' : ' MISSING'));
-        console.log('  - currentUser:', currentUser);
-        
-        if (!itemName || !issueQty || !issuedTo || !issuedBy) {
+
+        const { itemName, issueQty, issueDate, issuedTo, issuedToEmail, issuedToDepartment, issueReason } = issueForm;
+
+        if (!itemName || !issueQty || !issuedTo || !finalIssuedBy) {
             const missingFields = [];
             if (!itemName) missingFields.push('Item Name');
             if (!issueQty) missingFields.push('Quantity');
             if (!issuedTo) missingFields.push('Issued To');
-            if (!issuedBy) missingFields.push('Issued By');
-            
+            if (!finalIssuedBy) missingFields.push('Issued By');
+
             showDialog('Validation Error', `Missing fields: ${missingFields.join(', ')}. Please fill them in.`, 'error');
             return;
         }
@@ -819,7 +787,7 @@ export default function AdminInventory() {
 
         try {
             const token = localStorage.getItem('auth_token');
-            
+
             const payload = {
                 name: itemName,
                 quantity: qty,
@@ -828,26 +796,22 @@ export default function AdminInventory() {
                 issued_to_email: issuedToEmail,
                 issued_to_department: issuedToDepartment,
                 reason: issueReason,
-                issued_by: issuedBy,
+                issued_by: finalIssuedBy,
             };
-            
-            console.log('📤 Sending payload:', payload);
-            
+
             await axios.post('http://127.0.0.1:8000/api/admin/inventory/issued', payload, {
-                headers: { 
-                    Accept: 'application/json', 
-                    'Content-Type': 'application/json', 
-                    Authorization: `Bearer ${token}` 
+                headers: {
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`
                 },
             });
-            
-            console.log('✅ Response received');
+
             fetchInventory();
             showToast('✅ Material issued successfully!');
         } catch (err) {
-            console.error('❌ Save error:', err);
-            console.error('❌ Error response:', err.response?.data);
-            console.error('❌ Error status:', err.response?.status);
+            console.error('Save error:', err);
+            console.error('Error response:', err.response?.data);
             showDialog('Error', err.response?.data?.message || 'Failed to save record. Please try again.', 'error');
         }
 
@@ -856,7 +820,6 @@ export default function AdminInventory() {
         setShowIssueModal(false);
     };
 
-    /* ── Delete Received ── */
     const deleteRecord = async (id, qty, name) => {
         showDialog(
             'Confirm Delete',
@@ -880,7 +843,6 @@ export default function AdminInventory() {
         );
     };
 
-    /* ── Delete Issued ── */
     const deleteIssuedRecord = async (id, qty, name) => {
         showDialog(
             'Confirm Delete',
@@ -904,7 +866,6 @@ export default function AdminInventory() {
         );
     };
 
-    /* ── Bulk Delete ── */
     const bulkDeleteReceived = () => {
         if (selectedReceived.size === 0) return;
         showDialog(
@@ -921,23 +882,38 @@ export default function AdminInventory() {
         );
     };
 
-    const bulkDeleteIssued = () => {
+    const bulkDeleteIssued = async () => {
         if (selectedIssued.size === 0) return;
+
         showDialog(
             'Confirm Bulk Delete',
             `Delete ${selectedIssued.size} selected records?`,
             'warning',
-            () => {
-                issuedRecords.filter(r => selectedIssued.has(r.id)).forEach(r => updateLocalStock(r.name, r.qty));
-                setIssuedRecords(prev => prev.filter(r => !selectedIssued.has(r.id)));
-                setSelectedIssued(new Set());
-                showToast(`✅ ${selectedIssued.size} record(s) deleted.`);
+            async () => {
+                try {
+                    const token = localStorage.getItem('auth_token');
+
+                    const deletePromises = Array.from(selectedIssued).map(id =>
+                        axios.delete(`http://127.0.0.1:8000/api/admin/inventory/issued/${id}`, {
+                            headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
+                        })
+                    );
+
+                    await Promise.all(deletePromises);
+
+                    issuedRecords.filter(r => selectedIssued.has(r.id)).forEach(r => updateLocalStock(r.name, r.qty));
+                    setIssuedRecords(prev => prev.filter(r => !selectedIssued.has(r.id)));
+                    setSelectedIssued(new Set());
+                    showToast(`✅ ${selectedIssued.size} record(s) deleted.`);
+                } catch (err) {
+                    console.error('Bulk delete error:', err);
+                    showDialog('Error', 'Failed to delete records. Please try again.', 'error');
+                }
                 closeDialog();
             }
         );
     };
 
-    /* ── Checkbox helpers ── */
     const toggleSelectReceived = (id) => {
         setSelectedReceived(prev => {
             const s = new Set(prev);
@@ -945,9 +921,11 @@ export default function AdminInventory() {
             return s;
         });
     };
+
     const toggleSelectAllReceived = (checked) => {
         setSelectedReceived(checked ? new Set(receivedRecords.map(r => r.id)) : new Set());
     };
+
     const toggleSelectIssued = (id) => {
         setSelectedIssued(prev => {
             const s = new Set(prev);
@@ -955,6 +933,7 @@ export default function AdminInventory() {
             return s;
         });
     };
+
     const toggleSelectAllIssued = (checked) => {
         setSelectedIssued(checked ? new Set(issuedRecords.map(r => r.id)) : new Set());
     };
@@ -965,7 +944,6 @@ export default function AdminInventory() {
         return (qty * rate).toFixed(2);
     };
 
-    /* ── Filter helpers ── */
     const filterMaterials = (list, search) => {
         if (!search) return list;
         return list.filter(item => item.toLowerCase().includes(search.toLowerCase()));
@@ -994,7 +972,6 @@ export default function AdminInventory() {
         );
     };
 
-    /* ── Tabs config ── */
     const tabs = [
         { id: 'materials', label: 'Material List' },
         { id: 'received', label: 'Material Received' },
@@ -1013,7 +990,6 @@ export default function AdminInventory() {
     ═══════════════════════════════════════════ */
     return (
         <div className="min-h-screen bg-slate-50">
-            {/* Header */}
             <div className="sticky top-0 z-20 bg-slate-50 pb-4 mb-6 border-b border-slate-200">
                 <div className="p-6">
                     <h2 className="text-2xl font-bold text-slate-900">Inventory Management</h2>
@@ -1022,21 +998,18 @@ export default function AdminInventory() {
             </div>
 
             <div className="px-6 pb-6 space-y-6">
-                {/* Loading */}
                 {loading && (
                     <div className="flex items-center justify-center py-20">
                         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600" />
                     </div>
                 )}
 
-                {/* Error */}
                 {error && !loading && (
                     <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg">
                         {error}
                     </div>
                 )}
 
-                {/* Sub-tabs */}
                 {!loading && !error && (
                     <div className="border-b border-slate-200">
                         <nav className="-mb-px flex space-x-8">
@@ -1049,7 +1022,7 @@ export default function AdminInventory() {
                     </div>
                 )}
 
-                {/* ── MATERIAL LIST TAB ── */}
+                {/* MATERIAL LIST TAB */}
                 {!loading && !error && activeTab === 'materials' && (
                     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                         <div className="px-8 py-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -1122,7 +1095,7 @@ export default function AdminInventory() {
                     </div>
                 )}
 
-                {/* ── RECEIVED TAB ── */}
+                {/* RECEIVED TAB */}
                 {!loading && !error && activeTab === 'received' && (
                     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                         <div className="px-8 py-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -1226,7 +1199,7 @@ export default function AdminInventory() {
                     </div>
                 )}
 
-                {/* ── CURRENT STOCK TAB ── */}
+                {/* CURRENT STOCK TAB */}
                 {!loading && !error && activeTab === 'stock' && (
                     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                         <div className="px-8 py-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -1295,7 +1268,7 @@ export default function AdminInventory() {
                                         filterStock(stockData, searchStock).map((stock, index) => {
                                             const isLowStock = stock.currentStock < stockThreshold;
                                             const canDelete = stock.currentStock <= 0;
-                                            
+
                                             return (
                                                 <tr
                                                     key={index}
@@ -1310,7 +1283,7 @@ export default function AdminInventory() {
                                                         {stock.currentStock} units
                                                     </td>
                                                     <td className="px-8 py-5 text-center">
-                                                        <DeleteBtn 
+                                                        <DeleteBtn
                                                             onClick={() => deleteMaterial(stock.name)}
                                                             disabled={!canDelete}
                                                         />
@@ -1325,7 +1298,7 @@ export default function AdminInventory() {
                     </div>
                 )}
 
-                {/* ── ISSUED TAB ── */}
+                {/* ISSUED TAB */}
                 {!loading && !error && activeTab === 'issued' && (
                     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                         <div className="px-8 py-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -1395,9 +1368,14 @@ export default function AdminInventory() {
                                                     onChange={e => toggleSelectAllIssued(e.target.checked)}
                                                 />
                                             </th>
-                                            {['Sl.No', 'Item Name', 'Qty Issued', 'Issued To', 'Department', 'Reason', 'Date', 'Issued By'].map((h, i) => (
-                                                <th key={i} className={`px-6 py-4 text-xs font-semibold text-slate-600 uppercase tracking-wider ${h === 'Qty Issued' ? 'text-right' : 'text-left'}`}>{h}</th>
-                                            ))}
+                                            <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider w-16">Sl.No</th>
+                                            <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider w-48">Item Name</th>
+                                            <th className="px-6 py-4 text-right text-xs font-semibold text-slate-600 uppercase tracking-wider w-24">Qty Issued</th>
+                                            <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider w-64">Issued To</th>
+                                            <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider w-40">Department</th>
+                                            <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider w-32">Reason</th>
+                                            <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider w-32">Date</th>
+                                            <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider w-40">Issued By</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
@@ -1414,7 +1392,12 @@ export default function AdminInventory() {
                                                 <td className="px-6 py-5 text-sm text-slate-600">{record.slNo}</td>
                                                 <td className="px-6 py-5 text-sm font-semibold text-slate-900">{record.name}</td>
                                                 <td className="px-6 py-5 text-sm font-semibold text-red-600 text-right">{record.qty}</td>
-                                                <td className="px-6 py-5 text-sm text-slate-600">{record.issuedTo || '-'}</td>
+                                                <td className="px-6 py-5 text-sm text-slate-600">
+                                                    {record.issuedToEmail
+                                                        ? `${record.issuedTo} - ${record.issuedToEmail}`
+                                                        : record.issuedTo || '-'
+                                                    }
+                                                </td>
                                                 <td className="px-6 py-5 text-sm text-slate-600">{record.issuedToDepartment || '-'}</td>
                                                 <td className="px-6 py-5 text-sm text-slate-600">{record.reason || '-'}</td>
                                                 <td className="px-6 py-5 text-sm text-slate-600">{formatDate(record.date)}</td>
@@ -1429,9 +1412,7 @@ export default function AdminInventory() {
                 )}
             </div>
 
-            {/* ═══════════════════════════
-                ADD MATERIAL MODAL
-            ═══════════════════════════ */}
+            {/* ADD MATERIAL MODAL */}
             {showMaterialModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
                     <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowMaterialModal(false)} />
@@ -1467,9 +1448,7 @@ export default function AdminInventory() {
                 </div>
             )}
 
-            {/* ═══════════════════════════
-                ADD RECEIVED MODAL
-            ═══════════════════════════ */}
+            {/* ADD RECEIVED MODAL */}
             {showAddModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
                     <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowAddModal(false)} />
@@ -1567,9 +1546,7 @@ export default function AdminInventory() {
                 </div>
             )}
 
-            {/* ═══════════════════════════
-                ISSUE MATERIAL MODAL
-            ═══════════════════════════ */}
+            {/* ISSUE MATERIAL MODAL */}
             {showIssueModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
                     <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowIssueModal(false)} />
@@ -1679,15 +1656,22 @@ export default function AdminInventory() {
                                 <div>
                                     <label className="block text-sm font-semibold text-slate-700 mb-2">Production Team Member <span className="text-red-500">*</span></label>
                                     <select
-                                        value={issueForm.issuedTo}
+                                        value={issueForm.issuedTo || ''}
                                         onChange={e => handleProductionTeamSelect(e.target.value)}
                                         className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm transition-all"
                                     >
                                         <option value="">Select Production Team Member</option>
                                         {productionTeamMembers.map((member, index) => (
-                                            <option key={index} value={member.name}>{member.name}</option>
+                                            <option key={index} value={member.display}>
+                                                {member.display}
+                                            </option>
                                         ))}
                                     </select>
+                                    {issueForm.issuedTo && (
+                                        <p className="mt-2 text-sm text-emerald-600">
+                                            ✅ Selected: {issueForm.issuedTo}
+                                        </p>
+                                    )}
                                 </div>
                             )}
 

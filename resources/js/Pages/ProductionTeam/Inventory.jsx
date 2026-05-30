@@ -30,12 +30,14 @@ const EMPTY_ISSUE_FORM = {
     issueQty: '',
     issueDate: new Date().toISOString().split('T')[0],
     issuedTo: '',
+    issuedToDepartment: '',
+    issuedToEmail: '',
     issueReason: '',
     issuedBy: '',
 };
 
 /* ─────────────────────────────────────────────
-   Searchable Dropdown (reusable) - FIXED
+   Searchable Dropdown (reusable)
 ───────────────────────────────────────────── */
 function SearchableDropdown({ value, onChange, options, placeholder, allowNew = false }) {
     const [open, setOpen] = useState(false);
@@ -60,7 +62,6 @@ function SearchableDropdown({ value, onChange, options, placeholder, allowNew = 
 
     return (
         <div className="relative" ref={wrapRef}>
-            {/* ✅ Single input field - used for both display and search */}
             <div className="relative">
                 <input
                     type="text"
@@ -68,12 +69,12 @@ function SearchableDropdown({ value, onChange, options, placeholder, allowNew = 
                     onChange={e => {
                         setSearch(e.target.value);
                         if (allowNew) {
-                            onChange(e.target.value); // Allow typing new values
+                            onChange(e.target.value);
                         }
                         setOpen(true);
                     }}
                     onFocus={() => {
-                        setSearch(value); // Start with current value
+                        setSearch(value);
                         setOpen(true);
                     }}
                     placeholder={placeholder}
@@ -93,7 +94,6 @@ function SearchableDropdown({ value, onChange, options, placeholder, allowNew = 
 
             {open && (
                 <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-50 max-h-64 overflow-hidden flex flex-col">
-                    {/* ✅ Search inside dropdown */}
                     <div className="p-3 border-b border-slate-100 bg-slate-50 flex-shrink-0">
                         <input
                             type="text"
@@ -209,9 +209,16 @@ function Toast({ message, visible }) {
 /* ─────────────────────────────────────────────
    Delete icon button
 ───────────────────────────────────────────── */
-function DeleteBtn({ onClick }) {
+function DeleteBtn({ onClick, disabled = false }) {
     return (
-        <button onClick={onClick} className="text-red-500 hover:text-red-700 p-2 rounded-lg hover:bg-red-50 transition-all">
+        <button
+            onClick={onClick}
+            disabled={disabled}
+            className={`p-2 rounded-lg transition-all ${disabled
+                ? 'text-gray-300 cursor-not-allowed'
+                : 'text-red-500 hover:text-red-700 hover:bg-red-50'
+                }`}
+        >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
                     d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -220,7 +227,7 @@ function DeleteBtn({ onClick }) {
     );
 }
 
-/* ─────────────────────────────────────────────
+/* ────────────────────────────────────────────
    Format Date Helper
 ───────────────────────────────────────────── */
 const formatDate = (dateString) => {
@@ -291,23 +298,25 @@ export default function ProductionTeamInventory() {
     const [issuedRecords, setIssuedRecords] = useState([]);
     const [stockData, setStockData] = useState([]);
 
-    // ✅ NEW: Current user state
     const [currentUser, setCurrentUser] = useState(null);
-
-    // ✅ NEW: Search states for each tab
     const [searchMaterials, setSearchMaterials] = useState('');
     const [searchReceived, setSearchReceived] = useState('');
     const [searchStock, setSearchStock] = useState('');
     const [searchIssued, setSearchIssued] = useState('');
+    const [stockThreshold, setStockThreshold] = useState(10);
+    const [thresholdLoading, setThresholdLoading] = useState(false);
+    const [departments, setDepartments] = useState([]);
+    const [usersByDepartment, setUsersByDepartment] = useState([]);
+    const [allUsers, setAllUsers] = useState([]);
+    const [issueType, setIssueType] = useState('user');
+    const [productionTeamMembers, setProductionTeamMembers] = useState([]);
 
-    // Bulk selection
     const [selectedReceived, setSelectedReceived] = useState(new Set());
     const [selectedIssued, setSelectedIssued] = useState(new Set());
 
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    // Custom Dialog State
     const [dialog, setDialog] = useState({
         visible: false,
         title: '',
@@ -316,7 +325,6 @@ export default function ProductionTeamInventory() {
         onConfirm: null,
     });
 
-    // Toast
     const [toast, setToast] = useState({ visible: false, message: '' });
     const toastTimer = useRef(null);
 
@@ -340,7 +348,6 @@ export default function ProductionTeamInventory() {
         setDialog({ visible: false, title: '', message: '', type: 'info', onConfirm: null });
     };
 
-    /* ── API Fetch ── */
     const fetchInventory = async () => {
         try {
             setLoading(true);
@@ -378,15 +385,28 @@ export default function ProductionTeamInventory() {
                     qty: record.quantity,
                     date: record.transaction_date,
                     issuedTo: record.issued_to || '',
+                    issuedToEmail: record.issued_to_email || '',
+                    issuedToDepartment: record.issued_to_department || '',
                     reason: record.reason || '',
                     issuedBy: record.issued_by || '',
                 })));
 
-                setStockData(data.materials.map((material, index) => ({
+                const sortedStock = [...data.materials].sort((a, b) => {
+                    const dateA = a.updated_at ? new Date(a.updated_at).getTime() : 0;
+                    const dateB = b.updated_at ? new Date(b.updated_at).getTime() : 0;
+                    return dateB - dateA;
+                }).map((material, index) => ({
                     slNo: index + 1,
                     name: material.name,
                     currentStock: material.quantity,
-                })));
+                    updated_at: material.updated_at,
+                }));
+
+                setStockData(sortedStock);
+
+                if (data.threshold !== undefined) {
+                    setStockThreshold(data.threshold);
+                }
 
                 setError(null);
             }
@@ -398,7 +418,6 @@ export default function ProductionTeamInventory() {
         }
     };
 
-    /* ── Fetch Current User ── */
     const fetchCurrentUser = async () => {
         try {
             const token = localStorage.getItem('auth_token');
@@ -406,10 +425,6 @@ export default function ProductionTeamInventory() {
                 headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
             });
 
-            console.log('Full API response:', response); // ✅ See the full structure
-            console.log('Response data:', response.data); // ✅ See what's inside
-
-            // ✅ Try different possible structures
             let userData = null;
 
             if (response.data?.data) {
@@ -420,38 +435,159 @@ export default function ProductionTeamInventory() {
                 userData = response.data;
             }
 
-            console.log('Extracted user data:', userData); // ✅ Confirm what we got
-
             if (userData) {
                 setCurrentUser(userData);
-                // Also save to localStorage for backup
                 localStorage.setItem('user', JSON.stringify(userData));
             } else {
                 throw new Error('No user data in response');
             }
         } catch (err) {
             console.error('Failed to fetch current user:', err);
-            console.error('Error response:', err.response?.data); // ✅ See error details
 
-            // Fallback: try localStorage
             const storedUser = localStorage.getItem('user');
             if (storedUser) {
                 const parsed = JSON.parse(storedUser);
-                console.log('Using stored user:', parsed);
                 setCurrentUser(parsed);
             } else {
-                // Last resort: show error
                 showDialog('Error', 'Unable to load user profile. Please refresh the page.', 'error');
             }
+        }
+    };
+
+    const fetchStockThreshold = async () => {
+        try {
+            setThresholdLoading(true);
+            const token = localStorage.getItem('auth_token');
+            const response = await axios.get('http://127.0.0.1:8000/api/admin/inventory/threshold', {
+                headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
+            });
+            if (response.data.success) {
+                setStockThreshold(response.data.data.threshold);
+            }
+        } catch (err) {
+            console.error('Failed to fetch threshold:', err);
+        } finally {
+            setThresholdLoading(false);
+        }
+    };
+
+    const fetchDepartmentsAndUsers = async () => {
+        try {
+            const token = localStorage.getItem('auth_token');
+            const response = await axios.get('http://127.0.0.1:8000/api/admin/inventory/departments-users', {
+                headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
+            });
+            if (response.data.success) {
+                setDepartments(response.data.data.departments);
+                setAllUsers(response.data.data.users);
+            }
+        } catch (err) {
+            console.error('Failed to fetch departments and users:', err);
+        }
+    };
+
+    const fetchProductionTeamMembers = async () => {
+        try {
+            const token = localStorage.getItem('auth_token');
+            const response = await axios.get('http://127.0.0.1:8000/api/admin/inventory/departments-users', {
+                headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
+            });
+
+            if (response.data.success) {
+                const productionMembers = response.data.data.users
+                    .filter(user => user.role === 'production' || user.role === 'production_team')
+                    .map(user => ({
+                        id: user.id,
+                        name: user.name + ' (Production Team member)',
+                        email: user.email,
+                        display: `${user.name} - ${user.email}`,
+                    }));
+
+                setProductionTeamMembers(productionMembers);
+            }
+        } catch (err) {
+            console.error('Failed to fetch production team:', err);
+        }
+    };
+
+    const handleDepartmentChange = (department) => {
+        setIssueForm(p => ({ ...p, issuedToDepartment: department, issuedTo: '', issuedToEmail: '' }));
+
+        if (department) {
+            const filteredUsers = allUsers.filter(u => u.department === department);
+            setUsersByDepartment(filteredUsers);
+        } else {
+            setUsersByDepartment([]);
+        }
+    };
+
+    const handleUserSelect = (userDisplay) => {
+        let user = usersByDepartment.find(u => u.display === userDisplay);
+
+        if (!user) {
+            user = allUsers.find(u => u.display === userDisplay);
+        }
+
+        if (user) {
+            setIssueForm(p => ({
+                ...p,
+                issuedTo: user.name,
+                issuedToEmail: user.email,
+                issuedToDepartment: user.department,
+            }));
+        }
+    };
+
+    const handleProductionTeamSelect = (memberDisplay) => {
+        const parts = memberDisplay.split(' - ');
+        const name = parts[0];
+        const email = parts[1] || '';
+
+        setIssueForm(p => ({
+            ...p,
+            issuedTo: name,
+            issuedToEmail: email,
+            issuedToDepartment: 'Production Team',
+        }));
+    };
+
+    const handleIssueTypeChange = (type) => {
+        setIssueType(type);
+        setIssueForm(p => ({
+            ...p,
+            issuedTo: '',
+            issuedToEmail: '',
+            issuedToDepartment: '',
+        }));
+    };
+
+    const updateStockThreshold = async (newThreshold) => {
+        try {
+            setThresholdLoading(true);
+            const token = localStorage.getItem('auth_token');
+            await axios.post('http://127.0.0.1:8000/api/admin/inventory/threshold', {
+                threshold: newThreshold,
+            }, {
+                headers: { Accept: 'application/json', 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            });
+            setStockThreshold(newThreshold);
+            showToast('✅ Stock alert threshold updated!');
+        } catch (err) {
+            console.error('Failed to update threshold:', err);
+            showDialog('Error', 'Failed to save threshold. Please try again.', 'error');
+        } finally {
+            setThresholdLoading(false);
         }
     };
 
     useEffect(() => {
         fetchInventory();
         fetchCurrentUser();
+        fetchStockThreshold();
+        fetchDepartmentsAndUsers();
+        fetchProductionTeamMembers();
     }, []);
 
-    /* ── Stock helpers ── */
     const getLocalStock = (name) => {
         const entry = stockData.find(s => s.name.toLowerCase() === name.toLowerCase());
         return entry ? entry.currentStock : 0;
@@ -473,7 +609,6 @@ export default function ProductionTeamInventory() {
         });
     };
 
-    /* ── Add Material to Master List ── */
     const addMaterial = (e) => {
         e.preventDefault();
         if (!materialForm.name.trim()) {
@@ -493,7 +628,6 @@ export default function ProductionTeamInventory() {
         setShowMaterialModal(false);
     };
 
-    /* ── Delete Material from Master List ── */
     const deleteMaterial = (name) => {
         const usedInReceived = receivedRecords.some(r => r.name === name);
         const usedInIssued = issuedRecords.some(r => r.name === name);
@@ -519,7 +653,6 @@ export default function ProductionTeamInventory() {
         );
     };
 
-    /* ── Export Functions ── */
     const exportMaterials = () => {
         const exportData = materials.map((name, index) => ({
             'Sl.No': index + 1,
@@ -561,6 +694,7 @@ export default function ProductionTeamInventory() {
             'Item Name': r.name,
             'Qty Issued': r.qty,
             'Issued To': r.issuedTo,
+            'Department': r.issuedToDepartment,
             'Reason': r.reason,
             'Date': r.date,
             'Issued By': r.issuedBy,
@@ -569,12 +703,10 @@ export default function ProductionTeamInventory() {
         showToast('📥 Issued records exported successfully!');
     };
 
-    /* ── Add Received ── */
     const addToTable = async (e) => {
         e.preventDefault();
         const { itemName, itemDesc, itemQty, itemRate, itemDate } = addForm;
 
-        // ✅ Use currentUser data with fallback
         if (!itemName || !itemQty || !itemRate) {
             showDialog('Validation Error', 'Please fill in Item Name, Quantity, and Rate.', 'error');
             return;
@@ -585,10 +717,7 @@ export default function ProductionTeamInventory() {
             return;
         }
 
-        // ✅ Determine role - use from user object or fallback to 'admin'
-        const userRole = currentUser.role || 'admin'; // ✅ Fallback to 'admin'
-
-        console.log('Using role:', userRole); // ✅ Debug log
+        const userRole = currentUser.role || 'production_team';
 
         try {
             const token = localStorage.getItem('auth_token');
@@ -600,10 +729,8 @@ export default function ProductionTeamInventory() {
                 rate: parseFloat(itemRate),
                 transaction_date: itemDate,
                 received_by: currentUser.name,
-                received_by_role: userRole, // ✅ Use the determined role
+                received_by_role: userRole,
             };
-
-            console.log('Sending payload:', payload);
 
             await axios.post('http://127.0.0.1:8000/api/admin/inventory/received', payload, {
                 headers: { Accept: 'application/json', 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -620,12 +747,24 @@ export default function ProductionTeamInventory() {
         setShowAddModal(false);
     };
 
-    /* ── Issue Material ── */
     const issueMaterial = async (e) => {
         e.preventDefault();
-        const { itemName, issueQty, issueDate, issuedTo, issueReason, issuedBy } = issueForm;
-        if (!itemName || !issueQty || !issuedBy) {
-            showDialog('Validation Error', 'Please fill in Item Name, Quantity, and Issued By.', 'error');
+
+        let finalIssuedBy = issueForm.issuedBy;
+        if (!finalIssuedBy && currentUser?.name) {
+            finalIssuedBy = currentUser.name;
+        }
+
+        const { itemName, issueQty, issueDate, issuedTo, issuedToEmail, issuedToDepartment, issueReason } = issueForm;
+
+        if (!itemName || !issueQty || !issuedTo || !finalIssuedBy) {
+            const missingFields = [];
+            if (!itemName) missingFields.push('Item Name');
+            if (!issueQty) missingFields.push('Quantity');
+            if (!issuedTo) missingFields.push('Issued To');
+            if (!finalIssuedBy) missingFields.push('Issued By');
+
+            showDialog('Validation Error', `Missing fields: ${missingFields.join(', ')}. Please fill them in.`, 'error');
             return;
         }
 
@@ -638,39 +777,39 @@ export default function ProductionTeamInventory() {
 
         try {
             const token = localStorage.getItem('auth_token');
-            await axios.post('http://127.0.0.1:8000/api/admin/inventory/issued', {
+
+            const payload = {
                 name: itemName,
                 quantity: qty,
                 transaction_date: issueDate,
                 issued_to: issuedTo,
+                issued_to_email: issuedToEmail,
+                issued_to_department: issuedToDepartment,
                 reason: issueReason,
-                issued_by: issuedBy,
-            }, {
-                headers: { Accept: 'application/json', 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                issued_by: finalIssuedBy,
+            };
+
+            await axios.post('http://127.0.0.1:8000/api/admin/inventory/issued', payload, {
+                headers: {
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`
+                },
             });
+
             fetchInventory();
             showToast('✅ Material issued successfully!');
-        } catch {
-            const newRecord = {
-                id: Date.now(),
-                slNo: issuedRecords.length + 1,
-                name: itemName,
-                qty,
-                date: issueDate,
-                issuedTo,
-                reason: issueReason,
-                issuedBy,
-            };
-            setIssuedRecords(prev => [...prev, newRecord]);
-            updateLocalStock(itemName, -qty);
-            showToast('✅ Material issued successfully!');
+        } catch (err) {
+            console.error('Save error:', err);
+            console.error('Error response:', err.response?.data);
+            showDialog('Error', err.response?.data?.message || 'Failed to save record. Please try again.', 'error');
         }
 
         setIssueForm({ ...EMPTY_ISSUE_FORM, issueDate: new Date().toISOString().split('T')[0] });
+        setIssueType('user');
         setShowIssueModal(false);
     };
 
-    /* ── Delete Received ── */
     const deleteRecord = async (id, qty, name) => {
         showDialog(
             'Confirm Delete',
@@ -694,7 +833,6 @@ export default function ProductionTeamInventory() {
         );
     };
 
-    /* ── Delete Issued ── */
     const deleteIssuedRecord = async (id, qty, name) => {
         showDialog(
             'Confirm Delete',
@@ -718,7 +856,6 @@ export default function ProductionTeamInventory() {
         );
     };
 
-    /* ── Bulk Delete ── */
     const bulkDeleteReceived = () => {
         if (selectedReceived.size === 0) return;
         showDialog(
@@ -735,23 +872,38 @@ export default function ProductionTeamInventory() {
         );
     };
 
-    const bulkDeleteIssued = () => {
+    const bulkDeleteIssued = async () => {
         if (selectedIssued.size === 0) return;
+
         showDialog(
             'Confirm Bulk Delete',
             `Delete ${selectedIssued.size} selected records?`,
             'warning',
-            () => {
-                issuedRecords.filter(r => selectedIssued.has(r.id)).forEach(r => updateLocalStock(r.name, r.qty));
-                setIssuedRecords(prev => prev.filter(r => !selectedIssued.has(r.id)));
-                setSelectedIssued(new Set());
-                showToast(`✅ ${selectedIssued.size} record(s) deleted.`);
+            async () => {
+                try {
+                    const token = localStorage.getItem('auth_token');
+
+                    const deletePromises = Array.from(selectedIssued).map(id =>
+                        axios.delete(`http://127.0.0.1:8000/api/admin/inventory/issued/${id}`, {
+                            headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
+                        })
+                    );
+
+                    await Promise.all(deletePromises);
+
+                    issuedRecords.filter(r => selectedIssued.has(r.id)).forEach(r => updateLocalStock(r.name, r.qty));
+                    setIssuedRecords(prev => prev.filter(r => !selectedIssued.has(r.id)));
+                    setSelectedIssued(new Set());
+                    showToast(`✅ ${selectedIssued.size} record(s) deleted.`);
+                } catch (err) {
+                    console.error('Bulk delete error:', err);
+                    showDialog('Error', 'Failed to delete records. Please try again.', 'error');
+                }
                 closeDialog();
             }
         );
     };
 
-    /* ── Checkbox helpers ── */
     const toggleSelectReceived = (id) => {
         setSelectedReceived(prev => {
             const s = new Set(prev);
@@ -759,9 +911,11 @@ export default function ProductionTeamInventory() {
             return s;
         });
     };
+
     const toggleSelectAllReceived = (checked) => {
         setSelectedReceived(checked ? new Set(receivedRecords.map(r => r.id)) : new Set());
     };
+
     const toggleSelectIssued = (id) => {
         setSelectedIssued(prev => {
             const s = new Set(prev);
@@ -769,6 +923,7 @@ export default function ProductionTeamInventory() {
             return s;
         });
     };
+
     const toggleSelectAllIssued = (checked) => {
         setSelectedIssued(checked ? new Set(issuedRecords.map(r => r.id)) : new Set());
     };
@@ -779,7 +934,6 @@ export default function ProductionTeamInventory() {
         return (qty * rate).toFixed(2);
     };
 
-    /* ── Filter helpers ── */
     const filterMaterials = (list, search) => {
         if (!search) return list;
         return list.filter(item => item.toLowerCase().includes(search.toLowerCase()));
@@ -808,7 +962,6 @@ export default function ProductionTeamInventory() {
         );
     };
 
-    /* ── Tabs config ── */
     const tabs = [
         { id: 'materials', label: 'Material List' },
         { id: 'received', label: 'Material Received' },
@@ -827,7 +980,6 @@ export default function ProductionTeamInventory() {
     ═══════════════════════════════════════════ */
     return (
         <div className="min-h-screen bg-slate-50">
-            {/* Header */}
             <div className="sticky top-0 z-20 bg-slate-50 pb-4 mb-6 border-b border-slate-200">
                 <div className="p-6">
                     <h2 className="text-2xl font-bold text-slate-900">Inventory Management</h2>
@@ -836,21 +988,18 @@ export default function ProductionTeamInventory() {
             </div>
 
             <div className="px-6 pb-6 space-y-6">
-                {/* Loading */}
                 {loading && (
                     <div className="flex items-center justify-center py-20">
                         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600" />
                     </div>
                 )}
 
-                {/* Error */}
                 {error && !loading && (
                     <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg">
                         {error}
                     </div>
                 )}
 
-                {/* Sub-tabs */}
                 {!loading && !error && (
                     <div className="border-b border-slate-200">
                         <nav className="-mb-px flex space-x-8">
@@ -863,7 +1012,7 @@ export default function ProductionTeamInventory() {
                     </div>
                 )}
 
-                {/* ── MATERIAL LIST TAB ── */}
+                {/* MATERIAL LIST TAB */}
                 {!loading && !error && activeTab === 'materials' && (
                     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                         <div className="px-8 py-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -872,7 +1021,6 @@ export default function ProductionTeamInventory() {
                                 <p className="text-sm text-slate-500 mt-1">Master list of all materials</p>
                             </div>
                             <div className="flex items-center gap-3">
-                                {/* ✅ Search Bar */}
                                 <input
                                     type="text"
                                     placeholder="Search materials..."
@@ -880,7 +1028,6 @@ export default function ProductionTeamInventory() {
                                     onChange={(e) => setSearchMaterials(e.target.value)}
                                     className="px-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 w-48"
                                 />
-                                {/* ✅ Export Button */}
                                 <button
                                     onClick={exportMaterials}
                                     className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white text-sm font-semibold rounded-xl hover:bg-emerald-700 transition-all shadow-sm"
@@ -938,7 +1085,7 @@ export default function ProductionTeamInventory() {
                     </div>
                 )}
 
-                {/* ── RECEIVED TAB ── */}
+                {/* RECEIVED TAB */}
                 {!loading && !error && activeTab === 'received' && (
                     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                         <div className="px-8 py-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -947,7 +1094,6 @@ export default function ProductionTeamInventory() {
                                 <p className="text-sm text-slate-500 mt-1">Material receiving history</p>
                             </div>
                             <div className="flex items-center gap-3">
-                                {/* ✅ Search Bar */}
                                 <input
                                     type="text"
                                     placeholder="Search records..."
@@ -966,7 +1112,6 @@ export default function ProductionTeamInventory() {
                                         Delete Selected ({selectedReceived.size})
                                     </button>
                                 )}
-                                {/* ✅ Export Button */}
                                 <button
                                     onClick={exportReceived}
                                     className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white text-sm font-semibold rounded-xl hover:bg-emerald-700 transition-all shadow-sm"
@@ -1033,7 +1178,6 @@ export default function ProductionTeamInventory() {
                                                 <td className="px-6 py-5 text-sm text-slate-600 text-right">Nu. {record.rate.toFixed(2)}</td>
                                                 <td className="px-6 py-5 text-sm text-slate-600">{formatDate(record.date)}</td>
                                                 <td className="px-6 py-5 text-sm font-medium text-slate-900">{record.receivedBy || '-'}</td>
-                                                {/* ✅ NEW: Role column */}
                                                 <td className="px-6 py-5 text-sm text-slate-600">{formatRole(record.receivedByRole)}</td>
                                                 <td className="px-6 py-5 text-sm font-bold text-slate-900 text-right">Nu. {record.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
                                             </tr>
@@ -1045,16 +1189,15 @@ export default function ProductionTeamInventory() {
                     </div>
                 )}
 
-                {/* ── CURRENT STOCK TAB ── */}
+                {/* CURRENT STOCK TAB */}
                 {!loading && !error && activeTab === 'stock' && (
                     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                         <div className="px-8 py-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                             <div>
                                 <h2 className="text-xl font-bold text-slate-900">Current Stock</h2>
-                                <p className="text-sm text-slate-500 mt-1">Highlighted in red if stock &lt; 10 units</p>
+                                <p className="text-sm text-slate-500 mt-1">Stocks with stock below this value will be highlighted</p>
                             </div>
                             <div className="flex items-center gap-3">
-                                {/* ✅ Search Bar */}
                                 <input
                                     type="text"
                                     placeholder="Search stock..."
@@ -1062,7 +1205,29 @@ export default function ProductionTeamInventory() {
                                     onChange={(e) => setSearchStock(e.target.value)}
                                     className="px-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 w-48"
                                 />
-                                {/* ✅ Export Button */}
+                                <div className="flex items-center gap-2">
+                                    <label className="text-sm font-medium text-slate-700 whitespace-nowrap">Stock Alert Threshold:</label>
+                                    <div className="relative">
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            value={stockThreshold}
+                                            onChange={(e) => setStockThreshold(parseInt(e.target.value) || 0)}
+                                            onBlur={() => updateStockThreshold(stockThreshold)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') {
+                                                    updateStockThreshold(stockThreshold);
+                                                    e.target.blur();
+                                                }
+                                            }}
+                                            disabled={thresholdLoading}
+                                            className="w-20 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                        />
+                                    </div>
+                                    {thresholdLoading && (
+                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600" />
+                                    )}
+                                </div>
                                 <button
                                     onClick={exportStock}
                                     className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white text-sm font-semibold rounded-xl hover:bg-emerald-700 transition-all shadow-sm"
@@ -1081,29 +1246,41 @@ export default function ProductionTeamInventory() {
                                         <th className="px-8 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Sl.No</th>
                                         <th className="px-8 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Material Name</th>
                                         <th className="px-8 py-4 text-right text-xs font-semibold text-slate-600 uppercase tracking-wider">Current Stock</th>
+                                        <th className="px-8 py-4 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider">Action</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
                                     {filterStock(stockData, searchStock).length === 0 ? (
                                         <tr>
-                                            <td colSpan={3} className="px-8 py-16 text-center text-slate-400 font-medium">No stock data found</td>
+                                            <td colSpan={4} className="px-8 py-16 text-center text-slate-400 font-medium">No stock data found</td>
                                         </tr>
                                     ) : (
-                                        filterStock(stockData, searchStock).map((stock, index) => (
-                                            <tr
-                                                key={index}
-                                                className={`transition-colors ${stock.currentStock < 10
-                                                    ? 'bg-red-100 border-l-4 border-red-500'
-                                                    : 'hover:bg-slate-50'
-                                                    }`}
-                                            >
-                                                <td className="px-8 py-5 text-sm text-slate-600">{stock.slNo}</td>
-                                                <td className="px-8 py-5 text-sm font-semibold text-slate-900">{stock.name}</td>
-                                                <td className={`px-8 py-5 text-sm font-bold text-right ${stock.currentStock < 10 ? 'text-red-700' : 'text-slate-900'}`}>
-                                                    {stock.currentStock} units
-                                                </td>
-                                            </tr>
-                                        ))
+                                        filterStock(stockData, searchStock).map((stock, index) => {
+                                            const isLowStock = stock.currentStock < stockThreshold;
+                                            const canDelete = stock.currentStock <= 0;
+
+                                            return (
+                                                <tr
+                                                    key={index}
+                                                    className={`transition-colors ${isLowStock
+                                                        ? 'bg-red-100 border-l-4 border-red-500'
+                                                        : 'hover:bg-slate-50'
+                                                        }`}
+                                                >
+                                                    <td className="px-8 py-5 text-sm text-slate-600">{stock.slNo}</td>
+                                                    <td className="px-8 py-5 text-sm font-semibold text-slate-900">{stock.name}</td>
+                                                    <td className={`px-8 py-5 text-sm font-bold text-right ${isLowStock ? 'text-red-700' : 'text-slate-900'}`}>
+                                                        {stock.currentStock} units
+                                                    </td>
+                                                    <td className="px-8 py-5 text-center">
+                                                        <DeleteBtn
+                                                            onClick={() => deleteMaterial(stock.name)}
+                                                            disabled={!canDelete}
+                                                        />
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })
                                     )}
                                 </tbody>
                             </table>
@@ -1111,7 +1288,7 @@ export default function ProductionTeamInventory() {
                     </div>
                 )}
 
-                {/* ── ISSUED TAB ── */}
+                {/* ISSUED TAB */}
                 {!loading && !error && activeTab === 'issued' && (
                     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                         <div className="px-8 py-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -1120,7 +1297,6 @@ export default function ProductionTeamInventory() {
                                 <p className="text-sm text-slate-500 mt-1">Material issuance history</p>
                             </div>
                             <div className="flex items-center gap-3">
-                                {/* ✅ Search Bar */}
                                 <input
                                     type="text"
                                     placeholder="Search issued..."
@@ -1139,7 +1315,6 @@ export default function ProductionTeamInventory() {
                                         Delete Selected ({selectedIssued.size})
                                     </button>
                                 )}
-                                {/* ✅ Export Button */}
                                 <button
                                     onClick={exportIssued}
                                     className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white text-sm font-semibold rounded-xl hover:bg-emerald-700 transition-all shadow-sm"
@@ -1183,9 +1358,14 @@ export default function ProductionTeamInventory() {
                                                     onChange={e => toggleSelectAllIssued(e.target.checked)}
                                                 />
                                             </th>
-                                            {['Sl.No', 'Item Name', 'Qty Issued', 'Issued To', 'Reason', 'Date', 'Issued By', 'Action'].map((h, i) => (
-                                                <th key={i} className={`px-6 py-4 text-xs font-semibold text-slate-600 uppercase tracking-wider ${h === 'Qty Issued' ? 'text-right' : h === 'Action' ? 'text-center' : 'text-left'}`}>{h}</th>
-                                            ))}
+                                            <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider w-16">Sl.No</th>
+                                            <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider w-48">Item Name</th>
+                                            <th className="px-6 py-4 text-right text-xs font-semibold text-slate-600 uppercase tracking-wider w-24">Qty Issued</th>
+                                            <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider w-64">Issued To</th>
+                                            <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider w-40">Department</th>
+                                            <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider w-32">Reason</th>
+                                            <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider w-32">Date</th>
+                                            <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider w-40">Issued By</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
@@ -1202,13 +1382,16 @@ export default function ProductionTeamInventory() {
                                                 <td className="px-6 py-5 text-sm text-slate-600">{record.slNo}</td>
                                                 <td className="px-6 py-5 text-sm font-semibold text-slate-900">{record.name}</td>
                                                 <td className="px-6 py-5 text-sm font-semibold text-red-600 text-right">{record.qty}</td>
-                                                <td className="px-6 py-5 text-sm text-slate-600">{record.issuedTo || '-'}</td>
+                                                <td className="px-6 py-5 text-sm text-slate-600">
+                                                    {record.issuedToEmail
+                                                        ? `${record.issuedTo} - ${record.issuedToEmail}`
+                                                        : record.issuedTo || '-'
+                                                    }
+                                                </td>
+                                                <td className="px-6 py-5 text-sm text-slate-600">{record.issuedToDepartment || '-'}</td>
                                                 <td className="px-6 py-5 text-sm text-slate-600">{record.reason || '-'}</td>
                                                 <td className="px-6 py-5 text-sm text-slate-600">{formatDate(record.date)}</td>
                                                 <td className="px-6 py-5 text-sm font-medium text-slate-900">{record.issuedBy || '-'}</td>
-                                                <td className="px-6 py-5 text-center">
-                                                    <DeleteBtn onClick={() => deleteIssuedRecord(record.id, record.qty, record.name)} />
-                                                </td>
                                             </tr>
                                         ))}
                                     </tbody>
@@ -1219,9 +1402,7 @@ export default function ProductionTeamInventory() {
                 )}
             </div>
 
-            {/* ═══════════════════════════
-                ADD MATERIAL MODAL
-            ═══════════════════════════ */}
+            {/* ADD MATERIAL MODAL */}
             {showMaterialModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
                     <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowMaterialModal(false)} />
@@ -1257,9 +1438,7 @@ export default function ProductionTeamInventory() {
                 </div>
             )}
 
-            {/* ═══════════════════════════
-                ADD RECEIVED MODAL
-            ═══════════════════════════ */}
+            {/* ADD RECEIVED MODAL */}
             {showAddModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
                     <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowAddModal(false)} />
@@ -1274,7 +1453,6 @@ export default function ProductionTeamInventory() {
                         </div>
 
                         <form onSubmit={addToTable} className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            {/* Item Name */}
                             <div className="md:col-span-2">
                                 <label className="block text-sm font-semibold text-slate-700 mb-2">Item Name <span className="text-red-500">*</span></label>
                                 <SearchableDropdown
@@ -1286,7 +1464,6 @@ export default function ProductionTeamInventory() {
                                 />
                             </div>
 
-                            {/* Description */}
                             <div className="md:col-span-2">
                                 <label className="block text-sm font-semibold text-slate-700 mb-2">Description</label>
                                 <input
@@ -1298,7 +1475,6 @@ export default function ProductionTeamInventory() {
                                 />
                             </div>
 
-                            {/* Qty */}
                             <div>
                                 <label className="block text-sm font-semibold text-slate-700 mb-2">Qty <span className="text-red-500">*</span></label>
                                 <input
@@ -1310,7 +1486,6 @@ export default function ProductionTeamInventory() {
                                 />
                             </div>
 
-                            {/* Rate */}
                             <div>
                                 <label className="block text-sm font-semibold text-slate-700 mb-2">Rate (Nu.) <span className="text-red-500">*</span></label>
                                 <input
@@ -1322,7 +1497,6 @@ export default function ProductionTeamInventory() {
                                 />
                             </div>
 
-                            {/* Date */}
                             <div>
                                 <label className="block text-sm font-semibold text-slate-700 mb-2">Date</label>
                                 <input
@@ -1333,13 +1507,12 @@ export default function ProductionTeamInventory() {
                                 />
                             </div>
 
-                            {/* ✅ Received By - Auto-filled with current user */}
                             <div className="md:col-span-2">
                                 <label className="block text-sm font-semibold text-slate-700 mb-2">Received By</label>
                                 <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3">
                                     {currentUser ? (
                                         <span className="text-slate-900 font-medium">
-                                            {currentUser.name} ({formatRole(currentUser.role || 'admin')})
+                                            {currentUser.name} ({formatRole(currentUser.role || 'production_team')})
                                         </span>
                                     ) : (
                                         <span className="text-slate-400">Loading...</span>
@@ -1347,7 +1520,6 @@ export default function ProductionTeamInventory() {
                                 </div>
                             </div>
 
-                            {/* Total */}
                             <div className="md:col-span-2">
                                 <label className="block text-sm font-semibold text-slate-700 mb-2">Total Amount</label>
                                 <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 font-bold text-lg">
@@ -1355,7 +1527,6 @@ export default function ProductionTeamInventory() {
                                 </div>
                             </div>
 
-                            {/* Actions */}
                             <div className="md:col-span-2 flex justify-end gap-3 pt-6 border-t border-slate-100">
                                 <button type="button" onClick={() => setShowAddModal(false)} className="px-6 py-3 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-all">Cancel</button>
                                 <button type="submit" className="px-8 py-3 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 transition-all shadow-lg hover:shadow-xl">Save Record</button>
@@ -1365,9 +1536,7 @@ export default function ProductionTeamInventory() {
                 </div>
             )}
 
-            {/* ═══════════════════════════
-                ISSUE MATERIAL MODAL
-            ═══════════════════════════ */}
+            {/* ISSUE MATERIAL MODAL */}
             {showIssueModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
                     <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowIssueModal(false)} />
@@ -1381,9 +1550,8 @@ export default function ProductionTeamInventory() {
                             </button>
                         </div>
 
-                        <form onSubmit={issueMaterial} className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            {/* Item Name */}
-                            <div className="md:col-span-2">
+                        <form onSubmit={issueMaterial} className="space-y-6">
+                            <div>
                                 <label className="block text-sm font-semibold text-slate-700 mb-2">Item Name <span className="text-red-500">*</span></label>
                                 <SearchableDropdown
                                     value={issueForm.itemName}
@@ -1393,43 +1561,111 @@ export default function ProductionTeamInventory() {
                                 />
                             </div>
 
-                            {/* Qty */}
+                            <div className="grid grid-cols-2 gap-6">
+                                <div>
+                                    <label className="block text-sm font-semibold text-slate-700 mb-2">Qty to Issue <span className="text-red-500">*</span></label>
+                                    <input
+                                        type="number"
+                                        value={issueForm.issueQty}
+                                        onChange={e => setIssueForm(p => ({ ...p, issueQty: e.target.value }))}
+                                        placeholder="0"
+                                        className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm transition-all"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-semibold text-slate-700 mb-2">Date <span className="text-red-500">*</span></label>
+                                    <input
+                                        type="date"
+                                        value={issueForm.issueDate}
+                                        onChange={e => setIssueForm(p => ({ ...p, issueDate: e.target.value }))}
+                                        min={new Date().toISOString().split('T')[0]}
+                                        className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm transition-all"
+                                    />
+                                </div>
+                            </div>
+
                             <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-2">Qty to Issue <span className="text-red-500">*</span></label>
-                                <input
-                                    type="number"
-                                    value={issueForm.issueQty}
-                                    onChange={e => setIssueForm(p => ({ ...p, issueQty: e.target.value }))}
-                                    placeholder="0"
-                                    className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm transition-all"
-                                />
+                                <label className="block text-sm font-semibold text-slate-700 mb-3">Issue To <span className="text-red-500">*</span></label>
+                                <div className="flex gap-4">
+                                    <label className="flex items-center cursor-pointer">
+                                        <input
+                                            type="radio"
+                                            value="user"
+                                            checked={issueType === 'user'}
+                                            onChange={e => handleIssueTypeChange(e.target.value)}
+                                            className="w-4 h-4 text-indigo-600 border-slate-300 focus:ring-indigo-500"
+                                        />
+                                        <span className="ml-2 text-sm font-medium text-slate-700">User</span>
+                                    </label>
+                                    <label className="flex items-center cursor-pointer">
+                                        <input
+                                            type="radio"
+                                            value="production_team"
+                                            checked={issueType === 'production_team'}
+                                            onChange={e => handleIssueTypeChange(e.target.value)}
+                                            className="w-4 h-4 text-indigo-600 border-slate-300 focus:ring-indigo-500"
+                                        />
+                                        <span className="ml-2 text-sm font-medium text-slate-700">Production Team</span>
+                                    </label>
+                                </div>
                             </div>
 
-                            {/* Date */}
+                            {issueType === 'user' ? (
+                                <>
+                                    <div>
+                                        <label className="block text-sm font-semibold text-slate-700 mb-2">Department <span className="text-red-500">*</span></label>
+                                        <select
+                                            value={issueForm.issuedToDepartment}
+                                            onChange={e => handleDepartmentChange(e.target.value)}
+                                            className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm transition-all"
+                                        >
+                                            <option value="">Select Department</option>
+                                            {departments.map((dept, index) => (
+                                                <option key={index} value={dept}>{dept}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-semibold text-slate-700 mb-2">Issued To (User) <span className="text-red-500">*</span></label>
+                                        <select
+                                            value={issueForm.issuedTo && issueForm.issuedToEmail ? `${issueForm.issuedTo} - ${issueForm.issuedToEmail}` : ''}
+                                            onChange={e => handleUserSelect(e.target.value)}
+                                            disabled={!issueForm.issuedToDepartment}
+                                            className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm transition-all disabled:bg-slate-100 disabled:cursor-not-allowed"
+                                        >
+                                            <option value="">{issueForm.issuedToDepartment ? 'Select User' : 'Select Department First'}</option>
+                                            {usersByDepartment.map((user, index) => (
+                                                <option key={index} value={user.display}>{user.display}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </>
+                            ) : (
+                                <div>
+                                    <label className="block text-sm font-semibold text-slate-700 mb-2">Production Team Member <span className="text-red-500">*</span></label>
+                                    <select
+                                        value={issueForm.issuedTo || ''}
+                                        onChange={e => handleProductionTeamSelect(e.target.value)}
+                                        className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm transition-all"
+                                    >
+                                        <option value="">Select Production Team Member</option>
+                                        {productionTeamMembers.map((member, index) => (
+                                            <option key={index} value={member.display}>
+                                                {member.display}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    {issueForm.issuedTo && (
+                                        <p className="mt-2 text-sm text-emerald-600">
+                                            ✅ Selected: {issueForm.issuedTo}
+                                        </p>
+                                    )}
+                                </div>
+                            )}
+
                             <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-2">Date</label>
-                                <input
-                                    type="date"
-                                    value={issueForm.issueDate}
-                                    onChange={e => setIssueForm(p => ({ ...p, issueDate: e.target.value }))}
-                                    className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm transition-all"
-                                />
-                            </div>
-
-                            {/* Issued To */}
-                            <div className="md:col-span-2">
-                                <label className="block text-sm font-semibold text-slate-700 mb-2">Issued To <span className="text-red-500">*</span></label>
-                                <input
-                                    type="text"
-                                    value={issueForm.issuedTo}
-                                    onChange={e => setIssueForm(p => ({ ...p, issuedTo: e.target.value }))}
-                                    placeholder="e.g., Sonam Tshering, Project Alpha"
-                                    className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm transition-all"
-                                />
-                            </div>
-
-                            {/* Reason */}
-                            <div className="md:col-span-2">
                                 <label className="block text-sm font-semibold text-slate-700 mb-2">Reason</label>
                                 <input
                                     type="text"
@@ -1440,19 +1676,20 @@ export default function ProductionTeamInventory() {
                                 />
                             </div>
 
-                            {/* Issued By */}
-                            <div className="md:col-span-2">
-                                <label className="block text-sm font-semibold text-slate-700 mb-2">Issued By <span className="text-red-500">*</span></label>
-                                <SearchableDropdown
-                                    value={issueForm.issuedBy}
-                                    onChange={v => setIssueForm(p => ({ ...p, issuedBy: v }))}
-                                    options={materials}
-                                    placeholder="Select staff member..."
-                                />
+                            <div>
+                                <label className="block text-sm font-semibold text-slate-700 mb-2">Issued By</label>
+                                <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3">
+                                    {currentUser ? (
+                                        <span className="text-slate-900 font-medium">
+                                            {currentUser.name} ({formatRole(currentUser.role || 'production_team')})
+                                        </span>
+                                    ) : (
+                                        <span className="text-slate-400">Loading...</span>
+                                    )}
+                                </div>
                             </div>
 
-                            {/* Actions */}
-                            <div className="md:col-span-2 flex justify-end gap-3 pt-6 border-t border-slate-100">
+                            <div className="flex justify-end gap-3 pt-6 border-t border-slate-100">
                                 <button type="button" onClick={() => setShowIssueModal(false)} className="px-6 py-3 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-all">Cancel</button>
                                 <button type="submit" className="px-8 py-3 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 transition-all shadow-lg hover:shadow-xl">Issue Material</button>
                             </div>

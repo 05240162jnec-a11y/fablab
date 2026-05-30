@@ -18,6 +18,8 @@ class InventoryIssued extends Model
         'quantity',
         'transaction_date',
         'issued_to',
+        'issued_to_email',      // ← MUST BE HERE
+    'issued_to_department',
         'reason',
         'issued_by',
     ];

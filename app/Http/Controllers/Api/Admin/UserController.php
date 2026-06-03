@@ -37,6 +37,9 @@ class UserController extends Controller
             'students' => User::where('role', 'student')->count(),
             'faculty' => User::where('role', 'faculty')->count(),
             'outsiders' => User::where('role', 'outsider')->count(),
+            'production_team' => User::where('role', 'production_team')->count(), // ✅ Added
+            'active' => User::where('is_active', true)->count(), // ✅ Added
+            'inactive' => User::where('is_active', false)->count(), // ✅ Added
         ];
 
         return response()->json([
@@ -66,8 +69,9 @@ class UserController extends Controller
             'name' => 'sometimes|required|string|max:255',
             'email' => ['sometimes', 'required', 'email', Rule::unique('users')->ignore($id)],
             'gender' => 'sometimes|in:male,female,other',
-            'role' => 'sometimes|in:student,faculty,outsider',
+            'role' => 'sometimes|in:student,faculty,outsider,production_team', // ✅ Added production_team
             'phone' => 'sometimes|string|max:20',
+            'is_active' => 'sometimes|boolean', // ✅ Added
         ]);
 
         $user->update($validated);
@@ -79,7 +83,25 @@ class UserController extends Controller
         ]);
     }
 
-    // Delete user
+    // ✅ Toggle user status (enable/disable)
+    public function toggleStatus($id)
+    {
+        $user = User::findOrFail($id);
+        
+        // Toggle the is_active status
+        $user->is_active = !$user->is_active;
+        $user->save();
+
+        $status = $user->is_active ? 'enabled' : 'disabled';
+
+        return response()->json([
+            'success' => true,
+            'message' => "User {$status} successfully",
+            'data' => $user
+        ]);
+    }
+
+    // Delete user (permanent delete - kept for backup)
     public function destroy($id)
     {
         $user = User::findOrFail($id);

@@ -9,10 +9,11 @@ use App\Models\InventoryIssued;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Carbon\Carbon;
 
 class InventoryController extends Controller
 {
-        /**
+    /**
      * Display a listing of the inventory.
      */
     public function index(Request $request)
@@ -21,11 +22,15 @@ class InventoryController extends Controller
             // Get all materials
             $materials = Material::select('id', 'name')->get();
 
-            // Get all received records with material relationship
-            $received = InventoryReceived::with('material')->latest()->get();
+            // ✅ Get all received records - EXCLUDE soft deleted
+            $received = InventoryReceived::with('material')
+                ->whereNull('deleted_at')
+                ->latest()
+                ->get();
 
-            // ✅ Get all issued records - explicitly select all needed columns including new ones
+            // ✅ Get all issued records - EXCLUDE soft deleted
             $issued = InventoryIssued::with('material')
+                ->whereNull('deleted_at')
                 ->select('id', 'material_id', 'name', 'quantity', 'transaction_date', 
                          'issued_to', 'issued_to_email', 'issued_to_department', 
                          'reason', 'issued_by', 'created_at', 'updated_at')
@@ -37,15 +42,24 @@ class InventoryController extends Controller
             $threshold = $thresholdSetting ? (int)$thresholdSetting->value : 10;
 
             // Calculate Stock for each material (sorted by latest update)
+            // ✅ Only count non-deleted records
             $stockData = [];
             foreach ($materials as $material) {
-                $totalReceived = InventoryReceived::where('material_id', $material->id)->sum('quantity');
-                $totalIssued = InventoryIssued::where('material_id', $material->id)->sum('quantity');
+                $totalReceived = InventoryReceived::where('material_id', $material->id)
+                    ->whereNull('deleted_at')
+                    ->sum('quantity');
+                $totalIssued = InventoryIssued::where('material_id', $material->id)
+                    ->whereNull('deleted_at')
+                    ->sum('quantity');
                 
-                // Get latest updated_at from received or issued records
-                $latestReceived = InventoryReceived::where('material_id', $material->id)->max('updated_at');
-                $latestIssued = InventoryIssued::where('material_id', $material->id)->max('updated_at');
-                $latestUpdate = max($latestReceived, $latestIssued);
+                // Get latest updated_at from received or issued records (non-deleted only)
+                $latestReceived = InventoryReceived::where('material_id', $material->id)
+                    ->whereNull('deleted_at')
+                    ->max('updated_at');
+                $latestIssued = InventoryIssued::where('material_id', $material->id)
+                    ->whereNull('deleted_at')
+                    ->max('updated_at');
+                $latestUpdate = max($latestReceived ?? 0, $latestIssued ?? 0);
                 
                 $stockData[] = [
                     'id' => $material->id,
@@ -57,7 +71,7 @@ class InventoryController extends Controller
 
             // Sort by latest update (DESC)
             usort($stockData, function($a, $b) {
-                return strtotime($b['updated_at']) - strtotime($a['updated_at']);
+                return strtotime($b['updated_at'] ?? 0) - strtotime($a['updated_at'] ?? 0);
             });
 
             return response()->json([
@@ -65,7 +79,7 @@ class InventoryController extends Controller
                 'data' => [
                     'materials' => $materials,
                     'received' => $received,
-                    'issued' => $issued, // ✅ Now includes issued_to_email and issued_to_department
+                    'issued' => $issued,
                     'materials' => $stockData,
                     'threshold' => $threshold,
                 ],
@@ -98,7 +112,7 @@ class InventoryController extends Controller
         ]);
     }
 
-        /**
+    /**
      * Add received material.
      */
     public function addReceived(Request $request)
@@ -110,7 +124,7 @@ class InventoryController extends Controller
             'rate' => 'required|numeric|min:0',
             'transaction_date' => 'required|date',
             'received_by' => 'required|string',
-            'received_by_role' => 'required|string', // ✅ This field
+            'received_by_role' => 'required|string',
         ]);
 
         try {
@@ -130,7 +144,7 @@ class InventoryController extends Controller
                 'rate' => $validated['rate'],
                 'transaction_date' => $validated['transaction_date'],
                 'received_by' => $validated['received_by'],
-                'received_by_role' => $validated['received_by_role'], // ✅ Save the role
+                'received_by_role' => $validated['received_by_role'],
             ]);
 
             DB::commit();
@@ -151,13 +165,16 @@ class InventoryController extends Controller
     }
 
     /**
-     * Delete received record.
+     * ✅ Soft Delete received record.
      */
     public function deleteReceived($id)
     {
         try {
             $record = InventoryReceived::findOrFail($id);
-            $record->delete();
+            
+            // ✅ Soft delete: Set deleted_at timestamp instead of actual deletion
+            $record->deleted_at = Carbon::now();
+            $record->save();
 
             return response()->json([
                 'success' => true,
@@ -173,13 +190,16 @@ class InventoryController extends Controller
     }
 
     /**
-     * Delete issued record.
+     * ✅ Soft Delete issued record.
      */
     public function deleteIssued($id)
     {
         try {
             $record = InventoryIssued::findOrFail($id);
-            $record->delete();
+            
+            // ✅ Soft delete: Set deleted_at timestamp instead of actual deletion
+            $record->deleted_at = Carbon::now();
+            $record->save();
 
             return response()->json([
                 'success' => true,
@@ -194,21 +214,18 @@ class InventoryController extends Controller
         }
     }
 
-        /**
+    /**
      * Get Admin and Production Team members for dropdown
      */
     public function getTeamMembers()
     {
         try {
-            // ✅ Fetch users with roles: admin, production, production_team, staff
-            // Adjust these role names to match exactly what is in your database
             $roles = ['admin', 'production', 'production_team', 'staff'];
             
             $users = \App\Models\User::whereIn('role', $roles)
                 ->select('id', 'name', 'role')
                 ->get()
                 ->map(function ($user) {
-                    // Format the role for display
                     $roleDisplay = 'Member';
                     if ($user->role === 'admin') {
                         $roleDisplay = 'Admin';
@@ -221,7 +238,7 @@ class InventoryController extends Controller
                     return [
                         'id' => $user->id,
                         'name' => $user->name . ' (' . $roleDisplay . ')',
-                        'value' => $user->name, // Store just the name for saving
+                        'value' => $user->name,
                     ];
                 });
 
@@ -238,15 +255,13 @@ class InventoryController extends Controller
         }
     }
 
-        /**
+    /**
      * Get stock alert threshold setting
      */
     public function getStockAlertThreshold()
     {
         try {
             $setting = \App\Models\Setting::where('key', 'stock_alert_threshold')->first();
-            
-            // Default to 10 if not set
             $threshold = $setting ? (int)$setting->value : 10;
             
             return response()->json([
@@ -294,7 +309,8 @@ class InventoryController extends Controller
             ], 500);
         }
     }
-        /**
+
+    /**
      * Issue material.
      */
     public function issueMaterial(Request $request)
@@ -302,7 +318,7 @@ class InventoryController extends Controller
         $validated = $request->validate([
             'name' => 'required|string',
             'quantity' => 'required|integer|min:1',
-            'transaction_date' => 'required|date|after_or_equal:today', // ✅ Prevent past dates
+            'transaction_date' => 'required|date|after_or_equal:today',
             'issued_to' => 'required|string',
             'issued_to_email' => 'nullable|email',
             'issued_to_department' => 'nullable|string',
@@ -318,9 +334,13 @@ class InventoryController extends Controller
                 ['name' => $validated['name']]
             );
 
-            // Check Stock
-            $totalReceived = InventoryReceived::where('material_id', $material->id)->sum('quantity');
-            $totalIssued = InventoryIssued::where('material_id', $material->id)->sum('quantity');
+            // ✅ Check Stock - Only count non-deleted records
+            $totalReceived = InventoryReceived::where('material_id', $material->id)
+                ->whereNull('deleted_at')
+                ->sum('quantity');
+            $totalIssued = InventoryIssued::where('material_id', $material->id)
+                ->whereNull('deleted_at')
+                ->sum('quantity');
             $currentStock = $totalReceived - $totalIssued;
 
             if ($currentStock < $validated['quantity']) {
@@ -361,7 +381,7 @@ class InventoryController extends Controller
         }
     }
 
-            /**
+    /**
      * Get departments and users for issued material dropdown
      */
     public function getDepartmentsAndUsers()
@@ -377,7 +397,7 @@ class InventoryController extends Controller
 
             // ✅ Get all users with student/faculty/production roles - explicitly select role
             $users = \App\Models\User::whereIn('role', ['student', 'faculty', 'production', 'production_team'])
-                ->select('id', 'name', 'email', 'department', 'role') // ✅ Explicitly select role
+                ->select('id', 'name', 'email', 'department', 'role')
                 ->get()
                 ->map(function ($user) {
                     return [
@@ -385,7 +405,7 @@ class InventoryController extends Controller
                         'name' => $user->name,
                         'email' => $user->email,
                         'department' => $user->department,
-                        'role' => $user->role, // ✅ Include role in response
+                        'role' => $user->role,
                         'display' => $user->name . ' - ' . $user->email,
                     ];
                 });

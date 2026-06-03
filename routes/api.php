@@ -20,8 +20,12 @@ Route::prefix('admin')->group(function () {
         Route::apiResource('users', \App\Http\Controllers\Api\Admin\UserController::class)
             ->only(['index', 'show', 'update', 'destroy']);
         
+        // Add this route inside the admin middleware group
+        Route::post('users/{id}/toggle-status', [\App\Http\Controllers\Api\Admin\UserController::class, 'toggleStatus']);   
+
         // Production Team
         Route::apiResource('production-team', \App\Http\Controllers\Api\Admin\ProductionTeamController::class);
+        Route::post('production-team/{id}/toggle-status', [\App\Http\Controllers\Api\Admin\ProductionTeamController::class, 'toggleStatus']);
         
         // Machines
         Route::apiResource('machines', \App\Http\Controllers\Api\Admin\MachineController::class);

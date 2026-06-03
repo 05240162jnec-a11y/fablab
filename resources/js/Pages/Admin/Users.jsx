@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react'; // ✅ Added useRef
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { useNavigate } from 'react-router-dom'; // ✅ Added useNavigate
+import { useNavigate } from 'react-router-dom';
 
 export default function Users() {
 
@@ -10,7 +10,7 @@ export default function Users() {
     // Modal States
     const [showViewModal, setShowViewModal] = useState(false);
     const [showEditModal, setShowEditModal] = useState(false);
-    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [showToggleModal, setShowToggleModal] = useState(false); // ✅ Changed from showDeleteModal
     const [selectedUser, setSelectedUser] = useState(null);
 
     // Dropdown States
@@ -21,7 +21,10 @@ export default function Users() {
     const [admin, setAdmin] = useState(null);
     const [showDropdown, setShowDropdown] = useState(false);
     const dropdownRef = useRef(null);
-    const navigate = useNavigate(); // ✅ Added navigate
+    const navigate = useNavigate();
+
+    // ✅ Toast State
+    const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
 
     // Edit Form State
     const [editForm, setEditForm] = useState({
@@ -34,9 +37,17 @@ export default function Users() {
 
     // Backend State
     const [users, setUsers] = useState([]);
-    const [stats, setStats] = useState({ total: 0, students: 0, faculty: 0, outsiders: 0 });
+    const [stats, setStats] = useState({ total: 0, students: 0, faculty: 0, outsiders: 0, production_team: 0 });
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+
+    // ✅ Show toast notification
+    const showToast = (message, type = 'success') => {
+        setToast({ show: true, message, type });
+        setTimeout(() => {
+            setToast({ show: false, message: '', type: 'success' });
+        }, 3000);
+    };
 
     // ✅ Fetch admin data from localStorage
     useEffect(() => {
@@ -122,15 +133,17 @@ export default function Users() {
         return matchesSearch && matchesRole;
     });
 
-    // Get role badge color
+    // ✅ Get role badge color - Changed to black/gray
     const getRoleBadgeClass = (role) => {
         switch (role) {
             case 'faculty':
-                return 'bg-blue-600 text-white';
+                return 'bg-gray-200 text-gray-800';
+            case 'production_team':
+                return 'bg-gray-200 text-gray-800';
             case 'outsider':
-                return 'bg-gray-200 text-gray-700';
+                return 'bg-gray-100 text-gray-700';
             default:
-                return 'bg-blue-100 text-blue-700';
+                return 'bg-gray-100 text-gray-800';
         }
     };
 
@@ -170,30 +183,32 @@ export default function Users() {
         setShowEditModal(true);
     };
 
-    // Open Delete Modal
-    const handleDeleteUser = (user) => {
+    // ✅ Open Toggle Status Modal
+    const handleToggleStatus = (user) => {
         setSelectedUser(user);
-        setShowDeleteModal(true);
+        setShowToggleModal(true);
     };
 
-    // Confirm Delete
-    const confirmDelete = async () => {
+    // ✅ Confirm Toggle Status
+    const confirmToggleStatus = async () => {
         try {
             const token = localStorage.getItem('admin_token');
-            await axios.delete(`http://127.0.0.1:8000/api/admin/users/${selectedUser.id}`, {
+            await axios.post(`http://127.0.0.1:8000/api/admin/users/${selectedUser.id}/toggle-status`, {}, {
                 headers: {
                     'Accept': 'application/json',
                     'Authorization': `Bearer ${token}`,
                 }
             });
 
-            setShowDeleteModal(false);
+            setShowToggleModal(false);
             setSelectedUser(null);
             fetchUsers(); // Refresh list
-            alert('✅ User deleted successfully!');
+
+            const status = selectedUser.is_active ? 'disabled' : 'enabled';
+            showToast(`✅ User ${status} successfully!`, 'success');
         } catch (err) {
-            console.error('Delete error:', err);
-            alert('❌ Failed to delete user');
+            console.error('Toggle status error:', err);
+            showToast('❌ Failed to update user status', 'error');
         }
     };
 
@@ -212,10 +227,10 @@ export default function Users() {
             setShowEditModal(false);
             setSelectedUser(null);
             fetchUsers(); // Refresh list
-            alert('✅ User updated successfully!');
+            showToast('✅ User updated successfully!', 'success');
         } catch (err) {
             console.error('Update error:', err);
-            alert('❌ Failed to update user');
+            showToast('❌ Failed to update user', 'error');
         }
     };
 
@@ -223,7 +238,7 @@ export default function Users() {
     const closeAllModals = () => {
         setShowViewModal(false);
         setShowEditModal(false);
-        setShowDeleteModal(false);
+        setShowToggleModal(false);
         setSelectedUser(null);
     };
 
@@ -231,7 +246,7 @@ export default function Users() {
         <div className="flex min-h-screen bg-gray-50">
             {/* Main Content */}
             <div className="flex-1">
-                {/* Top Header - Updated with clickable avatar, no notification */}
+                {/* Top Header */}
                 <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
                     <div className="flex items-center justify-between px-6 py-4">
                         <div>
@@ -369,6 +384,18 @@ export default function Users() {
                                                 )}
                                             </button>
                                             <button
+                                                onClick={() => { setRoleFilter('production_team'); setShowFilterDropdown(false); }}
+                                                className={`w-full px-4 py-2 text-left text-sm flex items-center justify-between ${roleFilter === 'production_team' ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-gray-50'
+                                                    }`}
+                                            >
+                                                Production Team
+                                                {roleFilter === 'production_team' && (
+                                                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                                    </svg>
+                                                )}
+                                            </button>
+                                            <button
                                                 onClick={() => { setRoleFilter('outsider'); setShowFilterDropdown(false); }}
                                                 className={`w-full px-4 py-2 text-left text-sm flex items-center justify-between ${roleFilter === 'outsider' ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-gray-50'
                                                     }`}
@@ -400,7 +427,7 @@ export default function Users() {
                             </div>
                         )}
 
-                        {/* Users Table */}
+                        {/* Users Table - ✅ Removed Actions Column */}
                         {!loading && !error && (
                             <div className="overflow-x-auto">
                                 <table className="w-full">
@@ -408,8 +435,8 @@ export default function Users() {
                                         <tr className="border-b border-gray-100">
                                             <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">User</th>
                                             <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Role</th>
+                                            <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Status</th>
                                             <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Joined</th>
-                                            <th className="text-right py-3 px-4 text-sm font-semibold text-gray-700">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-100">
@@ -417,7 +444,8 @@ export default function Users() {
                                             <tr key={user.id} className="hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => handleViewUser(user)}>
                                                 <td className="py-4 px-4">
                                                     <div className="flex items-center gap-3">
-                                                        <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-semibold text-xs flex-shrink-0">
+                                                        {/* ✅ Changed avatar color to black */}
+                                                        <div className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center text-white font-semibold text-xs flex-shrink-0">
                                                             {getInitials(user.name)}
                                                         </div>
                                                         <div>
@@ -427,32 +455,18 @@ export default function Users() {
                                                     </div>
                                                 </td>
                                                 <td className="py-4 px-4">
+                                                    {/* ✅ Changed role badge color to black */}
                                                     <span className={`inline-flex px-3 py-1 rounded-full text-xs font-medium ${getRoleBadgeClass(user.role)}`}>
-                                                        {capitalize(user.role)}
+                                                        {user.role === 'production_team' ? 'Production Team' : capitalize(user.role)}
+                                                    </span>
+                                                </td>
+                                                <td className="py-4 px-4">
+                                                    <span className={`inline-flex px-3 py-1 rounded-full text-xs font-medium ${user.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                                        {user.is_active ? 'Active' : 'Disabled'}
                                                     </span>
                                                 </td>
                                                 <td className="py-4 px-4 text-sm text-gray-600">
                                                     {formatDate(user.created_at)}
-                                                </td>
-                                                <td className="py-4 px-4 text-right" onClick={(e) => e.stopPropagation()}>
-                                                    <button
-                                                        onClick={() => handleViewUser(user)}
-                                                        className="text-blue-600 hover:text-blue-700 text-sm font-medium mr-3"
-                                                    >
-                                                        View
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleEditUser(user)}
-                                                        className="text-blue-600 hover:text-blue-700 text-sm font-medium mr-3"
-                                                    >
-                                                        Edit
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleDeleteUser(user)}
-                                                        className="text-red-600 hover:text-red-700 text-sm font-medium"
-                                                    >
-                                                        Delete
-                                                    </button>
                                                 </td>
                                             </tr>
                                         ))}
@@ -474,7 +488,7 @@ export default function Users() {
                 </main>
             </div>
 
-            {/* ===== VIEW USER MODAL - YOUR DESIGN PRESERVED ===== */}
+            {/* ===== VIEW USER MODAL ===== */}
             {showViewModal && selectedUser && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
@@ -495,13 +509,15 @@ export default function Users() {
                         <div className="p-6">
                             {/* User Info */}
                             <div className="flex items-center gap-4 mb-6">
-                                <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-lg">
+                                {/* ✅ Changed avatar color to black */}
+                                <div className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center text-white font-bold text-lg">
                                     {getInitials(selectedUser.name)}
                                 </div>
                                 <div>
                                     <h4 className="text-lg font-bold text-gray-900">{selectedUser.name}</h4>
+                                    {/* ✅ Changed role badge color to black */}
                                     <span className={`inline-flex px-3 py-1 rounded-full text-xs font-medium ${getRoleBadgeClass(selectedUser.role)}`}>
-                                        {capitalize(selectedUser.role)}
+                                        {selectedUser.role === 'production_team' ? 'Production Team' : capitalize(selectedUser.role)}
                                     </span>
                                 </div>
                             </div>
@@ -539,10 +555,22 @@ export default function Users() {
                                         <p className="text-gray-900 font-medium">{selectedUser.phone || 'N/A'}</p>
                                     </div>
                                 </div>
+
+                                <div className="flex items-start gap-3">
+                                    <svg className="w-5 h-5 text-gray-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 01-18 0z" />
+                                    </svg>
+                                    <div>
+                                        <p className="text-sm text-gray-500">Status</p>
+                                        <span className={`inline-flex px-3 py-1 rounded-full text-xs font-medium ${selectedUser.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                            {selectedUser.is_active ? 'Active' : 'Disabled'}
+                                        </span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
-                        {/* Modal Footer */}
+                        {/* Modal Footer - ✅ Changed Delete to Disable/Enable */}
                         <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-100">
                             <button
                                 onClick={() => { closeAllModals(); handleEditUser(selectedUser); }}
@@ -554,20 +582,24 @@ export default function Users() {
                                 Edit
                             </button>
                             <button
-                                onClick={() => { closeAllModals(); handleDeleteUser(selectedUser); }}
-                                className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                                onClick={() => { closeAllModals(); handleToggleStatus(selectedUser); }}
+                                className={`flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-colors ${selectedUser.is_active ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'}`}
                             >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    {selectedUser.is_active ? (
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                                    ) : (
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    )}
                                 </svg>
-                                Delete
+                                {selectedUser.is_active ? 'Disable' : 'Enable'}
                             </button>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* ===== EDIT USER MODAL - YOUR DESIGN PRESERVED ===== */}
+            {/* ===== EDIT USER MODAL ===== */}
             {showEditModal && selectedUser && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
@@ -620,6 +652,7 @@ export default function Users() {
                                     >
                                         <option value="student">Student</option>
                                         <option value="faculty">Faculty</option>
+                                        <option value="production_team">Production Team</option>
                                         <option value="outsider">Outsider</option>
                                     </select>
                                 </div>
@@ -667,20 +700,27 @@ export default function Users() {
                 </div>
             )}
 
-            {/* ===== DELETE CONFIRMATION MODAL - YOUR DESIGN PRESERVED ===== */}
-            {showDeleteModal && selectedUser && (
+            {/* ===== TOGGLE STATUS CONFIRMATION MODAL ===== */}
+            {showToggleModal && selectedUser && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full">
                         {/* Modal Header */}
                         <div className="p-6 text-center">
-                            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                            <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${selectedUser.is_active ? 'bg-red-100' : 'bg-green-100'}`}>
+                                <svg className={`w-8 h-8 ${selectedUser.is_active ? 'text-red-600' : 'text-green-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    {selectedUser.is_active ? (
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                                    ) : (
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    )}
                                 </svg>
                             </div>
-                            <h3 className="text-xl font-bold text-gray-900 mb-2">Delete User?</h3>
+                            <h3 className="text-xl font-bold text-gray-900 mb-2">
+                                {selectedUser.is_active ? 'Disable' : 'Enable'} User?
+                            </h3>
                             <p className="text-gray-600">
-                                Are you sure you want to delete <span className="font-semibold">{selectedUser.name}</span>? This action cannot be undone.
+                                Are you sure you want to {selectedUser.is_active ? 'disable' : 'enable'} <span className="font-semibold">{selectedUser.name}</span>?
+                                {selectedUser.is_active && ' The user will not be able to log in.'}
                             </p>
                         </div>
 
@@ -693,12 +733,30 @@ export default function Users() {
                                 Cancel
                             </button>
                             <button
-                                onClick={confirmDelete}
-                                className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                                onClick={confirmToggleStatus}
+                                className={`px-6 py-2 text-white rounded-lg transition-colors ${selectedUser.is_active ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'}`}
                             >
-                                Delete
+                                {selectedUser.is_active ? 'Disable' : 'Enable'}
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ✅ Toast Notification */}
+            {toast.show && (
+                <div className={`fixed bottom-6 right-6 z-[100] px-6 py-3 rounded-lg shadow-lg text-white font-medium animate-slide-in ${toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'}`}>
+                    <div className="flex items-center gap-2">
+                        {toast.type === 'success' ? (
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        ) : (
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        )}
+                        {toast.message}
                     </div>
                 </div>
             )}

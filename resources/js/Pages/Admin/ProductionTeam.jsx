@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react'; // ✅ Added useRef
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { Link, useNavigate } from 'react-router-dom'; // ✅ Added useNavigate
+import { Link, useNavigate } from 'react-router-dom';
 
 export default function ProductionTeam() {
 
@@ -11,7 +11,7 @@ export default function ProductionTeam() {
     const [showViewModal, setShowViewModal] = useState(false);
     const [showAddModal, setShowAddModal] = useState(false);
     const [showEditModal, setShowEditModal] = useState(false);
-    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [showToggleModal, setShowToggleModal] = useState(false);
     const [selectedMember, setSelectedMember] = useState(null);
 
     // Dropdown States
@@ -21,7 +21,10 @@ export default function ProductionTeam() {
     const [admin, setAdmin] = useState(null);
     const [showDropdown, setShowDropdown] = useState(false);
     const dropdownRef = useRef(null);
-    const navigate = useNavigate(); // ✅ Added navigate
+    const navigate = useNavigate();
+
+    // ✅ Toast State
+    const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
 
     // Add/Edit Form State
     const [formState, setFormState] = useState({
@@ -29,17 +32,21 @@ export default function ProductionTeam() {
         email: '',
         phone: '',
         gender: 'male',
-        password: '',
-        confirmPassword: '',
-        status: 'available',
-        assignedTask: '',
     });
 
     // Backend State
     const [members, setMembers] = useState([]);
-    const [stats, setStats] = useState({ total: 0, available: 0, assigned: 0 });
+    const [stats, setStats] = useState({ total: 0, active: 0, inactive: 0, verified: 0, not_verified: 0 });
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+
+    // ✅ Show toast notification
+    const showToast = (message, type = 'success') => {
+        setToast({ show: true, message, type });
+        setTimeout(() => {
+            setToast({ show: false, message: '', type: 'success' });
+        }, 3000);
+    };
 
     // ✅ Fetch admin data from localStorage
     useEffect(() => {
@@ -102,8 +109,10 @@ export default function ProductionTeam() {
                 setMembers(response.data.data);
                 setStats({
                     total: response.data.stats?.total || 0,
-                    available: response.data.stats?.available || 0,
-                    assigned: response.data.stats?.assigned || 0,
+                    active: response.data.stats?.active || 0,
+                    inactive: response.data.stats?.inactive || 0,
+                    verified: response.data.stats?.verified || 0,
+                    not_verified: response.data.stats?.not_verified || 0,
                 });
                 setError(null);
             }
@@ -128,19 +137,6 @@ export default function ProductionTeam() {
             email.toLowerCase().includes(searchTerm.toLowerCase());
         return matchesSearch;
     });
-
-    // ✅ Safe status badge class
-    const getStatusBadgeClass = (status) => {
-        const safeStatus = status || 'available';
-        switch (safeStatus) {
-            case 'assigned':
-                return 'bg-blue-100 text-blue-700 border border-blue-200';
-            case 'available':
-                return 'bg-green-100 text-green-700 border border-green-200';
-            default:
-                return 'bg-gray-100 text-gray-700 border border-gray-200';
-        }
-    };
 
     // ✅ SAFE capitalize function
     const capitalize = (str) => {
@@ -167,10 +163,6 @@ export default function ProductionTeam() {
             email: '',
             phone: '',
             gender: 'male',
-            password: '',
-            confirmPassword: '',
-            status: 'available',
-            assignedTask: '',
         });
         setShowAddModal(true);
     };
@@ -183,38 +175,36 @@ export default function ProductionTeam() {
             email: member.email || '',
             phone: member.phone || '',
             gender: member.gender || 'male',
-            password: '',
-            confirmPassword: '',
-            status: member.status || 'available',
-            assignedTask: member.assigned_task || member.assignedTask || '',
         });
         setShowEditModal(true);
     };
 
-    // Open Delete Modal
-    const handleDeleteMember = (member) => {
+    // ✅ Open Toggle Status Modal
+    const handleToggleStatus = (member) => {
         setSelectedMember(member);
-        setShowDeleteModal(true);
+        setShowToggleModal(true);
     };
 
-    // Confirm Delete
-    const confirmDelete = async () => {
+    // ✅ Confirm Toggle Status
+    const confirmToggleStatus = async () => {
         try {
             const token = localStorage.getItem('auth_token');
-            await axios.delete(`/admin/production-team/${selectedMember.id}`, {
+            await axios.post(`/admin/production-team/${selectedMember.id}/toggle-status`, {}, {
                 headers: {
                     'Accept': 'application/json',
                     'Authorization': `Bearer ${token}`,
                 }
             });
 
-            setShowDeleteModal(false);
+            setShowToggleModal(false);
             setSelectedMember(null);
             fetchMembers();
-            alert('✅ Team member deleted successfully!');
+
+            const status = selectedMember.is_active ? 'disabled' : 'enabled';
+            showToast(`✅ Team member ${status} successfully!`, 'success');
         } catch (err) {
-            console.error('Delete error:', err);
-            alert('❌ Failed to delete team member');
+            console.error('Toggle status error:', err);
+            showToast('❌ Failed to update team member status', 'error');
         }
     };
 
@@ -237,11 +227,11 @@ export default function ProductionTeam() {
 
             setShowAddModal(false);
             fetchMembers();
-            alert('✅ Team member added successfully! Credentials sent to their email.');
+            showToast('✅ Team member added successfully! Credentials sent to their email.', 'success');
         } catch (err) {
             console.error('Add error:', err);
             const errorMsg = err.response?.data?.message || 'Failed to add team member';
-            alert('❌ ' + errorMsg);
+            showToast('❌ ' + errorMsg, 'error');
         }
     };
 
@@ -254,7 +244,6 @@ export default function ProductionTeam() {
                 email: formState.email,
                 phone: formState.phone,
                 gender: formState.gender,
-                ...(formState.password && { password: formState.password, password_confirmation: formState.confirmPassword }),
             }, {
                 headers: {
                     'Accept': 'application/json',
@@ -266,11 +255,11 @@ export default function ProductionTeam() {
             setShowEditModal(false);
             setSelectedMember(null);
             fetchMembers();
-            alert('✅ Team member updated successfully!');
+            showToast('✅ Team member updated successfully!', 'success');
         } catch (err) {
             console.error('Update error:', err);
             const errorMsg = err.response?.data?.message || 'Failed to update team member';
-            alert('❌ ' + errorMsg);
+            showToast('❌ ' + errorMsg, 'error');
         }
     };
 
@@ -279,7 +268,7 @@ export default function ProductionTeam() {
         setShowViewModal(false);
         setShowAddModal(false);
         setShowEditModal(false);
-        setShowDeleteModal(false);
+        setShowToggleModal(false);
         setSelectedMember(null);
     };
 
@@ -287,7 +276,7 @@ export default function ProductionTeam() {
         <div className="flex min-h-screen bg-gray-50">
             {/* Main Content */}
             <div className="flex-1">
-                {/* ✅ Top Header - Updated with clickable avatar, no notification */}
+                {/* ✅ Top Header */}
                 <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
                     <div className="flex items-center justify-between px-6 py-4">
                         <div>
@@ -295,7 +284,7 @@ export default function ProductionTeam() {
                             <p className="text-sm text-gray-600">Manage production team members and assignments</p>
                         </div>
 
-                        {/* ✅ Right Side - Profile Dropdown (No notification icon) */}
+                        {/* ✅ Right Side - Profile Dropdown */}
                         <div className="relative" ref={dropdownRef}>
                             <button
                                 onClick={() => setShowDropdown(!showDropdown)}
@@ -309,7 +298,6 @@ export default function ProductionTeam() {
                             {/* ✅ Dropdown Menu */}
                             {showDropdown && (
                                 <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-50 animate-fade-in">
-                                    {/* Admin Info */}
                                     <div className="px-4 py-3 border-b border-gray-100">
                                         <p className="font-semibold text-gray-900">{admin?.name || 'Admin'}</p>
                                         <p className="text-sm text-gray-500 truncate">{admin?.email || 'admin@fablab.jnec.rub.edu.bt'}</p>
@@ -318,7 +306,6 @@ export default function ProductionTeam() {
                                         </span>
                                     </div>
 
-                                    {/* Menu Items */}
                                     <div className="py-1">
                                         <button
                                             onClick={handleProfileClick}
@@ -331,7 +318,6 @@ export default function ProductionTeam() {
                                         </button>
                                     </div>
 
-                                    {/* Logout */}
                                     <div className="py-1 border-t border-gray-100">
                                         <button
                                             onClick={handleLogout}
@@ -371,7 +357,6 @@ export default function ProductionTeam() {
                                 <h3 className="text-lg font-bold text-gray-900">Team Members ({stats.total})</h3>
                             </div>
                             <div className="flex flex-col sm:flex-row gap-3">
-                                {/* Search */}
                                 <div className="relative">
                                     <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -401,7 +386,7 @@ export default function ProductionTeam() {
                             </div>
                         )}
 
-                        {/* Team Members Table */}
+                        {/* ✅ Team Members Table - Shows Both Statuses */}
                         {!loading && !error && (
                             <div className="overflow-x-auto">
                                 <table className="w-full">
@@ -410,7 +395,8 @@ export default function ProductionTeam() {
                                             <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Team Member</th>
                                             <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Role</th>
                                             <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Phone</th>
-                                            <th className="text-right py-3 px-4 text-sm font-semibold text-gray-700">Actions</th>
+                                            <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Verification</th>
+                                            <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Account Status</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-100">
@@ -418,7 +404,8 @@ export default function ProductionTeam() {
                                             <tr key={member.id} className="hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => handleViewMember(member)}>
                                                 <td className="py-4 px-4">
                                                     <div className="flex items-center gap-3">
-                                                        <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-semibold text-xs flex-shrink-0">
+                                                        {/* ✅ Changed avatar color to black */}
+                                                        <div className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center text-white font-semibold text-xs flex-shrink-0">
                                                             {getInitials(member?.name)}
                                                         </div>
                                                         <div>
@@ -428,32 +415,47 @@ export default function ProductionTeam() {
                                                     </div>
                                                 </td>
                                                 <td className="py-4 px-4">
-                                                    <span className="inline-flex px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700 border border-purple-200">
+                                                    {/* ✅ Changed role badge color to black */}
+                                                    <span className="inline-flex px-3 py-1 rounded-full text-xs font-medium bg-gray-200 text-gray-800 border border-gray-300">
                                                         {capitalize(member?.role) || 'Production Team'}
                                                     </span>
                                                 </td>
                                                 <td className="py-4 px-4 text-sm text-gray-600">
                                                     {member?.phone || '—'}
                                                 </td>
-                                                <td className="py-4 px-4 text-right" onClick={(e) => e.stopPropagation()}>
-                                                    <button
-                                                        onClick={() => handleViewMember(member)}
-                                                        className="text-blue-600 hover:text-blue-700 text-sm font-medium mr-3"
-                                                    >
-                                                        View
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleEditMember(member)}
-                                                        className="text-blue-600 hover:text-blue-700 text-sm font-medium mr-3"
-                                                    >
-                                                        Edit
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleDeleteMember(member)}
-                                                        className="text-red-600 hover:text-red-700 text-sm font-medium"
-                                                    >
-                                                        Delete
-                                                    </button>
+                                                <td className="py-4 px-4">
+                                                    {/* ✅ Verification Status - Professional Design */}
+                                                    <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border ${member.is_verified
+                                                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                                            : 'bg-amber-50 text-amber-700 border-amber-200'
+                                                        }`}>
+                                                        {member.is_verified ? (
+                                                            <>
+                                                                <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                                                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                                                </svg>
+                                                                <span>Verified</span>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                                                                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                                                </svg>
+                                                                <span>Not Verified</span>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                                <td className="py-4 px-4">
+                                                    {/* ✅ Account Status - Professional Design */}
+                                                    <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border ${member.is_active !== false
+                                                            ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                                            : 'bg-rose-50 text-rose-700 border-rose-200'
+                                                        }`}>
+                                                        <span className={`w-1.5 h-1.5 rounded-full ${member.is_active !== false ? 'bg-blue-600' : 'bg-rose-600'
+                                                            }`}></span>
+                                                        <span>{member.is_active !== false ? 'Active' : 'Disabled'}</span>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         ))}
@@ -582,12 +584,14 @@ export default function ProductionTeam() {
 
                         <div className="p-6">
                             <div className="flex items-center gap-4 mb-6">
-                                <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-lg">
+                                {/* ✅ Changed avatar color to black */}
+                                <div className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center text-white font-bold text-lg">
                                     {getInitials(selectedMember?.name)}
                                 </div>
                                 <div>
                                     <h4 className="text-lg font-bold text-gray-900">{selectedMember?.name || 'Unknown'}</h4>
-                                    <span className="inline-flex px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700 border border-purple-200">
+                                    {/* ✅ Changed role badge color to black */}
+                                    <span className="inline-flex px-3 py-1 rounded-full text-xs font-medium bg-gray-200 text-gray-800 border border-gray-300">
                                         {capitalize(selectedMember?.role) || 'Production Team'}
                                     </span>
                                 </div>
@@ -626,29 +630,84 @@ export default function ProductionTeam() {
                                     </div>
                                 </div>
 
-                                <div className="flex items-start gap-3">
-                                    <svg className="w-5 h-5 text-gray-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
-                                    <div>
-                                        <p className="text-sm text-gray-500">Email Verified</p>
-                                        <p className="text-gray-900 font-medium">
-                                            {selectedMember?.email_verified_at ? '✅ Yes' : '❌ No'}
+                                {/* ✅ Verification Status - Professional Design */}
+                                <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-xl border border-gray-100">
+                                    <div className="flex-1">
+                                        <p className="text-sm font-medium text-gray-900">Verification Status</p>
+                                        <p className="text-xs text-gray-500 mt-0.5">
+                                            {selectedMember.is_verified
+                                                ? 'Member has logged in at least once'
+                                                : 'Invited but has not logged in yet'}
                                         </p>
+                                        <div className={`inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-md text-xs font-medium ${selectedMember.is_verified
+                                                ? 'bg-emerald-100 text-emerald-700'
+                                                : 'bg-amber-100 text-amber-700'
+                                            }`}>
+                                            {selectedMember.is_verified ? (
+                                                <>
+                                                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                                    </svg>
+                                                    <span>Verified</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                                    </svg>
+                                                    <span>Not Verified</span>
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* ✅ Account Status - Professional Design */}
+                                <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-xl border border-gray-100">
+                                    <div className="flex-1">
+                                        <p className="text-sm font-medium text-gray-900">Account Status</p>
+                                        <p className="text-xs text-gray-500 mt-0.5">
+                                            {selectedMember.is_active !== false
+                                                ? 'Account is active and can login'
+                                                : 'Account is disabled and cannot login'}
+                                        </p>
+                                        <div className={`inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-md text-xs font-medium ${selectedMember.is_active !== false
+                                                ? 'bg-blue-100 text-blue-700'
+                                                : 'bg-rose-100 text-rose-700'
+                                            }`}>
+                                            <span className={`w-1.5 h-1.5 rounded-full ${selectedMember.is_active !== false ? 'bg-blue-600' : 'bg-rose-600'
+                                                }`}></span>
+                                            <span>{selectedMember.is_active !== false ? 'Active' : 'Disabled'}</span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
+                        {/* ✅ Modal Footer - Edit and Disable/Enable */}
                         <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-100">
                             <button
-                                onClick={() => { closeAllModals(); handleDeleteMember(selectedMember); }}
-                                className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                                onClick={() => { closeAllModals(); handleEditMember(selectedMember); }}
+                                className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
                             >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                                 </svg>
-                                Delete Member
+                                Edit
+                            </button>
+                            <button
+                                onClick={() => { closeAllModals(); handleToggleStatus(selectedMember); }}
+                                className={`flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-colors ${selectedMember.is_active !== false ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'
+                                    }`}
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    {selectedMember.is_active !== false ? (
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                                    ) : (
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    )}
+                                </svg>
+                                {selectedMember.is_active !== false ? 'Disable' : 'Enable'}
                             </button>
                         </div>
                     </div>
@@ -715,25 +774,6 @@ export default function ProductionTeam() {
                                     </select>
                                 </div>
                             </div>
-
-                            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                                <p className="text-sm text-yellow-800 font-medium mb-2">🔐 Change Password (Optional)</p>
-                                <input
-                                    type="password"
-                                    placeholder="New password"
-                                    value={formState.password}
-                                    onChange={(e) => setFormState({ ...formState, password: e.target.value })}
-                                    className="w-full px-3 py-2 border border-yellow-300 rounded mb-2 focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                                />
-                                <input
-                                    type="password"
-                                    placeholder="Confirm new password"
-                                    value={formState.confirmPassword}
-                                    onChange={(e) => setFormState({ ...formState, confirmPassword: e.target.value })}
-                                    className="w-full px-3 py-2 border border-yellow-300 rounded focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                                />
-                                <p className="text-xs text-yellow-600 mt-2">Leave blank to keep current password</p>
-                            </div>
                         </div>
 
                         <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-100">
@@ -754,19 +794,27 @@ export default function ProductionTeam() {
                 </div>
             )}
 
-            {/* ===== DELETE CONFIRMATION MODAL ===== */}
-            {showDeleteModal && selectedMember && (
+            {/* ===== TOGGLE STATUS CONFIRMATION MODAL ===== */}
+            {showToggleModal && selectedMember && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full">
                         <div className="p-6 text-center">
-                            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                            <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${selectedMember.is_active !== false ? 'bg-red-100' : 'bg-green-100'
+                                }`}>
+                                <svg className={`w-8 h-8 ${selectedMember.is_active !== false ? 'text-red-600' : 'text-green-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    {selectedMember.is_active !== false ? (
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                                    ) : (
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    )}
                                 </svg>
                             </div>
-                            <h3 className="text-xl font-bold text-gray-900 mb-2">Delete Team Member?</h3>
+                            <h3 className="text-xl font-bold text-gray-900 mb-2">
+                                {selectedMember.is_active !== false ? 'Disable' : 'Enable'} Team Member?
+                            </h3>
                             <p className="text-gray-600">
-                                Are you sure you want to delete <span className="font-semibold">{selectedMember?.name || 'this member'}</span>? This action cannot be undone.
+                                Are you sure you want to {selectedMember.is_active !== false ? 'disable' : 'enable'} <span className="font-semibold">{selectedMember?.name || 'this member'}</span>?
+                                {selectedMember.is_active !== false && ' They will not be able to log in.'}
                             </p>
                         </div>
 
@@ -778,12 +826,32 @@ export default function ProductionTeam() {
                                 Cancel
                             </button>
                             <button
-                                onClick={confirmDelete}
-                                className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                                onClick={confirmToggleStatus}
+                                className={`px-6 py-2 text-white rounded-lg transition-colors ${selectedMember.is_active !== false ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'
+                                    }`}
                             >
-                                Delete
+                                {selectedMember.is_active !== false ? 'Disable' : 'Enable'}
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ✅ Toast Notification */}
+            {toast.show && (
+                <div className={`fixed bottom-6 right-6 z-[100] px-6 py-3 rounded-lg shadow-lg text-white font-medium animate-slide-in ${toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'
+                    }`}>
+                    <div className="flex items-center gap-2">
+                        {toast.type === 'success' ? (
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        ) : (
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        )}
+                        {toast.message}
                     </div>
                 </div>
             )}

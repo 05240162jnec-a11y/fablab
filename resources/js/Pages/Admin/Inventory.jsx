@@ -496,14 +496,8 @@ export default function AdminInventory() {
             });
 
             if (response.data.success) {
-                console.log('📥 All users from API:', response.data.data.users);
-
                 const productionMembers = response.data.data.users
-                    .filter(user => {
-                        const isProduction = user.role === 'production' || user.role === 'production_team';
-                        console.log(`User: ${user.name}, Role: ${user.role}, Is Production: ${isProduction}`);
-                        return isProduction;
-                    })
+                    .filter(user => user.role === 'production' || user.role === 'production_team')
                     .map(user => ({
                         id: user.id,
                         name: user.name + ' (Production Team member)',
@@ -511,11 +505,10 @@ export default function AdminInventory() {
                         display: `${user.name} - ${user.email}`,
                     }));
 
-                console.log('✅ Production team members:', productionMembers);
                 setProductionTeamMembers(productionMembers);
             }
         } catch (err) {
-            console.error('❌ Failed to fetch production team:', err);
+            console.error('Failed to fetch production team:', err);
         }
     };
 
@@ -619,7 +612,7 @@ export default function AdminInventory() {
         });
     };
 
-    const addMaterial = (e) => {
+    const addMaterial = async (e) => {
         e.preventDefault();
         if (!materialForm.name.trim()) {
             showDialog('Validation Error', 'Please enter a material name.', 'error');
@@ -631,11 +624,29 @@ export default function AdminInventory() {
             return;
         }
 
-        const newMaterials = [...materials, materialForm.name].sort((a, b) => a.localeCompare(b));
-        setMaterials(newMaterials);
-        showToast('✅ Material added successfully!');
-        setMaterialForm({ name: '' });
-        setShowMaterialModal(false);
+        try {
+            const token = localStorage.getItem('auth_token');
+
+            await axios.post('http://127.0.0.1:8000/api/admin/inventory/materials', {
+                name: materialForm.name
+            }, {
+                headers: {
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`
+                },
+            });
+
+            const newMaterials = [...materials, materialForm.name].sort((a, b) => a.localeCompare(b));
+            setMaterials(newMaterials);
+            showToast('✅ Material added successfully!');
+            setMaterialForm({ name: '' });
+            setShowMaterialModal(false);
+        } catch (err) {
+            console.error('Add material error:', err);
+            console.error('Error response:', err.response?.data);
+            showDialog('Error', err.response?.data?.message || 'Failed to add material. Please try again.', 'error');
+        }
     };
 
     const deleteMaterial = (name) => {
@@ -1185,11 +1196,11 @@ export default function AdminInventory() {
                                                 <td className="px-6 py-5 text-sm font-semibold text-slate-900">{record.name}</td>
                                                 <td className="px-6 py-5 text-sm text-slate-600">{record.desc || '-'}</td>
                                                 <td className="px-6 py-5 text-sm font-semibold text-slate-900 text-right">{record.qty}</td>
-                                                <td className="px-6 py-5 text-sm text-slate-600 text-right">Nu. {record.rate.toFixed(2)}</td>
+                                                <td className="px-6 py-5 text-sm text-slate-600 text-right">{record.rate.toFixed(2)}</td>
                                                 <td className="px-6 py-5 text-sm text-slate-600">{formatDate(record.date)}</td>
                                                 <td className="px-6 py-5 text-sm font-medium text-slate-900">{record.receivedBy || '-'}</td>
                                                 <td className="px-6 py-5 text-sm text-slate-600">{formatRole(record.receivedByRole)}</td>
-                                                <td className="px-6 py-5 text-sm font-bold text-slate-900 text-right">Nu. {record.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                                                <td className="px-6 py-5 text-sm font-bold text-slate-900 text-right">{record.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
                                             </tr>
                                         ))}
                                     </tbody>
@@ -1221,8 +1232,11 @@ export default function AdminInventory() {
                                         <input
                                             type="number"
                                             min="0"
-                                            value={stockThreshold}
-                                            onChange={(e) => setStockThreshold(parseInt(e.target.value) || 0)}
+                                            value={stockThreshold || ''}
+                                            onChange={(e) => {
+                                                const value = e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value) || 0);
+                                                setStockThreshold(value);
+                                            }}
                                             onBlur={() => updateStockThreshold(stockThreshold)}
                                             onKeyDown={(e) => {
                                                 if (e.key === 'Enter') {
@@ -1391,7 +1405,7 @@ export default function AdminInventory() {
                                                 </td>
                                                 <td className="px-6 py-5 text-sm text-slate-600">{record.slNo}</td>
                                                 <td className="px-6 py-5 text-sm font-semibold text-slate-900">{record.name}</td>
-                                                <td className="px-6 py-5 text-sm font-semibold text-red-600 text-right">{record.qty}</td>
+                                                <td className="px-6 py-5 text-sm font-semibold text-slate-900 text-right">{record.qty}</td>
                                                 <td className="px-6 py-5 text-sm text-slate-600">
                                                     {record.issuedToEmail
                                                         ? `${record.issuedTo} - ${record.issuedToEmail}`
@@ -1399,7 +1413,28 @@ export default function AdminInventory() {
                                                     }
                                                 </td>
                                                 <td className="px-6 py-5 text-sm text-slate-600">{record.issuedToDepartment || '-'}</td>
-                                                <td className="px-6 py-5 text-sm text-slate-600">{record.reason || '-'}</td>
+                                                <td className="px-6 py-5 text-sm text-slate-600 w-48 max-w-[200px]">
+                                                    {record.reason ? (
+                                                        <div className="group relative">
+                                                            <div
+                                                                className="truncate cursor-help border-b border-dotted border-slate-400 hover:border-indigo-500 hover:text-indigo-600 transition-colors"
+                                                            >
+                                                                {record.reason}
+                                                            </div>
+
+                                                            {/* Modern Custom Tooltip */}
+                                                            <div className="absolute bottom-full left-0 mb-2 hidden group-hover:block w-80 max-w-md z-50">
+                                                                <div className="bg-slate-800 text-white text-xs rounded-lg py-2 px-3 shadow-xl">
+                                                                    <p className="leading-relaxed break-words">{record.reason}</p>
+                                                                    {/* Arrow */}
+                                                                    <div className="absolute top-full left-4 -mt-1 w-2 h-2 bg-slate-800 transform rotate-45"></div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        '-'
+                                                    )}
+                                                </td>
                                                 <td className="px-6 py-5 text-sm text-slate-600">{formatDate(record.date)}</td>
                                                 <td className="px-6 py-5 text-sm font-medium text-slate-900">{record.issuedBy || '-'}</td>
                                             </tr>
@@ -1489,10 +1524,15 @@ export default function AdminInventory() {
                                 <label className="block text-sm font-semibold text-slate-700 mb-2">Qty <span className="text-red-500">*</span></label>
                                 <input
                                     type="number"
-                                    value={addForm.itemQty}
-                                    onChange={e => setAddForm(p => ({ ...p, itemQty: e.target.value }))}
+                                    value={addForm.itemQty || ''}
+                                    onChange={e => {
+                                        const value = e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value) || 0);
+                                        setAddForm(p => ({ ...p, itemQty: value }));
+                                    }}
+                                    min="0"
+                                    onWheel={e => e.target.blur()}
                                     placeholder="0"
-                                    className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm transition-all"
+                                    className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                 />
                             </div>
 
@@ -1500,10 +1540,16 @@ export default function AdminInventory() {
                                 <label className="block text-sm font-semibold text-slate-700 mb-2">Rate (Nu.) <span className="text-red-500">*</span></label>
                                 <input
                                     type="number"
-                                    value={addForm.itemRate}
-                                    onChange={e => setAddForm(p => ({ ...p, itemRate: e.target.value }))}
+                                    value={addForm.itemRate || ''}
+                                    onChange={e => {
+                                        const value = e.target.value === '' ? '' : Math.max(0, parseFloat(e.target.value) || 0);
+                                        setAddForm(p => ({ ...p, itemRate: value }));
+                                    }}
+                                    min="0"
+                                    step="0.01"
+                                    onWheel={e => e.target.blur()}
                                     placeholder="0.00"
-                                    className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm transition-all"
+                                    className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                 />
                             </div>
 
@@ -1576,10 +1622,15 @@ export default function AdminInventory() {
                                     <label className="block text-sm font-semibold text-slate-700 mb-2">Qty to Issue <span className="text-red-500">*</span></label>
                                     <input
                                         type="number"
-                                        value={issueForm.issueQty}
-                                        onChange={e => setIssueForm(p => ({ ...p, issueQty: e.target.value }))}
+                                        value={issueForm.issueQty || ''}
+                                        onChange={e => {
+                                            const value = e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value) || 0);
+                                            setIssueForm(p => ({ ...p, issueQty: value }));
+                                        }}
+                                        min="0"
+                                        onWheel={e => e.target.blur()}
                                         placeholder="0"
-                                        className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm transition-all"
+                                        className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                     />
                                 </div>
 

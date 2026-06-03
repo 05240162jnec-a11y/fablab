@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Auth\Events\Registered;
+use Carbon\Carbon;
 
 class AuthController extends Controller
 {
@@ -107,16 +108,14 @@ class AuthController extends Controller
                 ],
                 'gender' => 'required|in:male,female,other',
                 'phone' => 'required|string|max:20',
-                'role' => 'required|in:student,faculty,outsider,production_team',  // ✅ Added production_team
+                'role' => 'required|in:student,faculty,outsider,production_team',
                 'department' => 'nullable|string|max:255',
                 'year_of_study' => 'nullable|integer|min:1|max:4',
             ]);
 
             // ← Manual phone validation based on country
-            // Note: Country code comes from frontend, we validate the phone format
             $phone = $validated['phone'];
 
-            // For this implementation, we'll validate based on phone format
             // Bhutan: 17xxxxxx or 77xxxxxx (8 digits)
             $bhutanPattern = '/^(17|77)\d{6}$/';
 
@@ -185,11 +184,17 @@ class AuthController extends Controller
             ]);
         }
 
+        // ✅ NEW: Track first login for production team members
+        if ($user->role === 'production_team' && $user->email_verified_at === null) {
+            $user->email_verified_at = Carbon::now();
+            $user->save();
+        }
+
         // ← 🔐 CRITICAL: Check if email is verified (SKIP for admin & production_team)
         if (!$user->hasVerifiedEmail() && !in_array($user->role, ['admin', 'production_team'])) {
             return response()->json([
                 'message' => 'Please verify your email first. Check your inbox for the verification link.',
-        ], 403);
+            ], 403);
         }
 
         // Create token
@@ -201,7 +206,7 @@ class AuthController extends Controller
                 'id' => $user->id,
                 'name' => $user->name,
                 'email' => $user->email,
-                'role' => $user->role,  // ✅ Will now include 'production_team'
+                'role' => $user->role,
                 'email_verified' => $user->email_verified_at !== null,
             ],
             'token' => $token,

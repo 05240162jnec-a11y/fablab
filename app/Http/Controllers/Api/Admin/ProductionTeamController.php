@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\User; // ✅ Changed from ProductionTeam
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -15,7 +15,7 @@ class ProductionTeamController extends Controller
     // ✅ Get all production team members (from users table)
     public function index(Request $request)
     {
-        $query = User::where('role', 'production_team'); // ✅ Filter by role
+        $query = User::where('role', 'production_team');
 
         // Search by name or email
         if ($request->has('search') && $request->search) {
@@ -31,7 +31,10 @@ class ProductionTeamController extends Controller
         // Calculate stats
         $stats = [
             'total' => $members->count(),
-            // Add more stats if you add a 'status' column later
+            'active' => $members->where('is_active', true)->count(),
+            'inactive' => $members->where('is_active', false)->count(),
+            'verified' => $members->whereNotNull('email_verified_at')->count(),
+            'not_verified' => $members->whereNull('email_verified_at')->count(),
         ];
 
         return response()->json([
@@ -44,8 +47,10 @@ class ProductionTeamController extends Controller
                     'phone' => $user->phone,
                     'gender' => $user->gender,
                     'role' => $user->role,
-                    'created_at' => $user->created_at,
+                    'is_active' => $user->is_active ?? true,
+                    'is_verified' => $user->email_verified_at !== null, // ✅ Added
                     'email_verified_at' => $user->email_verified_at,
+                    'created_at' => $user->created_at,
                 ];
             }),
             'stats' => $stats
@@ -59,7 +64,18 @@ class ProductionTeamController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $member
+            'data' => [
+                'id' => $member->id,
+                'name' => $member->name,
+                'email' => $member->email,
+                'phone' => $member->phone,
+                'gender' => $member->gender,
+                'role' => $member->role,
+                'is_active' => $member->is_active ?? true,
+                'is_verified' => $member->email_verified_at !== null, // ✅ Added
+                'email_verified_at' => $member->email_verified_at,
+                'created_at' => $member->created_at,
+            ]
         ]);
     }
 
@@ -68,7 +84,7 @@ class ProductionTeamController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email', // ✅ Check users table
+            'email' => 'required|email|unique:users,email',
             'phone' => 'nullable|string|max:20',
             'gender' => 'required|in:male,female,other',
         ]);
@@ -80,12 +96,13 @@ class ProductionTeamController extends Controller
         $user = User::create([
             'name' => $validated['name'],
             'email' => $validated['email'],
-            'password' => Hash::make($password), // ✅ Hashed!
-            'role' => 'production_team', // ✅ Critical!
+            'password' => Hash::make($password),
+            'role' => 'production_team',
             'gender' => $validated['gender'],
             'phone' => $validated['phone'] ?? null,
-            'email_verified_at' => now(), // ✅ Auto-verify for immediate login
-            'department' => null, // Optional: fill if needed
+            'email_verified_at' => null, // ✅ Changed: Start as "Not Verified"
+            'is_active' => true,
+            'department' => null,
             'year_of_study' => null,
         ]);
 
@@ -131,6 +148,7 @@ class ProductionTeamController extends Controller
             'phone' => 'sometimes|nullable|string|max:20',
             'gender' => 'sometimes|in:male,female,other',
             'password' => 'sometimes|nullable|min:6|confirmed',
+            'is_active' => 'sometimes|boolean',
         ]);
 
         if (isset($validated['password'])) {
@@ -146,7 +164,25 @@ class ProductionTeamController extends Controller
         ]);
     }
 
-    // ✅ Delete member
+    // ✅ Toggle member status (enable/disable)
+    public function toggleStatus($id)
+    {
+        $member = User::where('role', 'production_team')->findOrFail($id);
+        
+        // Toggle the is_active status
+        $member->is_active = !$member->is_active;
+        $member->save();
+
+        $status = $member->is_active ? 'enabled' : 'disabled';
+
+        return response()->json([
+            'success' => true,
+            'message' => "Production team member {$status} successfully",
+            'data' => $member
+        ]);
+    }
+
+    // ✅ Delete member (permanent delete - kept for backup)
     public function destroy($id)
     {
         $member = User::where('role', 'production_team')->findOrFail($id);

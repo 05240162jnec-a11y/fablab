@@ -15,11 +15,11 @@ export default function Projects() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    // ✅ NEW: Search & Filter
+    // Search & Filter
     const [searchTerm, setSearchTerm] = useState('');
     const [filterStatus, setFilterStatus] = useState('all');
 
-    // ✅ NEW: Bulk Selection
+    // Bulk Selection
     const [selectedProjects, setSelectedProjects] = useState([]);
 
     // Toast
@@ -30,6 +30,9 @@ export default function Projects() {
         setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 3000);
     };
 
+    // ✅ Production team token
+    const getToken = () => localStorage.getItem('production_team_token');
+
     // Fetch projects
     useEffect(() => {
         fetchProjects();
@@ -38,12 +41,12 @@ export default function Projects() {
     const fetchProjects = async () => {
         try {
             setLoading(true);
-            const adminToken = localStorage.getItem('admin_token');
+            const token = getToken();
 
-            const response = await axios.get('http://127.0.0.1:8000/api/admin/projects', {
+            const response = await axios.get('http://127.0.0.1:8000/api/production-team/projects', {
                 headers: {
                     'Accept': 'application/json',
-                    'Authorization': `Bearer ${adminToken}`,
+                    'Authorization': `Bearer ${token}`,
                 },
             });
 
@@ -60,7 +63,7 @@ export default function Projects() {
         }
     };
 
-    // ✅ Filter projects
+    // Filter projects
     const filteredProjects = projects.filter(project => {
         const matchesSearch =
             project.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -72,7 +75,7 @@ export default function Projects() {
         return matchesSearch && matchesFilter;
     });
 
-    // ✅ Bulk Selection Handlers
+    // Bulk Selection Handlers
     const handleSelectProject = (projectId) => {
         setSelectedProjects(prev =>
             prev.includes(projectId)
@@ -89,7 +92,7 @@ export default function Projects() {
         }
     };
 
-    // ✅ Bulk Delete
+    // Bulk Delete
     const handleBulkDelete = () => {
         if (selectedProjects.length === 0) {
             showToast('❌ Please select at least one project', 'error');
@@ -100,13 +103,13 @@ export default function Projects() {
 
     const confirmBulkDelete = async () => {
         try {
-            const adminToken = localStorage.getItem('admin_token');
-            await axios.post('http://127.0.0.1:8000/api/admin/projects/bulk-delete', {
+            const token = getToken();
+            await axios.post('http://127.0.0.1:8000/api/production-team/projects/bulk-delete', {
                 ids: selectedProjects
             }, {
                 headers: {
                     'Accept': 'application/json',
-                    'Authorization': `Bearer ${adminToken}`,
+                    'Authorization': `Bearer ${token}`,
                 }
             });
 
@@ -142,14 +145,14 @@ export default function Projects() {
         }
 
         try {
-            const adminToken = localStorage.getItem('admin_token');
+            const token = getToken();
             await axios.post(
-                `http://127.0.0.1:8000/api/admin/projects/${selectedProject.id}/reject`,
+                `http://127.0.0.1:8000/api/production-team/projects/${selectedProject.id}/reject`,
                 { reason: rejectionReason },
                 {
                     headers: {
                         'Accept': 'application/json',
-                        'Authorization': `Bearer ${adminToken}`,
+                        'Authorization': `Bearer ${token}`,
                     },
                 }
             );
@@ -169,14 +172,14 @@ export default function Projects() {
     // Approve Project
     const handleApproveProject = async () => {
         try {
-            const adminToken = localStorage.getItem('admin_token');
+            const token = getToken();
             await axios.post(
-                `http://127.0.0.1:8000/api/admin/projects/${selectedProject.id}/approve`,
+                `http://127.0.0.1:8000/api/production-team/projects/${selectedProject.id}/approve`,
                 {},
                 {
                     headers: {
                         'Accept': 'application/json',
-                        'Authorization': `Bearer ${adminToken}`,
+                        'Authorization': `Bearer ${token}`,
                     },
                 }
             );
@@ -191,15 +194,15 @@ export default function Projects() {
         }
     };
 
-    // ✅ Download Document
+    // Download Document
     const handleDownloadDocument = async (project) => {
         try {
-            const adminToken = localStorage.getItem('admin_token');
+            const token = getToken();
             const response = await axios.get(
-                `http://127.0.0.1:8000/api/admin/projects/${project.id}/download`,
+                `http://127.0.0.1:8000/api/production-team/projects/${project.id}/download`,
                 {
                     headers: {
-                        'Authorization': `Bearer ${adminToken}`,
+                        'Authorization': `Bearer ${token}`,
                     },
                     responseType: 'blob',
                 }
@@ -410,7 +413,7 @@ export default function Projects() {
                             </div>
                         </div>
 
-                        {/* ✅ Bulk Actions Bar */}
+                        {/* Bulk Actions Bar */}
                         {selectedProjects.length > 0 && (
                             <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between">
                                 <div className="flex items-center gap-3">
@@ -640,7 +643,9 @@ export default function Projects() {
                                         {selectedProject.reviewed_at ? formatDate(selectedProject.reviewed_at) : 'Not yet reviewed'}
                                     </p>
                                     {selectedProject.reviewer?.name && (
-                                        <p className="text-xs text-gray-500">by {selectedProject.reviewer.name}</p>
+                                        <p className="text-xs text-gray-500">
+                                            by {selectedProject.reviewer.name} ({selectedProject.reviewer.email})
+                                        </p>
                                     )}
                                 </div>
                             </div>

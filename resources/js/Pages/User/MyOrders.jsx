@@ -52,11 +52,11 @@ export default function MyOrders() {
         setSelectedOrder(null);
     };
 
-    // ✅ NEW: Update current time every minute for countdown
+    // ✅ NEW: Update current time every second for real-time countdown
     useEffect(() => {
         const timer = setInterval(() => {
             setCurrentTime(new Date());
-        }, 60000); // Update every minute
+        }, 1000); // ✅ Changed from 60000 to 1000 (1 second)
         return () => clearInterval(timer);
     }, []);
 
@@ -84,10 +84,35 @@ export default function MyOrders() {
             setLoading(false);
         }
     };
+    // ✅ NEW: Process expired orders (return stock, mark as permanently rejected)
+    const processExpiredOrders = async () => {
+        try {
+            const token = localStorage.getItem('auth_token');
+            const response = await axios.post(
+                'http://127.0.0.1:8000/api/user/product-orders/process-expired',
+                {},
+                {
+                    headers: {
+                        'Accept': 'application/json',
+                        'Authorization': `Bearer ${token}`,
+                    }
+                }
+            );
+
+            if (response.data.success && response.data.processed_count > 0) {
+                console.log(`Processed ${response.data.processed_count} expired order(s)`);
+                // Refresh orders to show updated status
+                fetchOrders();
+            }
+        } catch (err) {
+            console.error('Process expired orders error:', err);
+        }
+    };
 
     // Fetch on mount
     useEffect(() => {
         fetchOrders();
+        processExpiredOrders(); // ✅ Add this line
     }, []);
 
     // ✅ Filter orders by tab and other filters
@@ -208,14 +233,22 @@ export default function MyOrders() {
         return `http://127.0.0.1:8000/storage/${imagePath}`;
     };
 
-    // ✅ NEW: Calculate time remaining for rejection deadline
+    // ✅ UPDATED: Calculate time remaining with seconds
     const getTimeRemaining = (deadline) => {
         if (!deadline) return null;
         const total = Date.parse(deadline) - currentTime.getTime();
         if (total <= 0) return { expired: true };
-        const hours = Math.floor((total / (1000 * 60 * 60)) % 24);
-        const minutes = Math.floor((total / 1000 / 60) % 60);
-        return { expired: false, hours, minutes, total };
+
+        const hours = Math.floor((total / (1000 * 60 * 60)));
+        const minutes = Math.floor((total / (1000 * 60)) % 60);
+        const seconds = Math.floor((total / 1000) % 60); // ✅ Added seconds
+
+        return {
+            expired: false,
+            hours,
+            minutes,
+            seconds  // ✅ Added seconds to return
+        };
     };
 
     // ✅ NEW: Check if order can re-upload payment
@@ -738,49 +771,72 @@ export default function MyOrders() {
                                 </div>
                             </div>
 
-                            {/* ✅ NEW: Rejection Deadline Countdown */}
+                            {/* ✅ UPDATED: Real-Time Rejection Deadline Countdown */}
                             {selectedOrder.status === 'rejected' && !selectedOrder.permanently_rejected && selectedOrder.rejection_deadline && (
-                                <div className="mb-6 p-4 bg-orange-50 border border-orange-200 rounded-lg">
-                                    <div className="flex items-start gap-3">
-                                        <svg className="w-6 h-6 text-orange-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                        </svg>
-                                        <div>
-                                            <p className="text-sm font-semibold text-orange-900">⏰ Time Remaining to Re-upload Payment</p>
+                                <div className="mb-6 p-5 bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-xl shadow-sm">
+                                    <div className="flex items-start gap-4">
+                                        <div className="flex-shrink-0">
+                                            <svg className="w-7 h-7 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                        </div>
+                                        <div className="flex-1">
+                                            <h4 className="text-base font-bold text-orange-900 mb-2">⏰ Time Remaining to Re-upload Payment</h4>
                                             {(() => {
                                                 const remaining = getTimeRemaining(selectedOrder.rejection_deadline);
                                                 if (remaining?.expired) {
                                                     return (
-                                                        <p className="text-xs text-red-600 mt-1">
-                                                            ⚠️ Deadline has passed. Order will be permanently rejected soon.
-                                                        </p>
+                                                        <>
+                                                            <div className="flex items-center gap-2 mb-2">
+                                                                <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                                </svg>
+                                                                <p className="text-base font-bold text-red-700">
+                                                                    Time Expired
+                                                                </p>
+                                                            </div>
+                                                            <p className="text-sm text-red-600 leading-relaxed">
+                                                                Sorry, your re-uploading payment time is over. Your order has been permanently rejected and items have been returned to stock.
+                                                                If you want to order, please place a new order.
+                                                            </p>
+                                                        </>
                                                     );
                                                 }
                                                 return (
-                                                    <p className="text-xs text-orange-700 mt-1">
-                                                        {remaining?.hours}h {remaining?.minutes}m remaining
-                                                    </p>
+                                                    <>
+                                                        <div className="flex items-center gap-3 mb-3">
+                                                            <div className="bg-white px-4 py-2 rounded-lg border border-orange-200 shadow-sm">
+                                                                <p className="text-2xl font-bold text-orange-700 font-mono">
+                                                                    {remaining?.hours}h {remaining?.minutes}m {remaining?.seconds}s
+                                                                </p>
+                                                            </div>
+                                                            <span className="text-sm text-orange-600 font-medium">remaining</span>
+                                                        </div>
+                                                        <p className="text-sm text-orange-700 leading-relaxed">
+                                                            If you don't re-upload payment within the deadline, your order will be permanently rejected and items returned to stock.
+                                                        </p>
+                                                    </>
                                                 );
                                             })()}
-                                            <p className="text-xs text-orange-600 mt-1">
-                                                If you don't re-upload payment within 24 hours, your order will be permanently rejected and items returned to stock.
-                                            </p>
                                         </div>
                                     </div>
                                 </div>
                             )}
 
-                            {/* ✅ NEW: Permanent Rejection Message */}
+                            {/* ✅ UPDATED: Permanent Rejection Message */}
                             {selectedOrder.status === 'rejected' && selectedOrder.permanently_rejected && (
-                                <div className="mb-6 p-4 bg-gray-100 border border-gray-300 rounded-lg">
+                                <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
                                     <div className="flex items-start gap-3">
-                                        <svg className="w-6 h-6 text-gray-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <svg className="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                                         </svg>
                                         <div>
-                                            <p className="text-sm font-semibold text-gray-900">❌ Order Permanently Rejected</p>
-                                            <p className="text-xs text-gray-600 mt-1">
-                                                This order has been permanently rejected. Items have been returned to stock. Please place a new order.
+                                            <p className="text-sm font-semibold text-red-900">❌ Order Permanently Rejected</p>
+                                            <p className="text-sm text-red-700 mt-1">
+                                                Sorry, your re-uploading payment time is over. Your order has been permanently rejected and items have been returned to stock.
+                                            </p>
+                                            <p className="text-sm text-red-700 mt-1 font-medium">
+                                                If you want to order, please place a new order.
                                             </p>
                                         </div>
                                     </div>

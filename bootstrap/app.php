@@ -15,10 +15,10 @@ return Application::configure(basePath: dirname(__DIR__))
         // ← Add Sanctum stateful domains for SPA auth
         $middleware->statefulApi();
         
-        // ← Optional: Add custom API middleware if needed
-        // $middleware->api(prepend: [
-        //     \Illuminate\Http\Middleware\HandleCors::class,
-        // ]);
+        // ✅ Exclude API routes from CSRF verification
+        $middleware->validateCsrfTokens(except: [
+            'api/*',
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         // ← Optional: Custom exception handling

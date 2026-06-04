@@ -64,6 +64,9 @@ import UserMachines from './Pages/User/Machines';
 import ShopOrders from './Pages/User/ShopOrders';
 import Learning from './Pages/User/Learning';
 
+// ✅ NEW: User Projects Page
+import UserProjects from './Pages/User/Projects';
+
 // ✅ Production Team Pages
 import ProductionTeamDashboard from './Pages/ProductionTeam/Dashboard';
 import ProductionTeamCustomOrders from './Pages/ProductionTeam/CustomOrders';
@@ -76,6 +79,8 @@ import ProductionTeamProfile from './Pages/ProductionTeam/Profile';
 // ✅ NEW: Production Team Machines & Products
 import ProductionTeamMachines from './Pages/ProductionTeam/Machines';
 import ProductionTeamProducts from './Pages/ProductionTeam/Products';
+// ✅ NEW: Production Team Projects
+import ProductionTeamProjects from './Pages/ProductionTeam/Projects';
 
 const root = createRoot(document.getElementById('app'));
 
@@ -132,6 +137,9 @@ root.render(
                 <Route path="/user/machines" element={<UserMachines />} />
                 <Route path="/user/learning" element={<Learning />} />
 
+                {/* ✅ NEW: User Projects Route */}
+                <Route path="/user/projects" element={<UserProjects />} />
+
                 {/* Production Team Routes */}
                 <Route path="/production-team" element={<ProductionTeamLayout />}>
                     <Route path="dashboard" element={<ProductionTeamDashboard />} />
@@ -144,6 +152,7 @@ root.render(
                     {/* ✅ NEW: Production Team Machines & Products Routes */}
                     <Route path="machines" element={<ProductionTeamMachines />} />
                     <Route path="products" element={<ProductionTeamProducts />} />
+                    <Route path="projects" element={<ProductionTeamProjects />} />
                 </Route>
 
                 {/* Placeholder routes */}

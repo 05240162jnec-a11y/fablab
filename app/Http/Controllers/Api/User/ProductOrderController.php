@@ -377,4 +377,58 @@ class ProductOrderController extends Controller
             'image_url' => $imageUrl
         ]);
     }
+        /**
+     * ✅ NEW: Check and process expired orders (return stock, send email)
+     */
+    public function processExpiredOrders()
+    {
+        $user = Auth::user();
+        
+        // Find all rejected orders for this user where deadline has passed and not yet permanently rejected
+        $expiredOrders = ProductOrder::where('user_id', $user->id)
+            ->where('status', 'rejected')
+            ->where('permanently_rejected', false)
+            ->where('rejection_deadline', '<', now())
+            ->get();
+        
+        $processedCount = 0;
+        
+        foreach ($expiredOrders as $order) {
+            try {
+                // Return stock to products
+                foreach ($order->items as $item) {
+                    $product = Product::find($item['id']);
+                    if ($product) {
+                        $product->increment('stock', $item['quantity']);
+                    }
+                }
+                
+                // Mark as permanently rejected
+                $order->update([
+                    'permanently_rejected' => true,
+                ]);
+                
+                // Send email notification
+                try {
+                    if ($order->user && $order->user->email) {
+                        \Illuminate\Support\Facades\Mail::to($order->user->email)
+                            ->send(new \App\Mail\OrderDeadlineExpiredMail($order));
+                    }
+                } catch (\Exception $e) {
+                    \Log::error('Deadline expired email failed: ' . $e->getMessage());
+                }
+                
+                $processedCount++;
+                
+            } catch (\Exception $e) {
+                \Log::error('Failed to process expired order ' . $order->id . ': ' . $e->getMessage());
+            }
+        }
+        
+        return response()->json([
+            'success' => true,
+            'message' => $processedCount . ' expired order(s) processed',
+            'processed_count' => $processedCount
+        ]);
+    }
 }

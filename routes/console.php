@@ -11,3 +11,7 @@ Schedule::command('bookings:send-reminders')->dailyAt('20:00');
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
+
+// ✅ Run automatically every hour in the background
+Schedule::command('orders:process-expired')
+    ->hourly();

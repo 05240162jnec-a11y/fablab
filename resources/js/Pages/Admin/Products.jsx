@@ -20,6 +20,10 @@ export default function Products() {
     const [filterStatus, setFilterStatus] = useState('all');
     const [stockAlertThreshold, setStockAlertThreshold] = useState(5);
 
+    // ✅ NEW: Payment Deadline States
+    const [paymentDeadlineHours, setPaymentDeadlineHours] = useState(24);
+    const [deadlineLoading, setDeadlineLoading] = useState(false);
+
     // Form States
     const [formData, setFormData] = useState({
         name: '',
@@ -58,9 +62,45 @@ export default function Products() {
         }
     };
 
+    // ✅ NEW: Fetch Payment Deadline Setting
+    const fetchSettings = async () => {
+        try {
+            const adminToken = localStorage.getItem('admin_token');
+            const response = await axios.get('http://127.0.0.1:8000/api/admin/settings/payment-deadline/hours', {
+                headers: { 'Accept': 'application/json', 'Authorization': `Bearer ${adminToken}` }
+            });
+            if (response.data.success) {
+                setPaymentDeadlineHours(response.data.hours);
+            }
+        } catch (err) {
+            console.error('Error fetching settings:', err);
+        }
+    };
+
+    // ✅ NEW: Update Payment Deadline Setting
+    const updateDeadlineHours = async (hours) => {
+        try {
+            setDeadlineLoading(true);
+            const adminToken = localStorage.getItem('admin_token');
+            await axios.put(`http://127.0.0.1:8000/api/admin/settings/payment_upload_deadline_hours`, {
+                value: hours,
+                description: 'Hours allowed for user to re-upload payment after rejection'
+            }, {
+                headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` }
+            });
+            alert('✅ Payment deadline updated successfully!');
+        } catch (err) {
+            console.error('Error updating settings:', err);
+            alert('❌ Failed to update deadline.');
+        } finally {
+            setDeadlineLoading(false);
+        }
+    };
+
     // Fetch on mount
     useEffect(() => {
         fetchProducts();
+        fetchSettings(); // ✅ Add this line
     }, []);
 
     // ✅ NEW: Keyboard navigation for carousel
@@ -536,26 +576,69 @@ export default function Products() {
                             </div>
                         </div>
 
-                        <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 mb-6">
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                    <svg className="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                                    </svg>
-                                    <div>
-                                        <p className="font-semibold text-gray-900">Stock Alert Threshold</p>
-                                        <p className="text-sm text-gray-600">Products with stock below this value will be highlighted</p>
+                        {/* ✅ UPDATED: Settings Grid (Stock Alert + Payment Deadline) */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                            {/* Stock Alert Threshold */}
+                            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <svg className="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                        </svg>
+                                        <div>
+                                            <p className="font-semibold text-gray-900 text-sm">Stock Alert Threshold</p>
+                                            <p className="text-xs text-gray-600">Highlight low stock items</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            type="number"
+                                            value={stockAlertThreshold}
+                                            onChange={(e) => setStockAlertThreshold(parseInt(e.target.value) || 0)}
+                                            className="w-20 px-3 py-2 border border-gray-300 rounded-lg text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                            min="0"
+                                        />
+                                        <span className="text-xs text-gray-600">units</span>
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-3">
-                                    <input
-                                        type="number"
-                                        value={stockAlertThreshold}
-                                        onChange={(e) => setStockAlertThreshold(parseInt(e.target.value) || 0)}
-                                        className="w-20 px-3 py-2 border border-gray-300 rounded-lg text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                        min="0"
-                                    />
-                                    <span className="text-sm text-gray-600">units</span>
+                            </div>
+
+                            {/* ✅ NEW: Payment Upload Deadline */}
+                            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        <div>
+                                            <p className="font-semibold text-gray-900 text-sm">Payment Re-upload Deadline</p>
+                                            <p className="text-xs text-gray-600">Hours allowed after rejection</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            type="number"
+                                            value={paymentDeadlineHours}
+                                            onChange={(e) => setPaymentDeadlineHours(parseInt(e.target.value) || 0)}
+                                            onBlur={() => updateDeadlineHours(paymentDeadlineHours)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') {
+                                                    updateDeadlineHours(paymentDeadlineHours);
+                                                    e.target.blur();
+                                                }
+                                            }}
+                                            disabled={deadlineLoading}
+                                            className="w-20 px-3 py-2 border border-gray-300 rounded-lg text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                            min="1"
+                                        />
+                                        <span className="text-xs text-gray-600">hours</span>
+                                        {deadlineLoading && (
+                                            <svg className="animate-spin h-4 w-4 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         </div>

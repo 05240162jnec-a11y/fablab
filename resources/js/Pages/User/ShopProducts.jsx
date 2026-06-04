@@ -47,7 +47,7 @@ const Dialog = ({ type, title, message, onConfirm, onCancel, show }) => {
             <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 text-center animate-fade-in">
                 <div className="mb-4 flex justify-center">{style.icon}</div>
                 <h3 className="text-xl font-bold text-gray-900 mb-2">{title}</h3>
-                <p className="text-gray-600 mb-6">{message}</p>
+                <p className="text-gray-600 mb-6 whitespace-pre-line">{message}</p>
                 <div className="flex gap-3">
                     {onCancel && (
                         <button
@@ -83,6 +83,9 @@ export default function ShopProducts({
     const [selectedProduct, setSelectedProduct] = useState(null);
     const [showDetailsModal, setShowDetailsModal] = useState(false);
     const [quantity, setQuantity] = useState(1);
+
+    // ✅ NEW: Search State
+    const [searchTerm, setSearchTerm] = useState('');
 
     // Carousel State
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -263,6 +266,15 @@ export default function ShopProducts({
         }
     };
 
+    // ✅ NEW: Filter products based on search term
+    const filteredProducts = products.filter(product => {
+        const searchLower = searchTerm.toLowerCase();
+        return (
+            product.name.toLowerCase().includes(searchLower) ||
+            (product.description && product.description.toLowerCase().includes(searchLower))
+        );
+    });
+
     // Open product details modal
     const handleViewDetails = (product) => {
         setSelectedProduct(product);
@@ -438,8 +450,8 @@ export default function ShopProducts({
         }
     };
 
-    // Submit order
-    const handleSubmitOrder = async () => {
+    // ✅ UPDATED: Show confirmation dialog BEFORE submitting
+    const handleSubmitOrder = () => {
         if (!paymentScreenshot) {
             showDialog('error', 'Missing Payment Proof', 'Please upload payment screenshot.', closeDialog);
             return;
@@ -450,6 +462,25 @@ export default function ShopProducts({
             return;
         }
 
+        // ✅ Show confirmation dialog with warning
+        showDialog(
+            'warning',
+            'Confirm Order Submission',
+            'IMPORTANT: Payment refunds are not allowed once the order is submitted.\n\nPlease ensure all details are correct before proceeding.\n\nDo you want to continue?',
+            () => {
+                // User clicked "OK" - proceed with submission
+                closeDialog();
+                submitOrder();
+            },
+            () => {
+                // User clicked "Cancel" - go back to payment modal
+                closeDialog();
+            }
+        );
+    };
+
+    // ✅ NEW: Actual submission logic (separated from validation)
+    const submitOrder = async () => {
         setSubmitting(true);
 
         try {
@@ -505,7 +536,6 @@ export default function ShopProducts({
             );
 
             if (response.data.success) {
-                closeDialog();
                 showDialog(
                     'success',
                     'Order Submitted!',
@@ -598,6 +628,32 @@ export default function ShopProducts({
                 onCancel={dialog.onCancel}
             />
 
+            {/* ✅ NEW: Search Bar Above Product Grid */}
+            <div className="px-6 pt-6">
+                <div className="relative max-w-md">
+                    <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                    <input
+                        type="text"
+                        placeholder="Search products by name or description..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                    {searchTerm && (
+                        <button
+                            onClick={() => setSearchTerm('')}
+                            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                        >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    )}
+                </div>
+            </div>
+
             {/* Products Grid */}
             <main className="p-6">
                 {loading ? (
@@ -605,9 +661,23 @@ export default function ShopProducts({
                         <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent"></div>
                         <p className="mt-4 text-gray-600">Loading products...</p>
                     </div>
+                ) : filteredProducts.length === 0 ? (
+                    <div className="text-center py-12">
+                        <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                        <p className="text-gray-500 text-lg">No products found</p>
+                        <p className="text-gray-400 text-sm mt-2">Try adjusting your search term</p>
+                        <button
+                            onClick={() => setSearchTerm('')}
+                            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                        >
+                            Clear Search
+                        </button>
+                    </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                        {products.map((product) => (
+                        {filteredProducts.map((product) => (
                             <div
                                 key={product.id}
                                 onClick={() => handleViewDetails(product)}

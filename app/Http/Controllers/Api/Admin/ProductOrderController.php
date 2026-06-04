@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\ProductOrder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use App\Models\Setting;
 // ✅ NOTE: We're NOT importing Mail here to avoid conflict
 // We'll use \Illuminate\Support\Facades\Mail:: directly
 
@@ -94,7 +95,7 @@ class ProductOrderController extends Controller
             'status' => 'rejected',
             'rejection_reason' => $request->rejection_reason,
             'payment_rejected_at' => now(),
-            'rejection_deadline' => now()->addHours(24),
+            'rejection_deadline' => now()->addHours(Setting::getPaymentUploadDeadlineHours()),
             'permanently_rejected' => false,
         ]);
         

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
+import CustomAlert from '../../Components/CustomAlert';
 
 export default function MyOrders() {
     // Order States
@@ -8,8 +9,8 @@ export default function MyOrders() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    // ✅ Tab State (replaces statusFilter dropdown)
-    const [activeTab, setActiveTab] = useState('verifying'); // verifying, confirm, cancel, rejected
+    // ✅ Tab State
+    const [activeTab, setActiveTab] = useState('verifying');
 
     // Filter States
     const [searchTerm, setSearchTerm] = useState('');
@@ -31,8 +32,23 @@ export default function MyOrders() {
     // Form Loading State
     const [submitting, setSubmitting] = useState(false);
 
-    // ✅ NEW: Countdown timer state (updates every minute)
+    // ✅ Countdown timer state
     const [currentTime, setCurrentTime] = useState(new Date());
+
+    // ✅ Bulk Delete Selection State
+    const [selectedOrderIds, setSelectedOrderIds] = useState([]);
+
+    // ✅ Custom Alert State
+    const [alert, setAlert] = useState({
+        show: false,
+        type: 'success',
+        title: '',
+        message: '',
+        onConfirm: null,
+        onCancel: null,
+        confirmText: 'OK',
+        cancelText: 'Cancel',
+    });
 
     // Separate close functions
     const closeDetailsModal = () => {
@@ -52,13 +68,18 @@ export default function MyOrders() {
         setSelectedOrder(null);
     };
 
-    // ✅ NEW: Update current time every second for real-time countdown
+    // ✅ Update current time every second
     useEffect(() => {
         const timer = setInterval(() => {
             setCurrentTime(new Date());
-        }, 1000); // ✅ Changed from 60000 to 1000 (1 second)
+        }, 1000);
         return () => clearInterval(timer);
     }, []);
+
+    // ✅ Clear selection when tab changes
+    useEffect(() => {
+        setSelectedOrderIds([]);
+    }, [activeTab]);
 
     // Fetch orders from API
     const fetchOrders = async () => {
@@ -84,40 +105,14 @@ export default function MyOrders() {
             setLoading(false);
         }
     };
-    // ✅ NEW: Process expired orders (return stock, mark as permanently rejected)
-    const processExpiredOrders = async () => {
-        try {
-            const token = localStorage.getItem('auth_token');
-            const response = await axios.post(
-                'http://127.0.0.1:8000/api/user/product-orders/process-expired',
-                {},
-                {
-                    headers: {
-                        'Accept': 'application/json',
-                        'Authorization': `Bearer ${token}`,
-                    }
-                }
-            );
-
-            if (response.data.success && response.data.processed_count > 0) {
-                console.log(`Processed ${response.data.processed_count} expired order(s)`);
-                // Refresh orders to show updated status
-                fetchOrders();
-            }
-        } catch (err) {
-            console.error('Process expired orders error:', err);
-        }
-    };
 
     // Fetch on mount
     useEffect(() => {
         fetchOrders();
-        processExpiredOrders(); // ✅ Add this line
     }, []);
 
     // ✅ Filter orders by tab and other filters
     const filteredOrders = orders.filter(order => {
-        // ✅ Tab filter (replaces dropdown)
         let statusMatch = false;
         switch (activeTab) {
             case 'verifying':
@@ -138,7 +133,6 @@ export default function MyOrders() {
 
         if (!statusMatch) return false;
 
-        // Search filter
         if (searchTerm) {
             const search = searchTerm.toLowerCase();
             const orderNumber = order.order_number?.toLowerCase() || '';
@@ -149,7 +143,6 @@ export default function MyOrders() {
             }
         }
 
-        // Date range filter
         if (dateFrom) {
             const orderDate = new Date(order.created_at).toISOString().split('T')[0];
             if (orderDate < dateFrom) {
@@ -216,11 +209,10 @@ export default function MyOrders() {
         return order.items?.[0]?.name || 'Unknown Product';
     };
 
-    // ✅ UPDATED: Images use /storage/ path
+    // ✅ Images use /storage/ path
     const getProductImage = (order, item = null) => {
         let imagePath = null;
 
-        // Get image path from item or order
         if (item) {
             imagePath = item.image || (item.images?.[0] ?? null);
         } else if (order.items?.[0]) {
@@ -229,11 +221,10 @@ export default function MyOrders() {
 
         if (!imagePath) return null;
 
-        // ✅ Add /storage/ prefix
         return `http://127.0.0.1:8000/storage/${imagePath}`;
     };
 
-    // ✅ UPDATED: Calculate time remaining with seconds
+    // ✅ Calculate time remaining with seconds
     const getTimeRemaining = (deadline) => {
         if (!deadline) return null;
         const total = Date.parse(deadline) - currentTime.getTime();
@@ -241,17 +232,17 @@ export default function MyOrders() {
 
         const hours = Math.floor((total / (1000 * 60 * 60)));
         const minutes = Math.floor((total / (1000 * 60)) % 60);
-        const seconds = Math.floor((total / 1000) % 60); // ✅ Added seconds
+        const seconds = Math.floor((total / 1000) % 60);
 
         return {
             expired: false,
             hours,
             minutes,
-            seconds  // ✅ Added seconds to return
+            seconds
         };
     };
 
-    // ✅ NEW: Check if order can re-upload payment
+    // ✅ Check if order can re-upload payment
     const canReuploadPayment = (order) => {
         if (order.status !== 'rejected') return false;
         if (order.permanently_rejected) return false;
@@ -260,7 +251,7 @@ export default function MyOrders() {
         return !remaining?.expired;
     };
 
-    // ✅ NEW: Open payment upload modal
+    // ✅ Open payment upload modal
     const handleOpenPaymentModal = (order) => {
         setSelectedOrder(order);
         setDeliveryOption(order.delivery_option || 'pickup');
@@ -269,14 +260,20 @@ export default function MyOrders() {
         setShowPaymentModal(true);
     };
 
-    // ✅ NEW: Upload payment screenshot
+    // ✅ Upload payment screenshot
     const handleUploadPayment = async (e) => {
         e.preventDefault();
         const fileInput = e.target.querySelector('input[type="file"]');
         const file = fileInput.files[0];
 
         if (!file) {
-            alert('❌ Please select payment screenshot');
+            setAlert({
+                show: true,
+                type: 'error',
+                title: 'Error',
+                message: 'Please select payment screenshot',
+                onConfirm: () => setAlert({ ...alert, show: false }),
+            });
             return;
         }
 
@@ -309,7 +306,13 @@ export default function MyOrders() {
         } catch (err) {
             console.error('Upload payment error:', err);
             const message = err.response?.data?.message || 'Failed to upload payment';
-            alert('❌ ' + message);
+            setAlert({
+                show: true,
+                type: 'error',
+                title: 'Error',
+                message: message,
+                onConfirm: () => setAlert({ ...alert, show: false }),
+            });
         } finally {
             setSubmitting(false);
         }
@@ -338,53 +341,146 @@ export default function MyOrders() {
             }
         } catch (err) {
             console.error('Screenshot error:', err);
-            alert('❌ Failed to load payment screenshot');
+            setAlert({
+                show: true,
+                type: 'error',
+                title: 'Error',
+                message: 'Failed to load payment screenshot',
+                onConfirm: () => setAlert({ ...alert, show: false }),
+            });
         }
     };
 
     // ✅ Handle Cancel Order - Only for pending orders
     const handleCancelOrder = async (order) => {
-        // Confirm cancellation
-        const confirmed = window.confirm(
-            `Are you sure you want to cancel order ${order.order_number}?\n\n` +
-            `This action cannot be undone.`
-        );
+        setAlert({
+            show: true,
+            type: 'confirm',
+            title: 'Cancel Order',
+            message: `Are you sure you want to cancel order ${order.order_number}? This action cannot be undone.`,
+            onConfirm: async () => {
+                setAlert({ ...alert, show: false });
 
-        if (!confirmed) return;
+                try {
+                    const token = localStorage.getItem('auth_token');
 
-        try {
-            const token = localStorage.getItem('auth_token');
+                    const response = await axios.post(
+                        `http://127.0.0.1:8000/api/user/product-orders/${order.id}/cancel`,
+                        {},
+                        {
+                            headers: {
+                                'Accept': 'application/json',
+                                'Authorization': `Bearer ${token}`,
+                            }
+                        }
+                    );
 
-            // Call backend API to cancel order
-            const response = await axios.post(
-                `http://127.0.0.1:8000/api/user/product-orders/${order.id}/cancel`,
-                {},
-                {
-                    headers: {
-                        'Accept': 'application/json',
-                        'Authorization': `Bearer ${token}`,
+                    if (response.data.success) {
+                        setAlert({
+                            show: true,
+                            type: 'success',
+                            title: 'Success',
+                            message: 'Order cancelled successfully!',
+                            onConfirm: () => setAlert({ ...alert, show: false }),
+                        });
+                        fetchOrders();
+                        closeDetailsModal();
                     }
+                } catch (err) {
+                    console.error('Cancel error:', err);
+                    const message = err.response?.data?.message || 'Failed to cancel order. Please try again.';
+                    setAlert({
+                        show: true,
+                        type: 'error',
+                        title: 'Error',
+                        message: message,
+                        onConfirm: () => setAlert({ ...alert, show: false }),
+                    });
                 }
-            );
+            },
+            onCancel: () => setAlert({ ...alert, show: false }),
+            confirmText: 'Yes, Cancel',
+            cancelText: 'No, Keep',
+        });
+    };
 
-            if (response.data.success) {
-                alert('✅ Order cancelled successfully!');
-
-                // Refresh orders list
-                fetchOrders();
-
-                // Close modal
-                closeDetailsModal();
-            }
-        } catch (err) {
-            console.error('Cancel error:', err);
-
-            if (err.response?.data?.message) {
-                alert(`❌ ${err.response.data.message}`);
-            } else {
-                alert('❌ Failed to cancel order. Please try again.');
-            }
+    // ✅ NEW: Toggle Select All
+    const toggleSelectAll = () => {
+        if (selectedOrderIds.length === filteredOrders.length) {
+            setSelectedOrderIds([]);
+        } else {
+            setSelectedOrderIds(filteredOrders.map(order => order.id));
         }
+    };
+
+    // ✅ NEW: Toggle Individual Selection
+    const toggleSelectOrder = (id) => {
+        if (selectedOrderIds.includes(id)) {
+            setSelectedOrderIds(selectedOrderIds.filter(orderId => orderId !== id));
+        } else {
+            setSelectedOrderIds([...selectedOrderIds, id]);
+        }
+    };
+
+    // ✅ NEW: Handle Bulk Delete
+    const handleBulkDelete = () => {
+        if (selectedOrderIds.length === 0) return;
+
+        setAlert({
+            show: true,
+            type: 'confirm',
+            title: 'Delete Orders',
+            message: `Are you sure you want to delete ${selectedOrderIds.length} order(s)? This action cannot be undone.`,
+            onConfirm: async () => {
+                setAlert({ ...alert, show: false });
+
+                try {
+                    const token = localStorage.getItem('auth_token');
+                    const response = await axios.post(
+                        'http://127.0.0.1:8000/api/user/product-orders/bulk-delete',
+                        { order_ids: selectedOrderIds },
+                        {
+                            headers: {
+                                'Accept': 'application/json',
+                                'Authorization': `Bearer ${token}`
+                            }
+                        }
+                    );
+
+                    if (response.data.success) {
+                        setAlert({
+                            show: true,
+                            type: 'success',
+                            title: 'Success',
+                            message: 'Orders deleted successfully!',
+                            onConfirm: () => setAlert({ ...alert, show: false }),
+                        });
+                        setSelectedOrderIds([]);
+                        fetchOrders();
+                    } else {
+                        setAlert({
+                            show: true,
+                            type: 'error',
+                            title: 'Error',
+                            message: response.data.message || 'Failed to delete orders.',
+                            onConfirm: () => setAlert({ ...alert, show: false }),
+                        });
+                    }
+                } catch (err) {
+                    console.error('Bulk delete error:', err);
+                    setAlert({
+                        show: true,
+                        type: 'error',
+                        title: 'Error',
+                        message: 'Failed to delete orders. Please try again.',
+                        onConfirm: () => setAlert({ ...alert, show: false }),
+                    });
+                }
+            },
+            onCancel: () => setAlert({ ...alert, show: false }),
+            confirmText: 'Delete',
+            cancelText: 'Cancel',
+        });
     };
 
     return (
@@ -430,11 +526,10 @@ export default function MyOrders() {
             {/* Orders Table */}
             {!loading && !error && orders.length > 0 && (
                 <>
-                    {/* ✅ TABS - Replaces Status Dropdown */}
+                    {/* ✅ TABS */}
                     <div className="mb-6">
                         <div className="border-b border-gray-200">
                             <nav className="-mb-px flex space-x-8">
-                                {/* Verifying Order Tab */}
                                 <button
                                     onClick={() => setActiveTab('verifying')}
                                     className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${activeTab === 'verifying'
@@ -452,7 +547,6 @@ export default function MyOrders() {
                                     </span>
                                 </button>
 
-                                {/* Confirm Tab */}
                                 <button
                                     onClick={() => setActiveTab('confirm')}
                                     className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${activeTab === 'confirm'
@@ -470,7 +564,6 @@ export default function MyOrders() {
                                     </span>
                                 </button>
 
-                                {/* Cancel Tab */}
                                 <button
                                     onClick={() => setActiveTab('cancel')}
                                     className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${activeTab === 'cancel'
@@ -488,7 +581,6 @@ export default function MyOrders() {
                                     </span>
                                 </button>
 
-                                {/* Rejected Tab */}
                                 <button
                                     onClick={() => setActiveTab('rejected')}
                                     className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${activeTab === 'rejected'
@@ -512,7 +604,6 @@ export default function MyOrders() {
                     {/* Filters */}
                     <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 mb-6">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            {/* Date From */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">From Date</label>
                                 <input
@@ -523,7 +614,6 @@ export default function MyOrders() {
                                 />
                             </div>
 
-                            {/* Date To */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">To Date</label>
                                 <input
@@ -534,7 +624,6 @@ export default function MyOrders() {
                                 />
                             </div>
 
-                            {/* Search */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Search</label>
                                 <div className="relative">
@@ -552,7 +641,6 @@ export default function MyOrders() {
                             </div>
                         </div>
 
-                        {/* Clear Filters */}
                         {(searchTerm || dateFrom || dateTo) && (
                             <div className="mt-4">
                                 <button
@@ -569,12 +657,41 @@ export default function MyOrders() {
                         )}
                     </div>
 
+                    {/* ✅ NEW: Bulk Delete Toolbar */}
+                    {selectedOrderIds.length > 0 && activeTab !== 'verifying' && (
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4 flex items-center justify-between shadow-sm">
+                            <p className="text-sm font-medium text-blue-900">
+                                {selectedOrderIds.length} order(s) selected
+                            </p>
+                            <button
+                                onClick={handleBulkDelete}
+                                className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2"
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                                Delete Selected
+                            </button>
+                        </div>
+                    )}
+
                     {/* Table */}
                     <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                         <div className="overflow-x-auto">
                             <table className="w-full">
                                 <thead className="bg-gray-50 border-b border-gray-100">
                                     <tr>
+                                        {/* ✅ NEW: Checkbox Header Column */}
+                                        {activeTab !== 'verifying' && (
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-10">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={filteredOrders.length > 0 && selectedOrderIds.length === filteredOrders.length}
+                                                    onChange={toggleSelectAll}
+                                                    className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 cursor-pointer"
+                                                />
+                                            </th>
+                                        )}
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order #</th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Product</th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
@@ -584,13 +701,12 @@ export default function MyOrders() {
                                 <tbody className="divide-y divide-gray-100">
                                     {filteredOrders.length === 0 ? (
                                         <tr>
-                                            <td colSpan="4" className="px-6 py-12 text-center text-gray-500">
+                                            <td colSpan={activeTab !== 'verifying' ? 5 : 4} className="px-6 py-12 text-center text-gray-500">
                                                 <p>No orders found matching your filters</p>
                                             </td>
                                         </tr>
                                     ) : (
                                         filteredOrders.map((order) => {
-                                            // ✅ Check if permanently rejected
                                             const isPermanentlyRejected = order.status === 'rejected' && order.permanently_rejected;
 
                                             return (
@@ -599,6 +715,18 @@ export default function MyOrders() {
                                                     onClick={() => handleViewDetails(order)}
                                                     className={`hover:bg-blue-50 transition-colors cursor-pointer ${isPermanentlyRejected ? 'opacity-60' : ''}`}
                                                 >
+                                                    {/* ✅ NEW: Checkbox Column */}
+                                                    {activeTab !== 'verifying' && (
+                                                        <td className="px-6 py-4">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={selectedOrderIds.includes(order.id)}
+                                                                onChange={() => toggleSelectOrder(order.id)}
+                                                                onClick={(e) => e.stopPropagation()}
+                                                                className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 cursor-pointer"
+                                                            />
+                                                        </td>
+                                                    )}
                                                     <td className="px-6 py-4">
                                                         <span className="text-sm font-medium text-blue-600 hover:text-blue-700">
                                                             {order.order_number}
@@ -771,7 +899,7 @@ export default function MyOrders() {
                                 </div>
                             </div>
 
-                            {/* ✅ UPDATED: Real-Time Rejection Deadline Countdown */}
+                            {/* ✅ Real-Time Rejection Deadline Countdown */}
                             {selectedOrder.status === 'rejected' && !selectedOrder.permanently_rejected && selectedOrder.rejection_deadline && (
                                 <div className="mb-6 p-5 bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-xl shadow-sm">
                                     <div className="flex items-start gap-4">
@@ -781,7 +909,7 @@ export default function MyOrders() {
                                             </svg>
                                         </div>
                                         <div className="flex-1">
-                                            <h4 className="text-base font-bold text-orange-900 mb-2">⏰ Time Remaining to Re-upload Payment</h4>
+                                            <h4 className="text-base font-bold text-orange-900 mb-2">Time Remaining to Re-upload Payment</h4>
                                             {(() => {
                                                 const remaining = getTimeRemaining(selectedOrder.rejection_deadline);
                                                 if (remaining?.expired) {
@@ -823,7 +951,7 @@ export default function MyOrders() {
                                 </div>
                             )}
 
-                            {/* ✅ UPDATED: Permanent Rejection Message */}
+                            {/* ✅ Permanent Rejection Message */}
                             {selectedOrder.status === 'rejected' && selectedOrder.permanently_rejected && (
                                 <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
                                     <div className="flex items-start gap-3">
@@ -843,7 +971,7 @@ export default function MyOrders() {
                                 </div>
                             )}
 
-                            {/* Rejection Reason (if applicable) */}
+                            {/* Rejection Reason */}
                             {selectedOrder.status === 'rejected' && selectedOrder.rejection_reason && (
                                 <div className="mb-6">
                                     <h4 className="text-lg font-semibold text-gray-900 mb-4">Rejection Reason</h4>
@@ -853,7 +981,7 @@ export default function MyOrders() {
                                 </div>
                             )}
 
-                            {/* Payment Screenshot - Smaller image with full-size on click */}
+                            {/* Payment Screenshot */}
                             {selectedOrder.payment_screenshot && (
                                 <div>
                                     <h4 className="text-lg font-semibold text-gray-900 mb-4">Payment Proof</h4>
@@ -871,7 +999,6 @@ export default function MyOrders() {
 
                             {/* Action Buttons */}
                             <div className="text-center mt-6 flex gap-3 justify-center">
-                                {/* ✅ Make Payment Button - Only for rejected orders with active deadline */}
                                 {selectedOrder.status === 'rejected' &&
                                     !selectedOrder.permanently_rejected &&
                                     canReuploadPayment(selectedOrder) && (
@@ -886,7 +1013,6 @@ export default function MyOrders() {
                                         </button>
                                     )}
 
-                                {/* Cancel Button - Only for pending orders */}
                                 {selectedOrder.status === 'pending' && (
                                     <button
                                         onClick={() => handleCancelOrder(selectedOrder)}
@@ -899,7 +1025,6 @@ export default function MyOrders() {
                                     </button>
                                 )}
 
-                                {/* Close Button */}
                                 <button
                                     onClick={closeDetailsModal}
                                     className="px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors font-semibold"
@@ -916,7 +1041,6 @@ export default function MyOrders() {
             {showPaymentModal && selectedOrder && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={closeAllModals}>
                     <form onSubmit={handleUploadPayment} className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
-                        {/* Header */}
                         <div className="flex items-center justify-between p-6 border-b border-gray-100 flex-shrink-0">
                             <div>
                                 <h3 className="text-xl font-bold text-gray-900">Upload Payment</h3>
@@ -929,12 +1053,9 @@ export default function MyOrders() {
                             </button>
                         </div>
 
-                        {/* Scrollable Content */}
                         <div className="overflow-y-auto flex-1 p-6">
                             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                                {/* Left: Bank Details & Upload */}
                                 <div className="lg:col-span-2 space-y-6">
-                                    {/* Bank Details */}
                                     <div className="bg-gray-50 rounded-lg p-4">
                                         <h4 className="font-semibold text-gray-900 mb-3">Bank Transfer Details</h4>
                                         <div className="space-y-2 text-sm">
@@ -953,7 +1074,6 @@ export default function MyOrders() {
                                         </div>
                                     </div>
 
-                                    {/* Upload Screenshot */}
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-2">Upload Payment Screenshot *</label>
                                         <div className="border-2 border-dashed border-blue-300 rounded-lg p-8 text-center hover:border-blue-400 transition-colors bg-blue-50">
@@ -975,7 +1095,6 @@ export default function MyOrders() {
                                     </div>
                                 </div>
 
-                                {/* Right: Order Summary */}
                                 <div className="lg:col-span-1">
                                     <div className="bg-gray-50 rounded-lg p-4">
                                         <h4 className="font-semibold text-gray-900 mb-3">Order Summary</h4>
@@ -1010,7 +1129,6 @@ export default function MyOrders() {
                             </div>
                         </div>
 
-                        {/* Footer */}
                         <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-100 flex-shrink-0 bg-gray-50">
                             <button
                                 type="button"
@@ -1078,6 +1196,18 @@ export default function MyOrders() {
                     </div>
                 </div>
             )}
+
+            {/* ✅ Custom Alert Modal */}
+            <CustomAlert
+                show={alert.show}
+                type={alert.type}
+                title={alert.title}
+                message={alert.message}
+                onConfirm={alert.onConfirm}
+                onCancel={alert.onCancel}
+                confirmText={alert.confirmText}
+                cancelText={alert.cancelText}
+            />
         </>
     );
 }

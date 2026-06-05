@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Order Cancelled - JNEC Fab Lab</title>
+    <title>Order Rejected - JNEC Fab Lab</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f3f4f6; padding: 24px 16px; color: #111827; }
@@ -29,7 +29,9 @@
         .reason-box .box-label { color: #991b1b; }
         .reason-text { font-size: 14px; color: #7f1d1d; line-height: 1.6; }
 
-
+        .warning-box { background: #fef3c7; border-radius: 8px; padding: 16px 18px; margin-bottom: 20px; border: 1px solid #fbbf24; }
+        .warning-box .box-label { color: #92400e; }
+        .warning-text { font-size: 14px; color: #78350f; line-height: 1.6; font-weight: 500; }
 
         .contact-label { font-size: 14px; color: #6b7280; margin-bottom: 8px; line-height: 1.6; }
         .contact-row { display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 24px; }
@@ -43,14 +45,14 @@
     <div class="wrapper">
 
         <div class="banner">
-            <img src="../image/JNEC logo V2_for media profile.png" alt="JNEC Fab Lab" class="banner-logo">
-            <h1>Order Cancelled</h1>
+            <img src="{{ asset('image/JNEC logo V2_for media profile.png') }}" alt="JNEC Fab Lab" class="banner-logo">
+            <h1>Order Rejected</h1>
             <p>JNEC Fab Lab</p>
         </div>
 
         <div class="content">
 
-            <p class="greeting">Dear <strong>{{ $userName }}</strong>,</p>
+            <p class="greeting">Dear <strong>{{ $order->user->name }}</strong>,</p>
             <p class="intro">
                 Thank you for placing your order with us. Unfortunately, we are unable to process
                 your payment at this time. Please review the details and reason below.
@@ -61,26 +63,40 @@
                 <table class="details-table">
                     <tr>
                         <td class="key">Order number</td>
-                        <td class="val">{{ $orderNumber }}</td>
+                        <td class="val">{{ $order->order_number }}</td>
                     </tr>
                     <tr>
                         <td class="key">Product</td>
-                        <td class="val">{{ $productName }}</td>
+                        <td class="val">
+                            @if($order->items && count($order->items) > 0)
+                                {{ $order->items[0]['name'] ?? 'N/A' }}
+                            @else
+                                N/A
+                            @endif
+                        </td>
                     </tr>
                     <tr>
                         <td class="key">Total amount</td>
-                        <td class="val">Nu. {{ number_format($totalAmount, 2) }}</td>
+                        <td class="val">Nu. {{ number_format($order->total_amount, 2) }}</td>
                     </tr>
                     <tr>
                         <td class="key">Date</td>
-                        <td class="val">{{ $orderDate }}</td>
+                        <td class="val">{{ $order->created_at->format('M d, Y') }}</td>
                     </tr>
                 </table>
             </div>
 
             <div class="reason-box">
-                <div class="box-label">⚠ Reason for cancellation</div>
-                <p class="reason-text">{{ $rejectionReason }}</p>
+                <div class="box-label">⚠ Reason for rejection</div>
+                <p class="reason-text">{{ $reason }}</p>
+            </div>
+
+            <div class="warning-box">
+                <div class="box-label">⏰ Time Limit to Re-upload Payment</div>
+                <p class="warning-text">
+                    You have <strong>{{ $hours ?? 24 }} hours</strong> from the time of this email to re-upload your payment proof. 
+                    If you fail to do so within this time limit, your order will be permanently rejected and the items will be returned to stock.
+                </p>
             </div>
 
             <p class="contact-label">Need help? Reach out to our support team:</p>
@@ -90,7 +106,7 @@
             </div>
 
             <p style="font-size: 14px; color: #6b7280; margin-bottom: 24px; line-height: 1.6;">
-                We apologise for any inconvenience.
+                We apologise for any inconvenience and appreciate your understanding.
             </p>
 
             <div class="footer">

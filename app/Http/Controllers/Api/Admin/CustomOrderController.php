@@ -9,15 +9,19 @@ use App\Mail\CustomOrderPriceUpdated;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
+use App\Notifications\CustomOrderPriceUpdatedNotification;
 
 class CustomOrderController extends Controller
 {
     /**
-     * Get all custom orders for admin
+     * Get all custom orders for admin (Excludes Cancelled)
      */
     public function index(Request $request)
     {
         $query = CustomOrder::with(['user', 'assignedUser']);
+
+        // ✅ Hide Cancelled orders from admin view
+        $query->where('status', '!=', 'cancelled');
 
         // Search by title or order number
         if ($request->has('search') && $request->search) {
@@ -55,30 +59,31 @@ class CustomOrderController extends Controller
     }
 
     /**
-     * ✅ NEW: Update estimated price and notify user via email
+     * ✅ UPDATED: Update estimated price and breakdown
      */
     public function updatePrice(Request $request, $id)
     {
         $order = CustomOrder::findOrFail($id);
 
-        // Validate price
         $validated = $request->validate([
             'estimated_price' => 'required|numeric|min:0',
+            'price_breakdown' => 'nullable|string', // ✅ New field
         ]);
 
-        // Update the order
         $order->update([
             'estimated_price' => $validated['estimated_price'],
-            'status' => 'pending', // Reset to pending so user can pay
+            'price_breakdown' => $validated['price_breakdown'] ?? null, // ✅ Save breakdown
+            'status' => 'pending', 
+            'rejection_reason' => null, 
         ]);
 
-        // ✅ Send email notification to user
         try {
             Mail::to($order->user->email)->send(new CustomOrderPriceUpdated($order, $order->user));
         } catch (\Exception $e) {
-            // Log error but don't fail the request
             \Log::error('Failed to send price update email: ' . $e->getMessage());
         }
+        // ✅ Notify the user about the price update (in-app notification)
+        $order->user->notify(new CustomOrderPriceUpdatedNotification($order));
 
         return response()->json([
             'success' => true,
@@ -88,7 +93,7 @@ class CustomOrderController extends Controller
     }
 
     /**
-     * ✅ NEW: Verify payment screenshot uploaded by user
+     * Verify payment screenshot uploaded by user
      */
     public function verifyPayment(Request $request, $id)
     {
@@ -100,10 +105,10 @@ class CustomOrderController extends Controller
         ]);
 
         if ($validated['action'] === 'approve') {
-            // ✅ Approve payment - mark as verified and set status to in_progress
             $order->update([
                 'payment_verified_at' => now(),
                 'status' => 'in_progress',
+                'rejection_reason' => null,
             ]);
 
             return response()->json([
@@ -112,11 +117,10 @@ class CustomOrderController extends Controller
                 'data' => $order,
             ]);
         } else {
-            // ❌ Reject payment - ask user to re-upload
             $order->update([
                 'payment_verified_at' => null,
                 'rejection_reason' => $validated['rejection_reason'] ?? 'Payment could not be verified. Please re-upload.',
-                'status' => 'pending',
+                'status' => 'payment_rejected', 
             ]);
 
             return response()->json([
@@ -128,7 +132,7 @@ class CustomOrderController extends Controller
     }
 
     /**
-     * ✅ Assign order to production team member
+     * Assign order to production team member
      */
     public function assign(Request $request, $id)
     {
@@ -138,16 +142,14 @@ class CustomOrderController extends Controller
             'assigned_to' => 'required|exists:users,id',
         ]);
 
-        // Verify the assignee is actually a production team member
         $assignee = User::find($validated['assigned_to']);
-        if ($assignee->role !== 'production_team') {
+        if ($assignee && $assignee->role !== 'production_team') {
             return response()->json([
                 'success' => false,
                 'message' => 'Can only assign to production team members.',
             ], 422);
         }
 
-        // Only allow assignment if payment is verified
         if (!$order->payment_verified_at) {
             return response()->json([
                 'success' => false,
@@ -155,14 +157,12 @@ class CustomOrderController extends Controller
             ], 422);
         }
 
-        // ✅ Update assignment AND ensure status is in_progress
         $order->update([
             'assigned_to' => $validated['assigned_to'],
             'assigned_at' => now(),
-            'status' => 'in_progress', // ✅ Ensure status is correct
+            'status' => 'in_progress', 
         ]);
 
-        // Load the assigned user for response
         $order->load('assignedUser');
 
         return response()->json([
@@ -173,11 +173,10 @@ class CustomOrderController extends Controller
     }
 
     /**
-     * ✅ Get available production team members for dropdown
+     * Get available production team members for dropdown
      */
     public function getProductionTeam()
     {
-        // Fetch users with production_team role
         $team = User::where('role', 'production_team')
             ->select('id', 'name', 'email')
             ->get();
@@ -219,14 +218,24 @@ class CustomOrderController extends Controller
     {
         $order = CustomOrder::findOrFail($id);
 
-        // Delete design image if exists
-        if ($order->design_image) {
-            Storage::disk('public')->delete($order->design_image);
+        if ($order->design_images && is_array($order->design_images)) {
+            foreach ($order->design_images as $imagePath) {
+                if (Storage::disk('public')->exists($imagePath)) {
+                    Storage::disk('public')->delete($imagePath);
+                }
+            }
         }
 
-        // Delete payment screenshot if exists
+        if ($order->design_image) {
+            if (Storage::disk('public')->exists($order->design_image)) {
+                Storage::disk('public')->delete($order->design_image);
+            }
+        }
+
         if ($order->payment_screenshot) {
-            Storage::disk('public')->delete($order->payment_screenshot);
+            if (Storage::disk('public')->exists($order->payment_screenshot)) {
+                Storage::disk('public')->delete($order->payment_screenshot);
+            }
         }
 
         $order->delete();
@@ -234,6 +243,77 @@ class CustomOrderController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Order deleted successfully',
+        ]);
+    }
+
+    /**
+     * Reject design
+     */
+    public function rejectDesign(Request $request, $id)
+    {
+        $order = CustomOrder::findOrFail($id);
+
+        $validated = $request->validate([
+            'rejection_reason' => 'required|string|min:10',
+        ]);
+
+        $order->update([
+            'status' => 'rejected',
+            'rejection_reason' => $validated['rejection_reason'],
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Design rejected. User will be notified to resubmit.',
+            'data' => $order,
+        ]);
+    }
+
+    /**
+     * Bulk delete custom orders
+     */
+    public function bulkDelete(Request $request)
+    {
+        $validated = $request->validate([
+            'order_ids' => 'required|array|min:1',
+            'order_ids.*' => 'required|exists:custom_orders,id',
+        ]);
+
+        $deletedCount = 0;
+        
+        foreach ($validated['order_ids'] as $orderId) {
+            $order = CustomOrder::find($orderId);
+            
+            if ($order) {
+                if ($order->design_images && is_array($order->design_images)) {
+                    foreach ($order->design_images as $imagePath) {
+                        if (Storage::disk('public')->exists($imagePath)) {
+                            Storage::disk('public')->delete($imagePath);
+                        }
+                    }
+                }
+                
+                if ($order->design_image) {
+                    if (Storage::disk('public')->exists($order->design_image)) {
+                        Storage::disk('public')->delete($order->design_image);
+                    }
+                }
+                
+                if ($order->payment_screenshot) {
+                    if (Storage::disk('public')->exists($order->payment_screenshot)) {
+                        Storage::disk('public')->delete($order->payment_screenshot);
+                    }
+                }
+                
+                $order->delete();
+                $deletedCount++;
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => $deletedCount . ' order(s) deleted successfully',
+            'deleted_count' => $deletedCount,
         ]);
     }
 }

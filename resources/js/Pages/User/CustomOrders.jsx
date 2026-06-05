@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { useDialog } from '../../Components/UniformDialogManager';
 
 export default function CustomOrders() {
     // Modal States
@@ -43,14 +42,28 @@ export default function CustomOrders() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    // Stats State
-    const [stats, setStats] = useState({
-        pending: 0,
-        in_progress: 0,
-        completed: 0,
-        rejected: 0,
-        payment_rejected: 0,
+    // ✅ NEW: Bulk Delete Selection State
+    const [selectedOrderIds, setSelectedOrderIds] = useState([]);
+
+    // ✅ NEW: Custom Alert State
+    const [customAlert, setCustomAlert] = useState({
+        show: false,
+        type: 'info',
+        title: '',
+        message: '',
+        onConfirm: null,
     });
+
+    // ✅ NEW: Show custom alert helper
+    const showAlert = (type, title, message, onConfirm = null) => {
+        setCustomAlert({
+            show: true,
+            type,
+            title,
+            message,
+            onConfirm,
+        });
+    };
 
     // ✅ NEW: Countdown timer state
     const [currentTime, setCurrentTime] = useState(new Date());
@@ -71,15 +84,6 @@ export default function CustomOrders() {
             const ordersData = response.data?.data?.data || [];
             setOrders(ordersData);
 
-            const newStats = {
-                pending: ordersData.filter(o => o.status === 'pending').length,
-                in_progress: ordersData.filter(o => o.status === 'in_progress').length,
-                completed: ordersData.filter(o => o.status === 'completed').length,
-                rejected: ordersData.filter(o => o.status === 'rejected').length,
-                payment_rejected: ordersData.filter(o => o.status === 'payment_rejected').length,
-            };
-            setStats(newStats);
-
             setError(null);
         } catch (err) {
             console.error('Fetch error:', err);
@@ -98,6 +102,11 @@ export default function CustomOrders() {
         return () => clearInterval(timer);
     }, []);
 
+    // ✅ NEW: Clear selection when filter changes
+    useEffect(() => {
+        setSelectedOrderIds([]);
+    }, [filter]);
+
     // Fetch on mount
     useEffect(() => {
         fetchOrders();
@@ -112,7 +121,7 @@ export default function CustomOrders() {
             design_images: [],
         });
         setImagePreviews([]);
-        setIsEditMode(false); // ✅ Reset edit mode
+        setIsEditMode(false);
         setShowCreateModal(true);
     };
 
@@ -122,15 +131,14 @@ export default function CustomOrders() {
             title: order.title || '',
             description: order.description || '',
             quantity: order.quantity?.toString() || '1',
-            design_images: [], // Reset file list (existing images shown in previews)
+            design_images: [],
         });
 
-        // Pre-fill existing images as previews
         const existingImgs = order.design_images || (order.design_image ? [order.design_image] : []);
         const existingPreviews = existingImgs.map(img => `http://127.0.0.1:8000/storage/${img}`);
         setImagePreviews(existingPreviews);
 
-        setIsEditMode(true); // ✅ Set edit mode
+        setIsEditMode(true);
         setShowViewModal(false);
         setShowCreateModal(true);
     };
@@ -195,22 +203,30 @@ export default function CustomOrders() {
         e.preventDefault();
         setSubmitting(true);
 
-        // ✅ Only require images for NEW orders, NOT for edits
         if (!isEditMode && formState.design_images.length === 0) {
-            alert('❌ Please upload at least one design image');
+            showAlert('error', 'Error', 'Please upload at least one design image');
             setSubmitting(false);
             return;
         }
 
-        // ✅ Show confirmation dialog when editing
         if (isEditMode) {
-            const confirmed = window.confirm('Are you sure you want to save changes?');
-            if (!confirmed) {
-                setSubmitting(false);
-                return;
-            }
+            showAlert(
+                'confirm',
+                'Save Changes',
+                'Are you sure you want to save changes?',
+                async () => {
+                    await submitOrder();
+                }
+            );
+            setSubmitting(false);
+            return;
         }
 
+        await submitOrder();
+    };
+
+    // ✅ NEW: Actual submission logic
+    const submitOrder = async () => {
         try {
             const token = localStorage.getItem('auth_token');
             const formData = new FormData();
@@ -218,12 +234,10 @@ export default function CustomOrders() {
             formData.append('description', formState.description);
             formData.append('quantity', formState.quantity);
 
-            // Append all images (only new ones for edit mode)
             formState.design_images.forEach((file, index) => {
                 formData.append(`design_images[${index}]`, file);
             });
 
-            // ✅ Use PUT for edit, POST for create
             const url = isEditMode
                 ? `http://127.0.0.1:8000/api/user/custom-orders/${selectedOrder.id}`
                 : 'http://127.0.0.1:8000/api/user/custom-orders';
@@ -244,24 +258,24 @@ export default function CustomOrders() {
             if (response.data.success) {
                 setShowCreateModal(false);
 
-                // ✅ Show DIFFERENT success messages for edit vs create
                 if (isEditMode) {
-                    alert('✅ Order updated successfully!');
+                    showAlert('success', 'Success', 'Order updated successfully!');
                 } else {
                     setShowSuccessModal(true);
                 }
 
-                fetchOrders(); // ✅ Refresh orders list
+                fetchOrders();
                 imagePreviews.forEach(url => URL.revokeObjectURL(url));
-                setIsEditMode(false); // ✅ Reset edit mode
+                setIsEditMode(false);
             }
         } catch (err) {
             console.error('Submit order error:', err);
-            alert('❌ Failed to submit order. Please try again.');
+            showAlert('error', 'Error', 'Failed to submit order. Please try again.');
         } finally {
             setSubmitting(false);
         }
     };
+
     // ✅ Open Checkout Modal (Step 1 of payment)
     const handleOpenCheckout = () => {
         setShowViewModal(false);
@@ -271,7 +285,7 @@ export default function CustomOrders() {
     // ✅ Continue to Payment (Step 2)
     const handleContinueToPayment = () => {
         if (deliveryOption === 'shipping' && !shippingAddress.trim()) {
-            alert('❌ Please enter shipping address');
+            showAlert('error', 'Error', 'Please enter shipping address');
             return;
         }
         setShowCheckoutModal(false);
@@ -285,7 +299,7 @@ export default function CustomOrders() {
         const file = fileInput.files[0];
 
         if (!file) {
-            alert('❌ Please select payment screenshot');
+            showAlert('error', 'Error', 'Please select payment screenshot');
             return;
         }
 
@@ -318,37 +332,97 @@ export default function CustomOrders() {
         } catch (err) {
             console.error('Upload payment error:', err);
             const message = err.response?.data?.message || 'Failed to upload payment';
-            alert('❌ ' + message);
+            showAlert('error', 'Error', message);
         } finally {
             setSubmitting(false);
         }
     };
 
-    // Cancel Order
+    // ✅ UPDATED: Cancel Order with custom alert
     const handleCancelOrder = async (orderId) => {
-        if (!window.confirm('Are you sure you want to cancel this order?')) return;
+        showAlert(
+            'confirm',
+            'Cancel Order',
+            'Are you sure you want to cancel this order?',
+            async () => {
+                try {
+                    const token = localStorage.getItem('auth_token');
+                    const response = await axios.post(
+                        `http://127.0.0.1:8000/api/user/custom-orders/${orderId}/cancel`,
+                        {},
+                        {
+                            headers: {
+                                'Accept': 'application/json',
+                                'Authorization': `Bearer ${token}`,
+                            }
+                        }
+                    );
 
-        try {
-            const token = localStorage.getItem('auth_token');
-            const response = await axios.post(
-                `http://127.0.0.1:8000/api/user/custom-orders/${orderId}/cancel`,
-                {},
-                {
-                    headers: {
-                        'Accept': 'application/json',
-                        'Authorization': `Bearer ${token}`,
-                    }
+                    showAlert('success', 'Success', response.data.message);
+                    setShowViewModal(false);
+                    await fetchOrders();
+                } catch (err) {
+                    console.error('Cancel error:', err);
+                    const message = err.response?.data?.message || 'Failed to cancel order';
+                    showAlert('error', 'Error', message);
                 }
-            );
+            }
+        );
+    };
 
-            alert('✅ ' + response.data.message);
-            setShowViewModal(false);
-            await fetchOrders();
-        } catch (err) {
-            console.error('Cancel error:', err);
-            const message = err.response?.data?.message || 'Failed to cancel order';
-            alert('❌ ' + message);
+    // ✅ NEW: Toggle Select All
+    const toggleSelectAll = () => {
+        if (selectedOrderIds.length === filteredOrders.length) {
+            setSelectedOrderIds([]);
+        } else {
+            setSelectedOrderIds(filteredOrders.map(order => order.id));
         }
+    };
+
+    // ✅ NEW: Toggle Individual Selection
+    const toggleSelectOrder = (id) => {
+        if (selectedOrderIds.includes(id)) {
+            setSelectedOrderIds(selectedOrderIds.filter(orderId => orderId !== id));
+        } else {
+            setSelectedOrderIds([...selectedOrderIds, id]);
+        }
+    };
+
+    // ✅ UPDATED: Handle Bulk Delete with custom alert
+    const handleBulkDelete = () => {
+        if (selectedOrderIds.length === 0) return;
+
+        showAlert(
+            'confirm',
+            'Delete Orders',
+            `Are you sure you want to delete ${selectedOrderIds.length} order(s)? This action cannot be undone.`,
+            async () => {
+                try {
+                    const token = localStorage.getItem('auth_token');
+                    const response = await axios.post(
+                        'http://127.0.0.1:8000/api/user/custom-orders/bulk-delete',
+                        { order_ids: selectedOrderIds },
+                        {
+                            headers: {
+                                'Accept': 'application/json',
+                                'Authorization': `Bearer ${token}`
+                            }
+                        }
+                    );
+
+                    if (response.data.success) {
+                        showAlert('success', 'Success', 'Orders deleted successfully!');
+                        setSelectedOrderIds([]);
+                        fetchOrders();
+                    } else {
+                        showAlert('error', 'Error', response.data.message || 'Failed to delete orders.');
+                    }
+                } catch (err) {
+                    console.error('Bulk delete error:', err);
+                    showAlert('error', 'Error', 'Failed to delete orders. Please try again.');
+                }
+            }
+        );
     };
 
     // Get status badge class
@@ -385,6 +459,8 @@ export default function CustomOrders() {
     // Filter orders
     const filteredOrders = (orders || []).filter(order => {
         if (filter === 'all') return true;
+        if (filter === 'payment_rejected') return order.status === 'payment_rejected';
+        if (filter === 'cancelled') return order.status === 'cancelled';
         return order.status === filter;
     });
 
@@ -425,57 +501,6 @@ export default function CustomOrders() {
 
             {!loading && !error && (
                 <>
-                    {/* Stats Cards */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-                        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                            <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
-                                    <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                                </div>
-                                <div>
-                                    <p className="text-2xl font-bold text-gray-900">{stats.pending}</p>
-                                    <p className="text-sm text-gray-600">Pending Review</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                            <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                                    <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
-                                </div>
-                                <div>
-                                    <p className="text-2xl font-bold text-gray-900">{stats.in_progress}</p>
-                                    <p className="text-sm text-gray-600">In Progress</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                            <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                                    <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                                </div>
-                                <div>
-                                    <p className="text-2xl font-bold text-gray-900">{stats.completed}</p>
-                                    <p className="text-sm text-gray-600">Completed</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                            <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
-                                    <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                                </div>
-                                <div>
-                                    <p className="text-2xl font-bold text-gray-900">{stats.rejected}</p>
-                                    <p className="text-sm text-gray-600">Rejected</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
                     {/* Filter Tabs & New Order Button */}
                     <div className="flex items-center justify-between mb-6">
                         <div className="flex items-center gap-2 flex-wrap">
@@ -483,16 +508,24 @@ export default function CustomOrders() {
                                 All ({orders.length})
                             </button>
                             <button onClick={() => setFilter('pending')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === 'pending' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'}`}>
-                                Pending ({stats.pending})
+                                Pending ({orders.filter(o => o.status === 'pending').length})
                             </button>
                             <button onClick={() => setFilter('in_progress')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === 'in_progress' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'}`}>
-                                In Progress ({stats.in_progress})
+                                In Progress ({orders.filter(o => o.status === 'in_progress').length})
                             </button>
                             <button onClick={() => setFilter('completed')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === 'completed' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'}`}>
-                                Completed ({stats.completed})
+                                Completed ({orders.filter(o => o.status === 'completed').length})
                             </button>
-                            <button onClick={() => setFilter('rejected')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === 'rejected' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'}`}>
-                                Rejected ({stats.rejected + stats.payment_rejected})
+                            {/* ✅ NEW: Payment Rejected Tab */}
+                            <button onClick={() => setFilter('payment_rejected')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === 'payment_rejected' ? 'bg-orange-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'}`}>
+                                Payment Rejected ({orders.filter(o => o.status === 'payment_rejected').length})
+                            </button>
+                            {/* ✅ CANCELLED Tab - Already there! */}
+                            <button onClick={() => setFilter('cancelled')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === 'cancelled' ? 'bg-gray-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'}`}>
+                                Cancelled ({orders.filter(o => o.status === 'cancelled').length})
+                            </button>
+                            <button onClick={() => setFilter('rejected')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === 'rejected' ? 'bg-red-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'}`}>
+                                Rejected ({orders.filter(o => o.status === 'rejected').length})
                             </button>
                         </div>
 
@@ -502,6 +535,24 @@ export default function CustomOrders() {
                         </button>
                     </div>
 
+                    {/* ✅ NEW: Bulk Delete Toolbar */}
+                    {selectedOrderIds.length > 0 && (
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4 flex items-center justify-between shadow-sm">
+                            <p className="text-sm font-medium text-blue-900">
+                                {selectedOrderIds.length} order(s) selected
+                            </p>
+                            <button
+                                onClick={handleBulkDelete}
+                                className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2"
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                                Delete Selected
+                            </button>
+                        </div>
+                    )}
+
                     {/* Orders Grid */}
                     {filteredOrders.length === 0 ? (
                         <div className="text-center py-12 bg-white rounded-xl border border-gray-100">
@@ -510,59 +561,85 @@ export default function CustomOrders() {
                             <button onClick={handleCreateOrder} className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium">Create Your First Order</button>
                         </div>
                     ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {filteredOrders.map((order) => (
-                                <div key={order.id} onClick={() => handleViewOrder(order)} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-all duration-200 cursor-pointer group">
-                                    <div className="relative w-full h-40 bg-gray-100 overflow-hidden">
-                                        {order.design_images && order.design_images.length > 0 ? (
-                                            <img src={`http://127.0.0.1:8000/storage/${order.design_images[0]}`} alt={order.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                                        ) : order.design_image ? (
-                                            <img src={`http://127.0.0.1:8000/storage/${order.design_image}`} alt={order.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                                        ) : (
-                                            <div className="w-full h-full flex items-center justify-center">
-                                                <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                        <>
+                            {/* ✅ NEW: Select All Checkbox */}
+                            <div className="mb-4 flex items-center gap-2">
+                                <input
+                                    type="checkbox"
+                                    checked={filteredOrders.length > 0 && selectedOrderIds.length === filteredOrders.length}
+                                    onChange={toggleSelectAll}
+                                    className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 cursor-pointer"
+                                />
+                                <span className="text-sm font-medium text-gray-700">Select All</span>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {filteredOrders.map((order) => (
+                                    <div key={order.id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-all duration-200 group relative">
+                                        {/* ✅ NEW: Checkbox */}
+                                        <div className="absolute top-3 left-3 z-10">
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedOrderIds.includes(order.id)}
+                                                onChange={() => toggleSelectOrder(order.id)}
+                                                onClick={(e) => e.stopPropagation()}
+                                                className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 cursor-pointer bg-white shadow-md"
+                                            />
+                                        </div>
+
+                                        <div onClick={() => handleViewOrder(order)} className="cursor-pointer">
+                                            <div className="relative w-full h-40 bg-gray-100 overflow-hidden">
+                                                {order.design_images && order.design_images.length > 0 ? (
+                                                    <img src={`http://127.0.0.1:8000/storage/${order.design_images[0]}`} alt={order.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                                                ) : order.design_image ? (
+                                                    <img src={`http://127.0.0.1:8000/storage/${order.design_image}`} alt={order.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                                                ) : (
+                                                    <div className="w-full h-full flex items-center justify-center">
+                                                        <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                                                    </div>
+                                                )}
+                                                {(order.design_images && order.design_images.length > 1) && (
+                                                    <div className="absolute top-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded-full">+{order.design_images.length - 1}</div>
+                                                )}
+                                                <div className="absolute bottom-2 left-2">
+                                                    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(order.status)}`}>
+                                                        {getStatusIcon(order.status)}
+                                                        {capitalize(order.status.replace('_', ' '))}
+                                                    </span>
+                                                </div>
                                             </div>
-                                        )}
-                                        {(order.design_images && order.design_images.length > 1) && (
-                                            <div className="absolute top-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded-full">+{order.design_images.length - 1}</div>
-                                        )}
-                                        <div className="absolute bottom-2 left-2">
-                                            <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(order.status)}`}>
-                                                {getStatusIcon(order.status)}
-                                                {capitalize(order.status.replace('_', ' '))}
-                                            </span>
+                                            <div className="p-4">
+                                                <h3 className="text-lg font-bold text-gray-900 mb-2 line-clamp-1">{order.title}</h3>
+                                                <div className="space-y-2 text-sm">
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-gray-500">Quantity:</span>
+                                                        <span className="font-semibold text-gray-900">{order.quantity}</span>
+                                                    </div>
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-gray-500">Price:</span>
+                                                        <span className="font-bold text-blue-600">
+                                                            {order.estimated_price ? formatCurrency(order.estimated_price) : 'Pending'}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-gray-500">Submitted:</span>
+                                                        <span className="text-gray-700">{formatDate(order.created_at)}</span>
+                                                    </div>
+                                                </div>
+                                                {order.payment_verified_at && (
+                                                    <div className="mt-3 pt-3 border-t border-gray-100">
+                                                        <span className="inline-flex items-center gap-1 text-xs text-green-600 font-medium">
+                                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
+                                                            Payment Verified
+                                                        </span>
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
-                                    <div className="p-4">
-                                        <h3 className="text-lg font-bold text-gray-900 mb-2 line-clamp-1">{order.title}</h3>
-                                        <div className="space-y-2 text-sm">
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-gray-500">Quantity:</span>
-                                                <span className="font-semibold text-gray-900">{order.quantity}</span>
-                                            </div>
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-gray-500">Price:</span>
-                                                <span className="font-bold text-blue-600">
-                                                    {order.estimated_price ? formatCurrency(order.estimated_price) : 'Pending'}
-                                                </span>
-                                            </div>
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-gray-500">Submitted:</span>
-                                                <span className="text-gray-700">{formatDate(order.created_at)}</span>
-                                            </div>
-                                        </div>
-                                        {order.payment_verified_at && (
-                                            <div className="mt-3 pt-3 border-t border-gray-100">
-                                                <span className="inline-flex items-center gap-1 text-xs text-green-600 font-medium">
-                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
-                                                    Payment Verified
-                                                </span>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
+                                ))}
+                            </div>
+                        </>
                     )}
                 </>
             )}
@@ -573,7 +650,6 @@ export default function CustomOrders() {
                     <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-between p-6 border-b border-gray-100 flex-shrink-0">
                             <div>
-                                {/* ✅ Dynamic title */}
                                 <h3 className="text-xl font-bold text-gray-900">
                                     {isEditMode ? 'Edit Custom Order' : 'Request Custom Order'}
                                 </h3>
@@ -591,7 +667,7 @@ export default function CustomOrders() {
                         <form onSubmit={handleSubmitOrder} className="flex flex-col flex-1 overflow-hidden">
                             <div className="overflow-y-auto flex-1 p-6 space-y-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Project Title *</label>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Custom Title *</label>
                                     <input type="text" placeholder="e.g., Custom Trophy Stand" value={formState.title} onChange={(e) => setFormState({ ...formState, title: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" required />
                                 </div>
                                 <div>
@@ -600,7 +676,22 @@ export default function CustomOrders() {
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-2">Quantity *</label>
-                                    <input type="number" min="1" value={formState.quantity} onChange={(e) => setFormState({ ...formState, quantity: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" required />
+                                    <input
+                                        type="text"
+                                        inputMode="numeric"
+                                        pattern="[0-9]*"
+                                        value={formState.quantity}
+                                        onChange={(e) => {
+                                            const value = e.target.value;
+                                            // Only allow numbers
+                                            if (value === '' || /^\d+$/.test(value)) {
+                                                setFormState({ ...formState, quantity: value });
+                                            }
+                                        }}
+                                        placeholder="Enter quantity"
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                        required
+                                    />
                                 </div>
 
                                 <div>
@@ -638,7 +729,6 @@ export default function CustomOrders() {
 
                             <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-100 flex-shrink-0">
                                 <button type="button" onClick={closeAllModals} className="px-4 py-2 border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50">Cancel</button>
-                                {/* ✅ Dynamic button text */}
                                 <button
                                     type="submit"
                                     disabled={submitting}
@@ -722,7 +812,6 @@ export default function CustomOrders() {
                                 </div>
                             )}
 
-                            {/* ✅ UPDATED: Show rejection reason for both types */}
                             {(selectedOrder.status === 'rejected' || selectedOrder.status === 'payment_rejected') && selectedOrder.rejection_reason && (
                                 <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
                                     <p className="text-sm font-semibold text-red-800 mb-1">
@@ -733,21 +822,14 @@ export default function CustomOrders() {
                             )}
                         </div>
 
-                        {/* ✅ UPDATED: Modal Footer with Smart Button Logic */}
                         <div className="px-6 py-4 border-t border-gray-100 flex-shrink-0 bg-gray-50">
                             <div className="flex items-center justify-end gap-3">
-                                {/* Cancel Button - Available if not completed/cancelled */}
                                 {!selectedOrder.payment_verified_at && selectedOrder.status !== 'completed' && selectedOrder.status !== 'cancelled' && (
                                     <button onClick={() => handleCancelOrder(selectedOrder.id)} className="px-4 py-2 text-sm font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors">
                                         Cancel Order
                                     </button>
                                 )}
 
-                                {/* ✅ Edit Button - Only enabled when:
-                                    1. Admin has NOT set price yet (!estimated_price)
-                                    2. Status is NOT payment_rejected
-                                    3. Status is NOT completed/cancelled
-                                */}
                                 {!selectedOrder.estimated_price &&
                                     selectedOrder.status !== 'payment_rejected' &&
                                     selectedOrder.status !== 'completed' &&
@@ -763,7 +845,6 @@ export default function CustomOrders() {
                                         </button>
                                     )}
 
-                                {/* ✅ Re-upload Payment Button - Only for payment_rejected */}
                                 {selectedOrder.status === 'payment_rejected' && (
                                     <button onClick={handleOpenCheckout} className="px-6 py-2 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-1">
                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -773,7 +854,6 @@ export default function CustomOrders() {
                                     </button>
                                 )}
 
-                                {/* Make Payment Button - Only if price set, not verified, not cancelled */}
                                 {selectedOrder.estimated_price &&
                                     !selectedOrder.payment_verified_at &&
                                     selectedOrder.status !== 'cancelled' &&
@@ -982,6 +1062,78 @@ export default function CustomOrders() {
                         <h3 className="text-xl font-bold text-gray-900 mb-2">Success!</h3>
                         <p className="text-gray-600 text-sm mb-6">Thank you for your order. We are verifying your payment details and will update you soon.</p>
                         <button onClick={closeAllModals} className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Close</button>
+                    </div>
+                </div>
+            )}
+
+            {/* ✅ Custom Alert Modal */}
+            {customAlert.show && (
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md transform transition-all scale-100 animate-fade-in">
+                        <div className={`px-6 py-4 border-b ${customAlert.type === 'success' ? 'bg-green-50 border-green-100' :
+                            customAlert.type === 'error' ? 'bg-red-50 border-red-100' :
+                                customAlert.type === 'warning' ? 'bg-yellow-50 border-yellow-100' :
+                                    'bg-blue-50 border-blue-100'
+                            }`}>
+                            <h3 className="text-lg font-bold text-gray-900">{customAlert.title}</h3>
+                        </div>
+
+                        <div className="p-6">
+                            <div className="flex items-start gap-4">
+                                <div className={`flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center ${customAlert.type === 'success' ? 'bg-green-100' :
+                                    customAlert.type === 'error' ? 'bg-red-100' :
+                                        customAlert.type === 'warning' ? 'bg-yellow-100' :
+                                            'bg-blue-100'
+                                    }`}>
+                                    {customAlert.type === 'success' ? (
+                                        <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                                        </svg>
+                                    ) : customAlert.type === 'error' ? (
+                                        <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                        </svg>
+                                    ) : customAlert.type === 'warning' ? (
+                                        <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                        </svg>
+                                    ) : (
+                                        <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                    )}
+                                </div>
+                                <div className="flex-1">
+                                    <p className="text-gray-700 leading-relaxed">{customAlert.message}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="px-6 py-4 border-t border-gray-100 flex gap-3 justify-end">
+                            {customAlert.type === 'confirm' && (
+                                <button
+                                    onClick={() => setCustomAlert({ ...customAlert, show: false })}
+                                    className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                                >
+                                    Cancel
+                                </button>
+                            )}
+                            <button
+                                onClick={() => {
+                                    if (customAlert.onConfirm) {
+                                        customAlert.onConfirm();
+                                    }
+                                    setCustomAlert({ ...customAlert, show: false });
+                                }}
+                                className={`px-6 py-2 rounded-lg transition-colors font-medium ${customAlert.type === 'success' ? 'bg-green-600 hover:bg-green-700 text-white' :
+                                    customAlert.type === 'error' ? 'bg-red-600 hover:bg-red-700 text-white' :
+                                        customAlert.type === 'warning' ? 'bg-yellow-600 hover:bg-yellow-700 text-white' :
+                                            'bg-blue-600 hover:bg-blue-700 text-white'
+                                    }`}
+                            >
+                                {customAlert.type === 'confirm' ? 'Confirm' : 'OK'}
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

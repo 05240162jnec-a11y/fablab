@@ -14,4 +14,4 @@ Artisan::command('inspire', function () {
 
 // ✅ Run automatically every hour in the background
 Schedule::command('orders:process-expired')
-    ->hourly();
+    ->everyMinute(); 

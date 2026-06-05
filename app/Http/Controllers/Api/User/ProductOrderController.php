@@ -431,4 +431,67 @@ class ProductOrderController extends Controller
             'processed_count' => $processedCount
         ]);
     }
+        /**
+     * ✅ NEW: Bulk delete orders (soft delete)
+     * Only allows deletion of non-pending orders (approved, cancelled, rejected)
+     */
+    public function bulkDelete(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'order_ids' => 'required|array|min:1',
+            'order_ids.*' => 'required|integer|exists:product_orders,id',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        $user = Auth::user();
+        $orderIds = $request->order_ids;
+
+        // Get orders that belong to the user
+        $orders = ProductOrder::where('user_id', $user->id)
+            ->whereIn('id', $orderIds)
+            ->get();
+
+        if ($orders->isEmpty()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No orders found'
+            ], 404);
+        }
+
+        // Check if any orders are pending (cannot delete pending orders)
+        $pendingOrders = $orders->filter(function($order) {
+            return $order->status === 'pending';
+        });
+
+        if ($pendingOrders->isNotEmpty()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cannot delete pending orders. Please cancel them first.'
+            ], 400);
+        }
+
+        try {
+            // Perform soft delete
+            $deletedCount = ProductOrder::whereIn('id', $orders->pluck('id'))->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => $deletedCount . ' order(s) deleted successfully',
+                'deleted_count' => $deletedCount
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to delete orders: ' . $e->getMessage()
+            ], 500);
+        }
+    }
 }

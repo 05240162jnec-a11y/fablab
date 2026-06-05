@@ -24,6 +24,9 @@ export default function Products() {
     const [paymentDeadlineHours, setPaymentDeadlineHours] = useState(24);
     const [deadlineLoading, setDeadlineLoading] = useState(false);
 
+    // ✅ NEW: Toast State
+    const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
+
     // Form States
     const [formData, setFormData] = useState({
         name: '',
@@ -77,8 +80,19 @@ export default function Products() {
         }
     };
 
-    // ✅ NEW: Update Payment Deadline Setting
+    // ✅ NEW: Show toast notification
+    const showToast = (message, type = 'success') => {
+        setToast({ show: true, message, type });
+        setTimeout(() => {
+            setToast({ show: false, message: '', type: 'success' });
+        }, 3000);
+    };
+
+    // ✅ UPDATED: Update Payment Deadline Setting
     const updateDeadlineHours = async (hours) => {
+        // Prevent duplicate calls
+        if (deadlineLoading) return;
+
         try {
             setDeadlineLoading(true);
             const adminToken = localStorage.getItem('admin_token');
@@ -88,10 +102,10 @@ export default function Products() {
             }, {
                 headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` }
             });
-            alert('✅ Payment deadline updated successfully!');
+            showToast('✅ Payment deadline updated successfully!');
         } catch (err) {
             console.error('Error updating settings:', err);
-            alert('❌ Failed to update deadline.');
+            showToast('❌ Failed to update deadline.', 'error');
         } finally {
             setDeadlineLoading(false);
         }
@@ -100,7 +114,7 @@ export default function Products() {
     // Fetch on mount
     useEffect(() => {
         fetchProducts();
-        fetchSettings(); // ✅ Add this line
+        fetchSettings();
     }, []);
 
     // ✅ NEW: Keyboard navigation for carousel
@@ -192,7 +206,7 @@ export default function Products() {
         setPreviewImages([]);
         setOtherImages([]);
         setHasUnsavedChanges(false);
-        setCurrentImageIndex(0); // ✅ Reset carousel
+        setCurrentImageIndex(0);
     };
 
     // Open product details modal
@@ -208,7 +222,7 @@ export default function Products() {
         };
 
         setSelectedProduct(productWithFullUrls);
-        setCurrentImageIndex(0); // ✅ Reset to first image
+        setCurrentImageIndex(0);
         setShowDetailsModal(true);
     };
 
@@ -300,7 +314,7 @@ export default function Products() {
             }
         } catch (err) {
             console.error('Error toggling status:', err);
-            alert('❌ Failed to update status');
+            showToast('❌ Failed to update status', 'error');
         }
     };
 
@@ -326,11 +340,11 @@ export default function Products() {
             if (response.data.success) {
                 setProducts(products.filter(p => p.id !== productId));
                 setShowDetailsModal(false);
-                alert('✅ Product deleted successfully!');
+                showToast('✅ Product deleted successfully!');
             }
         } catch (err) {
             console.error('Error deleting product:', err);
-            alert('❌ Failed to delete product');
+            showToast('❌ Failed to delete product', 'error');
         }
     };
 
@@ -373,11 +387,11 @@ export default function Products() {
                 setShowAddModal(false);
                 resetForm();
                 fetchProducts();
-                alert('✅ Product added successfully!');
+                showToast('✅ Product added successfully!');
             }
         } catch (err) {
             console.error('Error adding product:', err);
-            alert('❌ Failed to add product');
+            showToast('❌ Failed to add product', 'error');
         } finally {
             setFormLoading(false);
         }
@@ -420,11 +434,11 @@ export default function Products() {
                 resetForm();
                 setSelectedProduct(null);
                 fetchProducts();
-                alert('✅ Product updated successfully!');
+                showToast('✅ Product updated successfully!');
             }
         } catch (err) {
             console.error('Error updating product:', err);
-            alert('❌ Failed to update product');
+            showToast('❌ Failed to update product', 'error');
         } finally {
             setFormLoading(false);
         }
@@ -480,7 +494,6 @@ export default function Products() {
     };
 
     return (
-        // ✅ JUST the main content - sidebar is in AdminLayout now
         <div className="flex-1">
             <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
                 <div className="flex items-center justify-between px-6 py-4">
@@ -592,11 +605,19 @@ export default function Products() {
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <input
-                                            type="number"
-                                            value={stockAlertThreshold}
-                                            onChange={(e) => setStockAlertThreshold(parseInt(e.target.value) || 0)}
+                                            type="text"
+                                            value={stockAlertThreshold === 0 ? '' : stockAlertThreshold}
+                                            onChange={(e) => {
+                                                const value = e.target.value;
+                                                if (value === '') {
+                                                    setStockAlertThreshold(0);
+                                                } else {
+                                                    const num = parseInt(value) || 0;
+                                                    setStockAlertThreshold(num);
+                                                }
+                                            }}
                                             className="w-20 px-3 py-2 border border-gray-300 rounded-lg text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                            min="0"
+                                            placeholder="0"
                                         />
                                         <span className="text-xs text-gray-600">units</span>
                                     </div>
@@ -617,9 +638,17 @@ export default function Products() {
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <input
-                                            type="number"
-                                            value={paymentDeadlineHours}
-                                            onChange={(e) => setPaymentDeadlineHours(parseInt(e.target.value) || 0)}
+                                            type="text"
+                                            value={paymentDeadlineHours === 0 ? '' : paymentDeadlineHours}
+                                            onChange={(e) => {
+                                                const value = e.target.value;
+                                                if (value === '') {
+                                                    setPaymentDeadlineHours(0);
+                                                } else {
+                                                    const num = parseInt(value) || 0;
+                                                    setPaymentDeadlineHours(num);
+                                                }
+                                            }}
                                             onBlur={() => updateDeadlineHours(paymentDeadlineHours)}
                                             onKeyDown={(e) => {
                                                 if (e.key === 'Enter') {
@@ -629,7 +658,7 @@ export default function Products() {
                                             }}
                                             disabled={deadlineLoading}
                                             className="w-20 px-3 py-2 border border-gray-300 rounded-lg text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                            min="1"
+                                            placeholder="0"
                                         />
                                         <span className="text-xs text-gray-600">hours</span>
                                         {deadlineLoading && (
@@ -1364,6 +1393,37 @@ export default function Products() {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* ✅ Toast Notification */}
+            {toast.show && (
+                <div className="fixed top-6 right-6 z-[9999] animate-fade-in">
+                    <div className={`px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 min-w-[350px] ${toast.type === 'success'
+                        ? 'bg-gradient-to-r from-green-500 to-emerald-600'
+                        : 'bg-gradient-to-r from-red-500 to-rose-600'
+                        } text-white`}>
+                        {toast.type === 'success' ? (
+                            <svg className="w-6 h-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        ) : (
+                            <svg className="w-6 h-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        )}
+                        <div className="flex-1">
+                            <p className="font-semibold text-sm">{toast.message}</p>
+                        </div>
+                        <button
+                            onClick={() => setToast({ show: false, message: '', type: 'success' })}
+                            className="flex-shrink-0 text-white/80 hover:text-white transition-colors"
+                        >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
                     </div>
                 </div>
             )}

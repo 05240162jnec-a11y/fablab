@@ -9,6 +9,9 @@
         .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px; }
         .order-info { background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #667eea; }
         .price { font-size: 24px; font-weight: bold; color: #667eea; text-align: center; margin: 20px 0; }
+        .breakdown { background: #e8f5e9; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #4caf50; }
+        .breakdown h4 { color: #2e7d32; margin-top: 0; }
+        .breakdown p { margin: 10px 0; line-height: 1.8; white-space: pre-line; }
         .button { display: inline-block; background: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; margin: 20px 0; }
         .button:hover { background: #5568d3; }
         .footer { text-align: center; margin-top: 30px; color: #666; font-size: 12px; }
@@ -32,8 +35,16 @@
             <p><strong>Quantity:</strong> {{ $customOrder->quantity }}</p>
         </div>
         
+        {{-- ✅ NEW: Price Breakdown Section --}}
+        @if($customOrder->price_breakdown)
+        <div class="breakdown">
+            <h4>💰 Price Breakdown</h4>
+            <p>{{ $customOrder->price_breakdown }}</p>
+        </div>
+        @endif
+        
         <div class="price">
-            Total Estimated Price (Price X Quantity): Nu. {{ number_format($customOrder->estimated_price, 2) }}
+            Total Estimated Price: Nu. {{ number_format($customOrder->estimated_price, 2) }}
         </div>
         
         <p>To proceed with your order, please complete the payment using the details below:</p>
@@ -43,7 +54,7 @@
             <ul style="margin: 10px 0 0 0; padding-left: 20px;">
                 <li>Transfer to: [Your Bank Details]</li>
                 <li>Reference: <code>{{ $customOrder->order_number }}</code></li>
-                <li>Amount: Nu. {{ number_format($customOrder->estimated_price, 2) }}</li>
+                <li>Amount: <strong>Nu. {{ number_format($customOrder->estimated_price, 2) }}</strong></li>
             </ul>
         </div>
         

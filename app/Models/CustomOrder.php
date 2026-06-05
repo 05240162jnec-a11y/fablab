@@ -20,6 +20,7 @@ class CustomOrder extends Model
     'design_image',   // Keep old field for backward compatibility
     'status',
     'estimated_price',
+    'price_breakdown',
     'payment_screenshot',
     'payment_verified_at',
     'rejection_reason',

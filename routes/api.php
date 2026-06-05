@@ -62,6 +62,9 @@ Route::prefix('admin')->group(function () {
         Route::post('/custom-orders/{id}/assign', [\App\Http\Controllers\Api\Admin\CustomOrderController::class, 'assign']);
         Route::post('/custom-orders/{id}/update-status', [\App\Http\Controllers\Api\Admin\CustomOrderController::class, 'updateStatus']);
         Route::delete('/custom-orders/{id}', [\App\Http\Controllers\Api\Admin\CustomOrderController::class, 'destroy']);
+        // Add after existing custom orders routes
+        Route::post('/custom-orders/{id}/reject-design', [\App\Http\Controllers\Api\Admin\CustomOrderController::class, 'rejectDesign']);
+        Route::post('/custom-orders/bulk-delete', [\App\Http\Controllers\Api\Admin\CustomOrderController::class, 'bulkDelete']);
         
         // Courses
         Route::apiResource('courses', \App\Http\Controllers\Api\Admin\CourseController::class);
@@ -131,6 +134,10 @@ Route::prefix('admin')->group(function () {
 // USER ROUTES (Authenticated)
 // ==========================================
 Route::middleware('auth:sanctum')->group(function () {
+        // ✅ Notification Routes
+    Route::get('/user/notifications', [App\Http\Controllers\Api\NotificationController::class, 'index']);
+    Route::get('/user/notifications/unread-count', [App\Http\Controllers\Api\NotificationController::class, 'unreadCount']);
+    Route::post('/user/notifications/{id}/read', [App\Http\Controllers\Api\NotificationController::class, 'markAsRead']);
     
     // User Dashboard
     Route::get('/user/dashboard', [App\Http\Controllers\Api\DashboardController::class, 'userDashboard']);
@@ -165,7 +172,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/user/custom-orders/{id}/upload-payment', [\App\Http\Controllers\Api\User\CustomOrderController::class, 'uploadPayment']);
     Route::post('/user/custom-orders/{id}/cancel', [\App\Http\Controllers\Api\User\CustomOrderController::class, 'cancel']);
     Route::get('/user/custom-orders/production-team', [\App\Http\Controllers\Api\User\CustomOrderController::class, 'getProductionTeam']);
-
+    Route::post('/user/custom-orders/bulk-delete', [\App\Http\Controllers\Api\User\CustomOrderController::class, 'bulkDelete']);
+    
     // Product Orders (Shop)
     Route::get('/user/product-orders', [\App\Http\Controllers\Api\User\ProductOrderController::class, 'index']);
     Route::post('/user/product-orders', [\App\Http\Controllers\Api\User\ProductOrderController::class, 'store']);
@@ -175,7 +183,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user/product-orders/{id}/screenshot', [\App\Http\Controllers\Api\User\ProductOrderController::class, 'screenshot']);
             // ✅ NEW: Process expired orders
     Route::post('/user/product-orders/process-expired', [App\Http\Controllers\Api\User\ProductOrderController::class, 'processExpiredOrders']);
-    
+    Route::post('/user/product-orders/bulk-delete', [App\Http\Controllers\Api\User\ProductOrderController::class, 'bulkDelete']);
+
     // ==========================================
     // ✅ USER PROJECT ROUTES (NEW)
     // ==========================================

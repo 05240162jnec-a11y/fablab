@@ -5,40 +5,53 @@ namespace App\Mail;
 use App\Models\ProductOrder;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
+use Illuminate\Mail\Mailables\Content;
+use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
 
 class OrderRejectedMail extends Mailable
 {
     use Queueable, SerializesModels;
 
-    public $orderNumber;
-    public $productName;
-    public $totalAmount;
-    public $userName;
-    public $rejectionReason;
+    public $order;
+    public $reason;
 
     /**
      * Create a new message instance.
      */
-    public function __construct(ProductOrder $order, string $reason)
+    public function __construct(ProductOrder $order, $reason)
     {
-        $this->orderNumber = $order->order_number;
-        $this->userName = $order->user->name ?? 'Valued Customer';
-        $this->totalAmount = $order->total_amount ?? 0;
-        $this->rejectionReason = $reason;
-        
-        // Get first product name from items
-        $items = $order->items ?? [];
-        $firstItem = is_array($items) ? ($items[0] ?? null) : null;
-        $this->productName = is_array($firstItem) ? ($firstItem['name'] ?? 'Your Order') : 'Your Order';
+        $this->order = $order;
+        $this->reason = $reason;
     }
 
     /**
-     * Build the message.
+     * Get the message envelope.
      */
-    public function build()
+    public function envelope(): Envelope
     {
-        return $this->subject("❌ Order Rejected - {$this->orderNumber}")
-                    ->view('emails.order_rejected');
+        return new Envelope(
+            subject: 'Order #' . $this->order->order_number . ' - Payment Rejected',
+        );
+    }
+
+    /**
+     * Get the message content definition.
+     */
+    public function content(): Content
+    {
+        return new Content(
+            view: 'emails.order_rejected',
+        );
+    }
+
+    /**
+     * Get the attachments for the message.
+     *
+     * @return array<int, \Illuminate\Mail\Mailables\Attachment>
+     */
+    public function attachments(): array
+    {
+        return [];
     }
 }

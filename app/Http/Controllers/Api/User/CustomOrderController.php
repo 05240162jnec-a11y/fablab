@@ -8,6 +8,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use App\Notifications\NewCustomOrderNotification;
+use App\Models\User;
 
 class CustomOrderController extends Controller
 {
@@ -79,6 +81,11 @@ class CustomOrderController extends Controller
         $validated['design_images'] = $imagePaths;
 
         $order = CustomOrder::create($validated);
+        // ✅ Notify all admins about the new custom order
+$admins = User::where('role', 'admin')->get();
+foreach ($admins as $admin) {
+    $admin->notify(new NewCustomOrderNotification($order));
+}
 
         return response()->json([
             'success' => true,
@@ -234,4 +241,24 @@ public function update(Request $request, $id)
             'data' => $team,
         ]);
     }
+    public function bulkDelete(Request $request)
+{
+    $request->validate([
+        'order_ids' => 'required|array',
+        'order_ids.*' => 'exists:custom_orders,id'
+    ]);
+
+    $orders = CustomOrder::where('user_id', auth()->id())
+        ->whereIn('id', $request->order_ids)
+        ->get();
+
+    foreach ($orders as $order) {
+        $order->delete(); // Soft delete
+    }
+
+    return response()->json([
+        'success' => true,
+        'message' => count($orders) . ' order(s) deleted successfully'
+    ]);
+}
 }

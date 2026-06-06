@@ -364,58 +364,6 @@ export default function Machines() {
                         <h2 className="text-xl font-semibold text-gray-800">Machines</h2>
                         <p className="text-sm text-gray-600">Manage laboratory equipment and machinery</p>
                     </div>
-
-                    {/* ✅ Right Side - Profile Dropdown for Production Team */}
-                    <div className="relative" ref={dropdownRef}>
-                        <button
-                            onClick={() => setShowDropdown(!showDropdown)}
-                            className="flex items-center gap-3 focus:outline-none"
-                        >
-                            <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-cyan-600 rounded-full flex items-center justify-center text-white font-bold text-sm cursor-pointer hover:shadow-md transition-shadow">
-                                {teamMember?.name?.charAt(0) || 'P'}
-                            </div>
-                        </button>
-
-                        {/* ✅ Dropdown Menu */}
-                        {showDropdown && (
-                            <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-50 animate-fade-in">
-                                {/* Production Team Info */}
-                                <div className="px-4 py-3 border-b border-gray-100">
-                                    <p className="font-semibold text-gray-900">{teamMember?.name || 'Team Member'}</p>
-                                    <p className="text-sm text-gray-500 truncate">{teamMember?.email || 'team@fablab.jnec.rub.edu.bt'}</p>
-                                    <span className="inline-flex mt-1 px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700">
-                                        Production Team
-                                    </span>
-                                </div>
-
-                                {/* Menu Items */}
-                                <div className="py-1">
-                                    <button
-                                        onClick={handleProfileClick}
-                                        className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors flex items-center gap-2"
-                                    >
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                                        </svg>
-                                        My Profile
-                                    </button>
-                                </div>
-
-                                {/* Logout */}
-                                <div className="py-1 border-t border-gray-100">
-                                    <button
-                                        onClick={handleLogout}
-                                        className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2"
-                                    >
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                                        </svg>
-                                        Logout
-                                    </button>
-                                </div>
-                            </div>
-                        )}
-                    </div>
                 </div>
             </header>
 

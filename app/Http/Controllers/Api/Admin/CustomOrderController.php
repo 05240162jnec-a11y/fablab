@@ -10,6 +10,10 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use App\Notifications\CustomOrderPriceUpdatedNotification;
+use App\Notifications\PaymentApprovedNotification;
+use App\Notifications\PaymentRejectedNotification;
+use App\Notifications\DesignRejectedNotification;
+use App\Notifications\OrderAssignedNotification;
 
 class CustomOrderController extends Controller
 {
@@ -67,12 +71,12 @@ class CustomOrderController extends Controller
 
         $validated = $request->validate([
             'estimated_price' => 'required|numeric|min:0',
-            'price_breakdown' => 'nullable|string', // ✅ New field
+            'price_breakdown' => 'nullable|string',
         ]);
 
         $order->update([
             'estimated_price' => $validated['estimated_price'],
-            'price_breakdown' => $validated['price_breakdown'] ?? null, // ✅ Save breakdown
+            'price_breakdown' => $validated['price_breakdown'] ?? null,
             'status' => 'pending', 
             'rejection_reason' => null, 
         ]);
@@ -82,6 +86,7 @@ class CustomOrderController extends Controller
         } catch (\Exception $e) {
             \Log::error('Failed to send price update email: ' . $e->getMessage());
         }
+        
         // ✅ Notify the user about the price update (in-app notification)
         $order->user->notify(new CustomOrderPriceUpdatedNotification($order));
 
@@ -110,6 +115,9 @@ class CustomOrderController extends Controller
                 'status' => 'in_progress',
                 'rejection_reason' => null,
             ]);
+            
+            // ✅ CORRECT: Notify the user that their payment has been APPROVED
+            $order->user->notify(new PaymentApprovedNotification($order));
 
             return response()->json([
                 'success' => true,
@@ -122,6 +130,10 @@ class CustomOrderController extends Controller
                 'rejection_reason' => $validated['rejection_reason'] ?? 'Payment could not be verified. Please re-upload.',
                 'status' => 'payment_rejected', 
             ]);
+            
+            // ✅ CORRECT: Notify the user that their payment was REJECTED (include the reason)
+            $reason = $validated['rejection_reason'] ?? 'Payment could not be verified. Please re-upload.';
+            $order->user->notify(new PaymentRejectedNotification($order, $reason));
 
             return response()->json([
                 'success' => true,
@@ -162,6 +174,8 @@ class CustomOrderController extends Controller
             'assigned_at' => now(),
             'status' => 'in_progress', 
         ]);
+        // ✅ NEW: Notify the production team member about the assignment
+        $assignee->notify(new OrderAssignedNotification($order));
 
         $order->load('assignedUser');
 
@@ -261,6 +275,9 @@ class CustomOrderController extends Controller
             'status' => 'rejected',
             'rejection_reason' => $validated['rejection_reason'],
         ]);
+        // ✅ Notify the user that their design was rejected
+        $reason = $validated['rejection_reason'];
+        $order->user->notify(new DesignRejectedNotification($order, $reason));
 
         return response()->json([
             'success' => true,

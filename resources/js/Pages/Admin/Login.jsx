@@ -34,8 +34,8 @@ export default function AdminLogin() {
         setErrors({});
 
         try {
-            // POST to ADMIN endpoint
-            const response = await axios.post('http://127.0.0.1:8000/api/admin/login', formData, {
+            // ✅ CHANGED: POST to STANDARD endpoint (not admin endpoint)
+            const response = await axios.post('http://127.0.0.1:8000/api/login', formData, {
                 headers: {
                     'Accept': 'application/json',
                     'Content-Type': 'application/json',
@@ -48,10 +48,10 @@ export default function AdminLogin() {
             // Save token per-tab (prevents other tabs overwriting it)
             sessionStorage.setItem('auth_token', response.data.token);
 
-            // Save user data with role: 'admin' per-tab
-            if (response.data.admin) {
+            // ✅ CHANGED: Save user data (not admin data) with role: 'admin'
+            if (response.data.user) {
                 sessionStorage.setItem('user', JSON.stringify({
-                    ...response.data.admin,
+                    ...response.data.user,
                     role: 'admin'  // Add role for unified redirect logic
                 }));
             }
@@ -93,8 +93,8 @@ export default function AdminLogin() {
                 {/* Message */}
                 {message && (
                     <div className={`mb-4 p-3 rounded-lg text-sm ${message.includes('✅')
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-red-100 text-red-800'
+                        ? 'bg-green-100 text-green-800'
+                        : 'bg-red-100 text-red-800'
                         }`}>
                         {message}
                     </div>
@@ -145,8 +145,8 @@ export default function AdminLogin() {
                         type="submit"
                         disabled={loading}
                         className={`w-full py-3 px-6 rounded-lg font-medium text-white transition duration-200 ${loading
-                                ? 'bg-gray-400 cursor-not-allowed'
-                                : 'bg-blue-600 hover:bg-blue-700'
+                            ? 'bg-gray-400 cursor-not-allowed'
+                            : 'bg-blue-600 hover:bg-blue-700'
                             }`}
                     >
                         {loading ? 'Logging in...' : 'Login as Admin'}

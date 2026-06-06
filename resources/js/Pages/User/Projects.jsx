@@ -1,18 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
-import UserSidebar from './UserSidebar';
 
 export default function UserProjects() {
-    const location = useLocation();
-    const navigate = useNavigate();
-
-    const [expandedMenus, setExpandedMenus] = useState({
-        shopOrders: false,
-        machines: false,
-        learning: false,
-    });
-
     const [projects, setProjects] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -43,31 +32,6 @@ export default function UserProjects() {
 
     // Toast
     const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
-
-    // Toggle submenu
-    const toggleSubmenu = (menu) => {
-        setExpandedMenus(prev => ({
-            ...prev,
-            [menu]: !prev[menu]
-        }));
-    };
-
-    // Handle logout
-    const handleLogout = () => {
-        sessionStorage.clear();
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('user');
-        localStorage.removeItem('user_data');
-        localStorage.removeItem('enrollments');
-        localStorage.removeItem('courses');
-        localStorage.removeItem('bookings');
-        localStorage.removeItem('machines');
-        localStorage.removeItem('dashboard_data');
-        localStorage.removeItem('cart_items');
-        localStorage.removeItem('user_profile');
-        localStorage.removeItem('booking_data');
-        navigate('/login', { replace: true });
-    };
 
     const showToast = (message, type = 'success') => {
         setToast({ show: true, message, type });
@@ -176,7 +140,7 @@ export default function UserProjects() {
         }
     };
 
-    
+
     // ✅ Open Cancel Modal (close View modal first)
     const handleCancelClick = (project) => {
         console.log('🔵 Cancel button clicked for project:', project);
@@ -185,7 +149,6 @@ export default function UserProjects() {
         setShowCancelModal(true); // ✅ Open Cancel modal
     };
 
-    // ✅ Confirm Cancel
     // ✅ Confirm Cancel
     const confirmCancel = async () => {
         console.log('🟡 Confirm Cancel clicked');
@@ -447,224 +410,218 @@ export default function UserProjects() {
     };
 
     return (
-        <div className="flex min-h-screen bg-gray-50">
-            {/* ✅ Sidebar */}
-            <UserSidebar expandedMenus={expandedMenus} toggleSubmenu={toggleSubmenu} onLogout={handleLogout} />
+        <>
+            {/* Header */}
+            <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
+                <div className="flex items-center justify-between px-6 py-4">
+                    <div>
+                        <h2 className="text-xl font-semibold text-gray-800">My Projects</h2>
+                        <p className="text-sm text-gray-600">Submit and track your Fab Lab projects</p>
+                    </div>
+                    <button
+                        onClick={handleOpenSubmit}
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                    >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                        </svg>
+                        Submit New Project
+                    </button>
+                </div>
+            </header>
 
             {/* Main Content */}
-            <div className="flex-1">
-                {/* Header */}
-                <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
-                    <div className="flex items-center justify-between px-6 py-4">
-                        <div>
-                            <h2 className="text-xl font-semibold text-gray-800">My Projects</h2>
-                            <p className="text-sm text-gray-600">Submit and track your Fab Lab projects</p>
-                        </div>
-                        <button
-                            onClick={handleOpenSubmit}
-                            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
-                        >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                            </svg>
-                            Submit New Project
-                        </button>
-                    </div>
-                </header>
+            <main className="p-6">
+                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+                        <h3 className="text-lg font-bold text-gray-900">
+                            My Submissions ({filteredProjects.length})
+                        </h3>
 
-                {/* Main Content */}
-                <main className="p-6">
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
-                            <h3 className="text-lg font-bold text-gray-900">
-                                My Submissions ({filteredProjects.length})
-                            </h3>
-
-                            <div className="flex flex-col sm:flex-row gap-3">
-                                {/* Search Bar */}
-                                <div className="relative w-full sm:w-80">
-                                    <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                                    </svg>
-                                    <input
-                                        type="text"
-                                        placeholder="Search projects..."
-                                        value={searchTerm}
-                                        onChange={(e) => setSearchTerm(e.target.value)}
-                                        className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    />
-                                </div>
-
-                                {/* ✅ NEW: Status Filter Dropdown */}
-                                <select
-                                    value={filterStatus}
-                                    onChange={(e) => setFilterStatus(e.target.value)}
-                                    className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                                >
-                                    <option value="all">All Status ({stats.total})</option>
-                                    <option value="pending">Pending ({stats.pending})</option>
-                                    <option value="approved">Approved ({stats.approved})</option>
-                                    <option value="rejected">Rejected ({stats.rejected})</option>
-                                    <option value="cancelled">Cancelled ({stats.cancelled})</option>
-                                </select>
+                        <div className="flex flex-col sm:flex-row gap-3">
+                            {/* Search Bar */}
+                            <div className="relative w-full sm:w-80">
+                                <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                </svg>
+                                <input
+                                    type="text"
+                                    placeholder="Search projects..."
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                />
                             </div>
-                        </div>
 
-                        {/* Bulk Actions Bar */}
-                        {selectedProjects.length > 0 && (
-                            <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                    <span className="text-sm font-medium text-blue-900">
-                                        {selectedProjects.length} project(s) selected
-                                    </span>
-                                    <button
-                                        onClick={() => setSelectedProjects([])}
-                                        className="text-sm text-blue-600 hover:text-blue-800 underline"
-                                    >
-                                        Clear selection
-                                    </button>
-                                </div>
+                            {/* ✅ NEW: Status Filter Dropdown */}
+                            <select
+                                value={filterStatus}
+                                onChange={(e) => setFilterStatus(e.target.value)}
+                                className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                            >
+                                <option value="all">All Status ({stats.total})</option>
+                                <option value="pending">Pending ({stats.pending})</option>
+                                <option value="approved">Approved ({stats.approved})</option>
+                                <option value="rejected">Rejected ({stats.rejected})</option>
+                                <option value="cancelled">Cancelled ({stats.cancelled})</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    {/* Bulk Actions Bar */}
+                    {selectedProjects.length > 0 && (
+                        <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <span className="text-sm font-medium text-blue-900">
+                                    {selectedProjects.length} project(s) selected
+                                </span>
                                 <button
-                                    onClick={handleBulkDelete}
-                                    className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
+                                    onClick={() => setSelectedProjects([])}
+                                    className="text-sm text-blue-600 hover:text-blue-800 underline"
                                 >
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                    </svg>
-                                    Delete Selected
+                                    Clear selection
                                 </button>
                             </div>
-                        )}
+                            <button
+                                onClick={handleBulkDelete}
+                                className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                                Delete Selected
+                            </button>
+                        </div>
+                    )}
 
-                        {/* Loading State */}
-                        {loading && (
-                            <div className="flex items-center justify-center py-20">
-                                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-                            </div>
-                        )}
+                    {/* Loading State */}
+                    {loading && (
+                        <div className="flex items-center justify-center py-20">
+                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                        </div>
+                    )}
 
-                        {/* Error State */}
-                        {error && !loading && (
-                            <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg mb-4">
-                                {error}
-                            </div>
-                        )}
+                    {/* Error State */}
+                    {error && !loading && (
+                        <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg mb-4">
+                            {error}
+                        </div>
+                    )}
 
-                        {/* Projects Table */}
-                        {!loading && !error && filteredProjects.length > 0 && (
-                            <div className="overflow-x-auto">
-                                <table className="w-full">
-                                    <thead>
-                                        <tr className="border-b border-gray-100">
-                                            <th className="text-left py-3 px-4 w-12">
+                    {/* Projects Table */}
+                    {!loading && !error && filteredProjects.length > 0 && (
+                        <div className="overflow-x-auto">
+                            <table className="w-full">
+                                <thead>
+                                    <tr className="border-b border-gray-100">
+                                        <th className="text-left py-3 px-4 w-12">
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedProjects.length === filteredProjects.length && filteredProjects.length > 0}
+                                                onChange={handleSelectAll}
+                                                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+                                            />
+                                        </th>
+                                        <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Project</th>
+                                        <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Status</th>
+                                        <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Submitted</th>
+                                        <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Reviewed</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                    {filteredProjects.map((project) => (
+                                        <tr
+                                            key={project.id}
+                                            onClick={() => handleOpenView(project)}
+                                            className="hover:bg-gray-50 transition-colors cursor-pointer"
+                                        >
+                                            <td className="py-4 px-4" onClick={(e) => e.stopPropagation()}>
                                                 <input
                                                     type="checkbox"
-                                                    checked={selectedProjects.length === filteredProjects.length && filteredProjects.length > 0}
-                                                    onChange={handleSelectAll}
+                                                    checked={selectedProjects.includes(project.id)}
+                                                    onChange={() => handleSelectProject(project.id)}
                                                     className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
                                                 />
-                                            </th>
-                                            <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Project</th>
-                                            <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Status</th>
-                                            <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Submitted</th>
-                                            <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Reviewed</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-100">
-                                        {filteredProjects.map((project) => (
-                                            <tr
-                                                key={project.id}
-                                                onClick={() => handleOpenView(project)}
-                                                className="hover:bg-gray-50 transition-colors cursor-pointer"
-                                            >
-                                                <td className="py-4 px-4" onClick={(e) => e.stopPropagation()}>
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={selectedProjects.includes(project.id)}
-                                                        onChange={() => handleSelectProject(project.id)}
-                                                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
-                                                    />
-                                                </td>
-                                                <td className="py-4 px-4">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center text-white flex-shrink-0">
-                                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                                            </svg>
-                                                        </div>
-                                                        <div>
-                                                            <p className="font-semibold text-gray-900 text-sm">{project.title}</p>
-                                                            <p className="text-xs text-gray-500 line-clamp-1">{project.description}</p>
-                                                        </div>
+                                            </td>
+                                            <td className="py-4 px-4">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center text-white flex-shrink-0">
+                                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                        </svg>
                                                     </div>
-                                                </td>
-                                                <td className="py-4 px-4">
-                                                    {getStatusBadge(project.status)}
-                                                </td>
-                                                <td className="py-4 px-4 text-sm text-gray-600">
-                                                    {formatDate(project.submitted_at || project.created_at)}
-                                                </td>
-                                                <td className="py-4 px-4 text-sm text-gray-600">
-                                                    {project.reviewed_at ? (
-                                                        <div>
-                                                            <p>{formatDate(project.reviewed_at)}</p>
-                                                            {project.reviewer_name && (
-                                                                <p className="text-xs text-gray-500">by {project.reviewer_name}</p>
-                                                            )}
-                                                        </div>
-                                                    ) : (
-                                                        '—'
-                                                    )}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
+                                                    <div>
+                                                        <p className="font-semibold text-gray-900 text-sm">{project.title}</p>
+                                                        <p className="text-xs text-gray-500 line-clamp-1">{project.description}</p>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="py-4 px-4">
+                                                {getStatusBadge(project.status)}
+                                            </td>
+                                            <td className="py-4 px-4 text-sm text-gray-600">
+                                                {formatDate(project.submitted_at || project.created_at)}
+                                            </td>
+                                            <td className="py-4 px-4 text-sm text-gray-600">
+                                                {project.reviewed_at ? (
+                                                    <div>
+                                                        <p>{formatDate(project.reviewed_at)}</p>
+                                                        {project.reviewer_name && (
+                                                            <p className="text-xs text-gray-500">by {project.reviewer_name}</p>
+                                                        )}
+                                                    </div>
+                                                ) : (
+                                                    '—'
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
 
-                        {/* Empty State */}
-                        {!loading && !error && filteredProjects.length === 0 && (
-                            <div className="text-center py-16">
-                                {searchTerm || filterStatus !== 'all' ? (
-                                    <>
-                                        <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    {/* Empty State */}
+                    {!loading && !error && filteredProjects.length === 0 && (
+                        <div className="text-center py-16">
+                            {searchTerm || filterStatus !== 'all' ? (
+                                <>
+                                    <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                    </svg>
+                                    <h3 className="text-lg font-semibold text-gray-900 mb-2">No projects found</h3>
+                                    <p className="text-gray-500 mb-4">Try adjusting your search or filter</p>
+                                    <button
+                                        onClick={() => { setSearchTerm(''); setFilterStatus('all'); }}
+                                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                                    >
+                                        Clear Filters
+                                    </button>
+                                </>
+                            ) : (
+                                <>
+                                    <div className="inline-flex items-center justify-center w-20 h-20 bg-blue-100 rounded-full mb-4">
+                                        <svg className="w-10 h-10 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                         </svg>
-                                        <h3 className="text-lg font-semibold text-gray-900 mb-2">No projects found</h3>
-                                        <p className="text-gray-500 mb-4">Try adjusting your search or filter</p>
-                                        <button
-                                            onClick={() => { setSearchTerm(''); setFilterStatus('all'); }}
-                                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
-                                        >
-                                            Clear Filters
-                                        </button>
-                                    </>
-                                ) : (
-                                    <>
-                                        <div className="inline-flex items-center justify-center w-20 h-20 bg-blue-100 rounded-full mb-4">
-                                            <svg className="w-10 h-10 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                            </svg>
-                                        </div>
-                                        <h3 className="text-lg font-semibold text-gray-900 mb-2">No projects yet</h3>
-                                        <p className="text-gray-500 mb-4">Submit your first Fab Lab project to get started!</p>
-                                        <button
-                                            onClick={handleOpenSubmit}
-                                            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
-                                        >
-                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                                            </svg>
-                                            Submit Your First Project
-                                        </button>
-                                    </>
-                                )}
-                            </div>
-                        )}
-                    </div>
-                </main>
-            </div>
+                                    </div>
+                                    <h3 className="text-lg font-semibold text-gray-900 mb-2">No projects yet</h3>
+                                    <p className="text-gray-500 mb-4">Submit your first Fab Lab project to get started!</p>
+                                    <button
+                                        onClick={handleOpenSubmit}
+                                        className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                                    >
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                        </svg>
+                                        Submit Your First Project
+                                    </button>
+                                </>
+                            )}
+                        </div>
+                    )}
+                </div>
+            </main>
 
             {/* ===== CANCEL CONFIRMATION MODAL ===== */}
             {showCancelModal && selectedProject && (
@@ -1091,6 +1048,6 @@ export default function UserProjects() {
                     {toast.message}
                 </div>
             )}
-        </div>
+        </>
     );
 }

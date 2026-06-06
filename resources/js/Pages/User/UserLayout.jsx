@@ -1,28 +1,26 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
-import AdminSidebar from '../../Components/AdminSidebar';
+import UserSidebar from './UserSidebar';
 import NotificationBell from '../../Components/NotificationBell';
 
-export default function AdminLayout() {
-    const [expandedMenus, setExpandedMenus] = useState({
-        userManagement: false,
-        operations: false,
-        resources: false,
-        contentMedia: false,
-    });
-    const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-
-    // ✅ Profile Dropdown State (from Dashboard)
-    const [admin, setAdmin] = useState(null);
-    const [showProfileDropdown, setShowProfileDropdown] = useState(false);
-    const profileDropdownRef = useRef(null);
+export default function UserLayout() {
     const navigate = useNavigate();
 
-    // Fetch admin data from localStorage
+    // User data state
+    const [user, setUser] = useState(null);
+
+    // Profile dropdown state
+    const [showProfileDropdown, setShowProfileDropdown] = useState(false);
+    const profileDropdownRef = useRef(null);
+
+    // Logout confirmation
+    const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+
+    // Fetch user data from localStorage
     useEffect(() => {
-        const storedAdmin = JSON.parse(localStorage.getItem('admin'));
-        if (storedAdmin) {
-            setAdmin(storedAdmin);
+        const storedUser = JSON.parse(localStorage.getItem('user'));
+        if (storedUser) {
+            setUser(storedUser);
         }
     }, []);
 
@@ -43,17 +41,20 @@ export default function AdminLayout() {
     };
 
     const confirmLogout = () => {
+        // Clear ALL user data
         localStorage.removeItem('auth_token');
-        localStorage.removeItem('admin_token');
         localStorage.removeItem('user');
-        localStorage.removeItem('admin');
-        localStorage.removeItem('admin_dashboard_data');
         localStorage.removeItem('user_data');
         localStorage.removeItem('enrollments');
         localStorage.removeItem('courses');
         localStorage.removeItem('bookings');
         localStorage.removeItem('machines');
+        localStorage.removeItem('dashboard_data');
+        localStorage.removeItem('cart_items');
+        localStorage.removeItem('user_profile');
+        localStorage.removeItem('booking_data');
         sessionStorage.clear();
+
         navigate('/login', { replace: true });
     };
 
@@ -63,59 +64,60 @@ export default function AdminLayout() {
 
     const handleProfileClick = () => {
         setShowProfileDropdown(false);
-        navigate('/admin/profile');
+        navigate('/user/profile');
     };
 
-    const toggleSubmenu = (menu) => {
-        setExpandedMenus(prev => ({
-            ...prev,
-            [menu]: !prev[menu]
-        }));
+    // Get user initials
+    const getUserInitials = () => {
+        if (user?.name) {
+            return user.name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
+        }
+        return 'U';
     };
 
     return (
         <div className="flex min-h-screen bg-gray-50">
             {/* Sidebar */}
-            <AdminSidebar
-                expandedMenus={expandedMenus}
-                toggleSubmenu={toggleSubmenu}
-                onLogout={handleLogout}
-            />
+            <UserSidebar onLogout={handleLogout} />
 
             {/* Main Content Area */}
             <div className="flex-1 flex flex-col min-w-0">
 
-                {/* ✅ UPDATED: Global Top Header with Bell + Profile Dropdown */}
+                {/* Global Top Header */}
                 <header className="bg-white border-b border-gray-200 sticky top-0 z-[100] px-6 py-3 shadow-sm">
                     <div className="flex items-center justify-between">
                         <div>
-                            <h2 className="text-lg font-semibold text-gray-800">Admin Panel</h2>
+                            <h2 className="text-lg font-semibold text-gray-800">User Portal</h2>
                         </div>
 
                         <div className="flex items-center gap-4">
                             {/* Notification Bell */}
                             <NotificationBell />
 
-                            {/* ✅ Profile Dropdown (Merged from Dashboard) */}
+                            {/* Profile Dropdown */}
                             <div className="relative" ref={profileDropdownRef}>
                                 <button
                                     onClick={() => setShowProfileDropdown(!showProfileDropdown)}
                                     className="flex items-center gap-3 focus:outline-none"
                                 >
                                     <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-cyan-600 rounded-full flex items-center justify-center text-white font-bold text-sm cursor-pointer hover:shadow-md transition-shadow">
-                                        {admin?.name?.charAt(0) || 'A'}
+                                        {getUserInitials()}
+                                    </div>
+                                    <div className="hidden md:block text-left">
+                                        <p className="text-sm font-medium text-gray-900">{user?.name?.split(' ')[0] || 'User'}</p>
+                                        <p className="text-xs text-gray-500">{user?.department || 'Student'}</p>
                                     </div>
                                 </button>
 
                                 {/* Dropdown Menu */}
                                 {showProfileDropdown && (
                                     <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-[110] animate-fade-in">
-                                        {/* Admin Info */}
+                                        {/* User Info */}
                                         <div className="px-4 py-3 border-b border-gray-100">
-                                            <p className="font-semibold text-gray-900">{admin?.name || 'Admin'}</p>
-                                            <p className="text-sm text-gray-500 truncate">{admin?.email || 'admin@fablab.jnec.rub.edu.bt'}</p>
+                                            <p className="font-semibold text-gray-900">{user?.name || 'User'}</p>
+                                            <p className="text-sm text-gray-500 truncate">{user?.email || 'user@example.com'}</p>
                                             <span className="inline-flex mt-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
-                                                Administrator
+                                                {user?.department || 'Student'}
                                             </span>
                                         </div>
 
@@ -152,7 +154,7 @@ export default function AdminLayout() {
                 </header>
 
                 {/* Page Content */}
-                <div className="flex-1 p-6">
+                <div className="flex-1">
                     <Outlet />
                 </div>
             </div>

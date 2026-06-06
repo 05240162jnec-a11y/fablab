@@ -8,7 +8,7 @@ export default function Login() {
     const [message, setMessage] = useState('');
     const [errors, setErrors] = useState({});
     const [showPwd, setShowPwd] = useState(false);
-    const [token, setToken] = useState(null);  // kept from original
+    const [token, setToken] = useState(null);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -16,7 +16,7 @@ export default function Login() {
         if (errors[name]) setErrors(prev => ({ ...prev, [name]: '' }));
     };
 
-    // ── UNIFIED LOGIN (User + Admin + Production Team) — original logic untouched ──
+    // ── UNIFIED LOGIN (All roles use /api/login) ──
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
@@ -24,39 +24,22 @@ export default function Login() {
         setErrors({});
 
         try {
-            let response;
-            let loginType = 'user';
+            // ✅ SIMPLIFIED: Only use /api/login for all roles
+            const response = await axios.post('http://127.0.0.1:8000/api/login', formData);
 
-            try {
-                response = await axios.post('http://127.0.0.1:8000/api/login', formData);
-            } catch (userError) {
-                if (userError.response?.status === 401 ||
-                    userError.response?.data?.message?.includes('Invalid credentials')) {
-                    response = await axios.post('http://127.0.0.1:8000/api/admin/login', formData);
-                    loginType = 'admin';
-                } else {
-                    throw userError;
-                }
-            }
-
-            // Clear per-tab old data only (localStorage is shared across tabs)
+            // Clear per-tab old data
             sessionStorage.clear();
 
+            // Save token
             sessionStorage.setItem('auth_token', response.data.token);
 
-            if (loginType === 'admin') {
-                if (response.data.admin) {
-                    sessionStorage.setItem('user', JSON.stringify({ ...response.data.admin, role: 'admin' }));
-                }
-            } else {
-                if (response.data.user) {
-                    sessionStorage.setItem('user', JSON.stringify(response.data.user));
-                }
+            // ✅ SIMPLIFIED: Save user data (no more admin fallback)
+            if (response.data.user) {
+                sessionStorage.setItem('user', JSON.stringify(response.data.user));
             }
 
-
-            const userData = response.data.user || response.data.admin;
-            const userRole = userData?.role || (loginType === 'admin' ? 'admin' : 'student');
+            // Get user role and redirect
+            const userRole = response.data.user?.role;
             const redirectPath =
                 userRole === 'admin' ? '/admin/dashboard' :
                     userRole === 'production_team' ? '/production-team/dashboard' :
@@ -82,10 +65,9 @@ export default function Login() {
         }
     };
 
-    // Logout helper (kept from original)
+    // Logout helper
     const handleLogout = () => {
         sessionStorage.clear();
-        // Keep existing localStorage cleanup to avoid stale non-auth data affecting UI.
         ['admin_token', 'user_data', 'enrollments', 'courses', 'bookings', 'machines'].forEach(k => localStorage.removeItem(k));
         setToken(null);
         setMessage('👋 You have been logged out.');
@@ -253,8 +235,8 @@ export default function Login() {
                     {/* Message banner */}
                     {message && (
                         <div className={`msg-banner ${message.startsWith('✅') ? 'msg-success' :
-                                message.startsWith('⚠️') ? 'msg-warning' :
-                                    'msg-error'
+                            message.startsWith('⚠️') ? 'msg-warning' :
+                                'msg-error'
                             }`}>
                             {message}
                         </div>

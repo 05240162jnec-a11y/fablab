@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom'; // ✅ Kept Link for Quick Actions
 
 export default function Dashboard() {
     const [stats, setStats] = useState({
@@ -11,49 +11,6 @@ export default function Dashboard() {
     });
     const [recentActivity, setRecentActivity] = useState([]);
     const [loading, setLoading] = useState(true);
-
-    // Profile dropdown state
-    const [admin, setAdmin] = useState(null);
-    const [showDropdown, setShowDropdown] = useState(false);
-    const dropdownRef = useRef(null);
-    const navigate = useNavigate();
-
-    // Fetch admin data from localStorage
-    useEffect(() => {
-        const storedAdmin = JSON.parse(localStorage.getItem('admin'));
-        if (storedAdmin) {
-            setAdmin(storedAdmin);
-        }
-    }, []);
-
-    // Close dropdown when clicking outside
-    useEffect(() => {
-        const handleClickOutside = (event) => {
-            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-                setShowDropdown(false);
-            }
-        };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
-
-    const handleLogout = () => {
-        // Per-tab auth token is stored in sessionStorage now
-        localStorage.removeItem('admin_token');
-        localStorage.removeItem('admin_dashboard_data');
-        localStorage.removeItem('user_data');
-        localStorage.removeItem('enrollments');
-        localStorage.removeItem('courses');
-        localStorage.removeItem('bookings');
-        localStorage.removeItem('machines');
-        sessionStorage.clear();
-        navigate('/login', { replace: true });
-    };
-
-    const handleProfileClick = () => {
-        setShowDropdown(false);
-        navigate('/admin/profile');
-    };
 
     useEffect(() => {
         fetchDashboardData();
@@ -77,65 +34,11 @@ export default function Dashboard() {
 
     return (
         <div className="flex-1">
-            {/* Top Header - Updated with clickable avatar */}
+            {/* ✅ Dashboard Header - Title & Welcome Message KEPT, Avatar REMOVED */}
             <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
-                <div className="flex items-center justify-between px-6 py-4">
-                    <div>
-                        <h2 className="text-xl font-semibold text-gray-800">Dashboard</h2>
-                        <p className="text-sm text-gray-600">Welcome back, Admin. Here is an overview of your Fab Lab.</p>
-                    </div>
-
-                    {/* Right Side - Profile Dropdown (No notification icon) */}
-                    <div className="relative" ref={dropdownRef}>
-                        <button
-                            onClick={() => setShowDropdown(!showDropdown)}
-                            className="flex items-center gap-3 focus:outline-none"
-                        >
-                            <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-cyan-600 rounded-full flex items-center justify-center text-white font-bold text-sm cursor-pointer hover:shadow-md transition-shadow">
-                                {admin?.name?.charAt(0) || 'A'}
-                            </div>
-                        </button>
-
-                        {/* Dropdown Menu */}
-                        {showDropdown && (
-                            <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-50 animate-fade-in">
-                                {/* Admin Info */}
-                                <div className="px-4 py-3 border-b border-gray-100">
-                                    <p className="font-semibold text-gray-900">{admin?.name || 'Admin'}</p>
-                                    <p className="text-sm text-gray-500 truncate">{admin?.email || 'admin@fablab.jnec.rub.edu.bt'}</p>
-                                    <span className="inline-flex mt-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
-                                        Administrator
-                                    </span>
-                                </div>
-
-                                {/* Menu Items */}
-                                <div className="py-1">
-                                    <button
-                                        onClick={handleProfileClick}
-                                        className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors flex items-center gap-2"
-                                    >
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                                        </svg>
-                                        My Profile
-                                    </button>
-                                </div>
-
-                                {/* Logout */}
-                                <div className="py-1 border-t border-gray-100">
-                                    <button
-                                        onClick={handleLogout}
-                                        className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2"
-                                    >
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                                        </svg>
-                                        Logout
-                                    </button>
-                                </div>
-                            </div>
-                        )}
-                    </div>
+                <div className="px-6 py-4">
+                    <h2 className="text-xl font-semibold text-gray-800">Dashboard</h2>
+                    <p className="text-sm text-gray-600">Welcome back, Admin. Here is an overview of your Fab Lab.</p>
                 </div>
             </header>
 
@@ -222,7 +125,7 @@ export default function Dashboard() {
                                                 <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-semibold text-xs flex-shrink-0">
                                                     {activity.user_initials}
                                                 </div>
-                                                <div className="flex-1">
+                                                <div>
                                                     <p className="text-gray-900 text-sm font-medium">
                                                         <span className="font-semibold">{activity.user_name}</span> {activity.action} {activity.target}
                                                     </p>

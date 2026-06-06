@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use App\Notifications\NewCustomOrderNotification;
 use App\Models\User;
+use App\Notifications\PaymentUploadedNotification;
 
 class CustomOrderController extends Controller
 {
@@ -81,11 +82,12 @@ class CustomOrderController extends Controller
         $validated['design_images'] = $imagePaths;
 
         $order = CustomOrder::create($validated);
+        
         // ✅ Notify all admins about the new custom order
-$admins = User::where('role', 'admin')->get();
-foreach ($admins as $admin) {
-    $admin->notify(new NewCustomOrderNotification($order));
-}
+        $admins = User::where('role', 'admin')->get();
+        foreach ($admins as $admin) {
+            $admin->notify(new NewCustomOrderNotification($order));
+        }
 
         return response()->json([
             'success' => true,
@@ -95,58 +97,58 @@ foreach ($admins as $admin) {
     }
 
     /**
- * ✅ NEW: Update existing custom order (Edit functionality)
- */
-public function update(Request $request, $id)
-{
-    $user = Auth::user();
-    $order = CustomOrder::where('user_id', $user->id)->findOrFail($id);
+     * ✅ NEW: Update existing custom order (Edit functionality)
+     */
+    public function update(Request $request, $id)
+    {
+        $user = Auth::user();
+        $order = CustomOrder::where('user_id', $user->id)->findOrFail($id);
 
-    // Check if order can be edited
-    if ($order->estimated_price) {
-        return response()->json([
-            'success' => false,
-            'message' => 'Cannot edit order after admin has set the price.',
-        ], 422);
-    }
+        // Check if order can be edited
+        if ($order->estimated_price) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cannot edit order after admin has set the price.',
+            ], 422);
+        }
 
-    // ✅ UPDATED: Use 'sometimes' instead of 'required'
-    // This allows saving even if fields aren't changed
-    $validated = $request->validate([
-        'title' => 'sometimes|string|max:255',
-        'description' => 'sometimes|string',
-        'quantity' => 'sometimes|integer|min:1',
-        'design_images.*' => 'nullable|image|max:5120',
-    ]);
+        // ✅ UPDATED: Use 'sometimes' instead of 'required'
+        // This allows saving even if fields aren't changed
+        $validated = $request->validate([
+            'title' => 'sometimes|string|max:255',
+            'description' => 'sometimes|string',
+            'quantity' => 'sometimes|integer|min:1',
+            'design_images.*' => 'nullable|image|max:5120',
+        ]);
 
-    // Handle new image uploads (if any)
-    $imagePaths = $order->design_images ?? [];
-    
-    if ($request->hasFile('design_images')) {
-        // Delete old images
-        if (!empty($imagePaths)) {
-            foreach ($imagePaths as $oldPath) {
-                Storage::disk('public')->delete($oldPath);
+        // Handle new image uploads (if any)
+        $imagePaths = $order->design_images ?? [];
+        
+        if ($request->hasFile('design_images')) {
+            // Delete old images
+            if (!empty($imagePaths)) {
+                foreach ($imagePaths as $oldPath) {
+                    Storage::disk('public')->delete($oldPath);
+                }
+            }
+            
+            // Upload new images
+            $imagePaths = [];
+            foreach ($request->file('design_images') as $file) {
+                $path = $file->store('custom-orders', 'public');
+                $imagePaths[] = $path;
             }
         }
-        
-        // Upload new images
-        $imagePaths = [];
-        foreach ($request->file('design_images') as $file) {
-            $path = $file->store('custom-orders', 'public');
-            $imagePaths[] = $path;
-        }
+
+        // ✅ Only update fields that were actually sent
+        $order->update(array_filter($validated));
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Custom order updated successfully!',
+            'data' => $order,
+        ]);
     }
-
-    // ✅ Only update fields that were actually sent
-    $order->update(array_filter($validated));
-
-    return response()->json([
-        'success' => true,
-        'message' => 'Custom order updated successfully!',
-        'data' => $order,
-    ]);
-}
 
     /**
      * ✅ NEW: Upload payment screenshot
@@ -185,6 +187,12 @@ public function update(Request $request, $id)
         $validated['status'] = 'pending';
 
         $order->update($validated);
+        
+        // ✅ Notify all admins about the uploaded payment
+        $admins = User::where('role', 'admin')->get();
+        foreach ($admins as $admin) {
+            $admin->notify(new PaymentUploadedNotification($order));
+        }
 
         return response()->json([
             'success' => true,
@@ -241,24 +249,25 @@ public function update(Request $request, $id)
             'data' => $team,
         ]);
     }
+    
     public function bulkDelete(Request $request)
-{
-    $request->validate([
-        'order_ids' => 'required|array',
-        'order_ids.*' => 'exists:custom_orders,id'
-    ]);
+    {
+        $request->validate([
+            'order_ids' => 'required|array',
+            'order_ids.*' => 'exists:custom_orders,id'
+        ]);
 
-    $orders = CustomOrder::where('user_id', auth()->id())
-        ->whereIn('id', $request->order_ids)
-        ->get();
+        $orders = CustomOrder::where('user_id', auth()->id())
+            ->whereIn('id', $request->order_ids)
+            ->get();
 
-    foreach ($orders as $order) {
-        $order->delete(); // Soft delete
+        foreach ($orders as $order) {
+            $order->delete(); // Soft delete
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => count($orders) . ' order(s) deleted successfully'
+        ]);
     }
-
-    return response()->json([
-        'success' => true,
-        'message' => count($orders) . ' order(s) deleted successfully'
-    ]);
-}
 }

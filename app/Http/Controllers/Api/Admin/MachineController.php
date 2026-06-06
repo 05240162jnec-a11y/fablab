@@ -28,7 +28,7 @@ class MachineController extends Controller
 
         $machines = $query->latest()->get();
 
-        // Calculate stats - ✅ Use in_use (with underscore)
+        // Calculate stats
         $stats = [
             'total' => $machines->count(),
             'available' => Machine::where('status', 'available')->count(),
@@ -61,8 +61,8 @@ class MachineController extends Controller
             'name' => 'required|string|max:255',
             'type' => 'required|string',
             'description' => 'nullable|string',
-            'status' => 'required|in:available,in_use,maintenance', // ✅ Use in_use
-            'image' => 'nullable|image|max:5120', // 5MB max
+            'status' => 'required|in:available,in_use,maintenance',
+            'image' => 'nullable|image|max:5120',
         ]);
 
         // Handle image upload
@@ -88,7 +88,7 @@ class MachineController extends Controller
             'name' => 'sometimes|required|string|max:255',
             'type' => 'sometimes|required|string',
             'description' => 'sometimes|nullable|string',
-            'status' => 'sometimes|in:available,in_use,maintenance', // ✅ Use in_use
+            'status' => 'sometimes|in:available,in_use,maintenance',
             'image' => 'sometimes|nullable|image|max:5120',
         ]);
 
@@ -128,7 +128,7 @@ class MachineController extends Controller
         ]);
     }
 
-    // ✅ Toggle maintenance mode with email notification
+    // ✅ SMART Toggle maintenance mode with booking status updates and email notifications
     public function toggleMaintenance(Request $request, $id)
     {
         $machine = Machine::findOrFail($id);
@@ -136,13 +136,26 @@ class MachineController extends Controller
         $newStatus = $request->input('status');
         $notifyUsers = $request->input('notify_users', false);
         
+        // Validate status
+        if (!in_array($newStatus, ['available', 'maintenance'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid status'
+            ], 422);
+        }
+        
         // Update machine status
         $machine->status = $newStatus;
         $machine->save();
         
-        // Send email notifications if setting to maintenance AND notify_users is true
-        if ($notifyUsers && $newStatus === 'maintenance') {
-            // Get all users who have active/pending bookings for this machine
+        // Refresh the model to ensure we have the latest data
+        $machine = $machine->fresh();
+        
+        $emailsSent = 0;
+        
+        // ✅ SCENARIO 1: Setting to MAINTENANCE
+        if ($newStatus === 'maintenance' && $notifyUsers) {
+            // Get all active bookings for this machine
             $bookings = Booking::where('machine_id', $machine->id)
                 ->whereIn('status', ['pending', 'confirmed', 'approved'])
                 ->with('user')
@@ -151,13 +164,43 @@ class MachineController extends Controller
             foreach ($bookings as $booking) {
                 if ($booking->user && $booking->user->email) {
                     try {
-                        // Send email notification
+                        // ✅ Update booking status to cancelled_due_to_maintenance
+                        $booking->status = 'cancelled_due_to_maintenance';
+                        $booking->save();
+                        
+                        // ✅ Send cancellation email
                         Mail::to($booking->user->email)->send(
-                            new MachineMaintenanceNotification($machine, $booking)
+                            new MachineMaintenanceNotification($machine, $booking, 'cancelled')
                         );
+                        $emailsSent++;
                     } catch (\Exception $e) {
-                        // Log error but continue with other users
-                        \Log::error('Failed to send maintenance notification: ' . $e->getMessage());
+                        \Log::error('Failed to send maintenance cancellation notification: ' . $e->getMessage());
+                    }
+                }
+            }
+        }
+        
+        // ✅ SCENARIO 2: Setting back to AVAILABLE
+        elseif ($newStatus === 'available' && $notifyUsers) {
+            // Get all bookings that were cancelled due to maintenance
+            $cancelledBookings = Booking::where('machine_id', $machine->id)
+                ->where('status', 'cancelled_due_to_maintenance')
+                ->with('user')
+                ->get();
+            
+            foreach ($cancelledBookings as $booking) {
+                if ($booking->user && $booking->user->email) {
+                    try {
+                        // ✅ Send "machine available again" email
+                        Mail::to($booking->user->email)->send(
+                            new MachineMaintenanceNotification($machine, $booking, 'available')
+                        );
+                        $emailsSent++;
+                        
+                        // Note: We keep the status as 'cancelled_due_to_maintenance' 
+                        // so we have a record of who was affected
+                    } catch (\Exception $e) {
+                        \Log::error('Failed to send machine available notification: ' . $e->getMessage());
                     }
                 }
             }
@@ -166,9 +209,10 @@ class MachineController extends Controller
         return response()->json([
             'success' => true,
             'message' => $newStatus === 'maintenance' 
-                ? 'Machine set to maintenance. Notifications sent to booked users.' 
-                : 'Machine is now available.',
-            'data' => $machine
+                ? 'Machine set to maintenance mode. ' . $emailsSent . ' user(s) notified.' 
+                : 'Machine is now available. ' . $emailsSent . ' user(s) notified.',
+            'data' => $machine,
+            'emails_sent' => $emailsSent
         ]);
     }
 }

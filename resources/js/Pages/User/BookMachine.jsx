@@ -3,7 +3,6 @@ import axios from 'axios';
 import { Link, useNavigate } from 'react-router-dom';
 
 export default function BookMachine() {
-    // ✅ Initialize React Router navigate hook
     const navigate = useNavigate();
 
     // API Data States
@@ -12,9 +11,10 @@ export default function BookMachine() {
     const [showDetailsModal, setShowDetailsModal] = useState(false);
     const [showBookingModal, setShowBookingModal] = useState(false);
     const [loading, setLoading] = useState(true);
-    const [userRole, setUserRole] = useState(null); // ✅ Track user role
+    const [userRole, setUserRole] = useState(null);
+    const [searchQuery, setSearchQuery] = useState('');
 
-    // ✅ NEW: User enrollment state
+    // NEW: User enrollment state
     const [userEnrollments, setUserEnrollments] = useState([]);
 
     // Booking States
@@ -27,7 +27,7 @@ export default function BookMachine() {
     const [bookingSubmitting, setBookingSubmitting] = useState(false);
     const [bookingMessage, setBookingMessage] = useState('');
 
-    // ✅ Fetch user role on mount
+    // Fetch user role on mount
     useEffect(() => {
         const user = JSON.parse(sessionStorage.getItem('user'));
         if (user && user.role) {
@@ -44,7 +44,7 @@ export default function BookMachine() {
     const fetchMachines = async () => {
         try {
             setLoading(true);
-            const authToken = localStorage.getItem('auth_token');
+            const authToken = sessionStorage.getItem('auth_token');
 
             const response = await axios.get('http://127.0.0.1:8000/api/user/machines', {
                 headers: {
@@ -62,10 +62,10 @@ export default function BookMachine() {
         }
     };
 
-    // ✅ NEW: Fetch user enrollments to check completion status
+    // NEW: Fetch user enrollments to check completion status
     const fetchUserEnrollments = async () => {
         try {
-            const authToken = localStorage.getItem('auth_token');
+            const authToken = sessionStorage.getItem('auth_token');
             const response = await axios.get('http://127.0.0.1:8000/api/user/my-courses', {
                 headers: {
                     'Accept': 'application/json',
@@ -81,22 +81,30 @@ export default function BookMachine() {
         }
     };
 
-    // ✅ FIXED: Check if user has completed ANY course (GLOBAL check)
+    // FIXED: Check if user has completed ANY course (GLOBAL check)
     const hasCompletedAnyCourse = () => {
         return userEnrollments.some(enrollment => enrollment.status === 'completed');
     };
 
-    // ✅ FIXED: Check if user CAN book machines (Production team = always yes)
+    // FIXED: Check if user CAN book machines (Production team = always yes)
     const canBookMachine = (machine) => {
         // Machine must be available
         if (machine.status !== 'available') return false;
 
-        // ✅ Production team can always book (no course restriction)
+        // Production team can always book (no course restriction)
         if (userRole === 'production_team') return true;
 
-        // ✅ Regular users must have completed at least ONE course
+        // Regular users must have completed at least ONE course
         return hasCompletedAnyCourse();
     };
+
+    // ✅ NEW: Filter machines based on search query
+    const filteredMachines = machines.filter(machine => {
+        if (!searchQuery) return true;
+        const query = searchQuery.toLowerCase();
+        return machine.name?.toLowerCase().includes(query) ||
+            machine.category?.toLowerCase().includes(query);
+    });
 
     const handleViewDetails = (machine) => {
         setSelectedMachine(machine);
@@ -104,11 +112,9 @@ export default function BookMachine() {
     };
 
     const handleBookNow = (machine) => {
-        // ✅ Get user role directly from localStorage
-        const user = JSON.parse(localStorage.getItem('user'));
+        const user = JSON.parse(sessionStorage.getItem('user'));
         const userRole = user?.role;
 
-        // ✅ Skip course check for production team
         if (userRole !== 'production_team' && !hasCompletedAnyCourse()) {
             alert('❌ You must complete at least one training course before booking machines. Please enroll in and complete a course first.');
             return;
@@ -124,13 +130,13 @@ export default function BookMachine() {
         });
         setBookingMessage('');
 
-        // ✅ CRITICAL: Fetch booked dates EVERY time modal opens
+        // CRITICAL: Fetch booked dates EVERY time modal opens
         fetchBookedDates(machine.id);
     };
 
     const fetchBookedDates = async (machineId) => {
         try {
-            const authToken = localStorage.getItem('auth_token');
+            const authToken = sessionStorage.getItem('auth_token');
             const response = await axios.get(`http://127.0.0.1:8000/api/user/machines/${machineId}/booked-dates?t=${Date.now()}`, {
                 headers: {
                     'Accept': 'application/json',
@@ -138,7 +144,6 @@ export default function BookMachine() {
                 },
             });
 
-            // ✅ DEBUG: Log the response
             console.log('📅 Fetched booked dates for machine', machineId, ':', response.data.dates);
 
             setBookedDates(response.data.dates || []);
@@ -161,7 +166,6 @@ export default function BookMachine() {
         const start = new Date(startDate);
         const end = new Date(endDate);
         for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-            // ✅ Use local date formatting (same as calendar)
             const dateStr = [
                 d.getFullYear(),
                 String(d.getMonth() + 1).padStart(2, '0'),
@@ -177,11 +181,9 @@ export default function BookMachine() {
         setBookingSubmitting(true);
         setBookingMessage('');
 
-        // ✅ Get user role directly from localStorage
-        const user = JSON.parse(localStorage.getItem('user'));
+        const user = JSON.parse(sessionStorage.getItem('user'));
         const userRole = user?.role;
 
-        // ✅ Skip course check for production team
         if (userRole !== 'production_team' && !hasCompletedAnyCourse()) {
             setBookingMessage('❌ You must complete at least one training course before booking machines.');
             setBookingSubmitting(false);
@@ -195,7 +197,7 @@ export default function BookMachine() {
         }
 
         try {
-            const authToken = localStorage.getItem('auth_token');
+            const authToken = sessionStorage.getItem('auth_token');
             const payload = {
                 machine_id: bookingData.machine_id,
                 start_date: bookingData.start_date,
@@ -216,32 +218,13 @@ export default function BookMachine() {
 
             setBookingMessage('✅ ' + response.data.message);
 
-            // ✅ Close modal FIRST, then navigate using React Router
             setShowBookingModal(false);
             setTimeout(() => {
-                
-                // ✅ Check if user is production team
-                const user = JSON.parse(localStorage.getItem('user'));
+                const user = JSON.parse(sessionStorage.getItem('user'));
                 if (user?.role === 'production_team') {
-                    // Redirect to production team's booking page
                     navigate('/production-team/book-machine?tab=my-bookings', { replace: true });
                 } else {
-                    // Regular users go to their page
-                    setBookingMessage('✅ ' + response.data.message);
-
-                    // ✅ Close modal FIRST, then navigate using React Router
-                    setShowBookingModal(false);
-                    setTimeout(() => {
-                        // ✅ Check if user is production team to redirect correctly
-                        const user = JSON.parse(localStorage.getItem('user'));
-                        if (user?.role === 'production_team') {
-                            // Redirect to production team's booking page and auto-switch to "My Bookings" tab
-                            navigate('/production-team/book-machine?tab=my-bookings', { replace: true });
-                        } else {
-                            // Regular users go to their page
-                            navigate('/user/machines?tab=bookings', { replace: true });
-                        }
-                    }, 300);
+                    navigate('/user/machines?tab=bookings', { replace: true });
                 }
             }, 300);
         } catch (error) {
@@ -310,7 +293,6 @@ export default function BookMachine() {
 
                 for (let d = 1; d <= daysInMonth; d++) {
                     const dateObj = new Date(year, month, d);
-                    // ✅ Use local date formatting (YYYY-MM-DD in user's timezone)
                     const dateStr = [
                         dateObj.getFullYear(),
                         String(dateObj.getMonth() + 1).padStart(2, '0'),
@@ -321,12 +303,11 @@ export default function BookMachine() {
                         date: dateStr,
                         dayNumber: d,
                         isBooked: bookedDates.includes(dateStr),
-                        isPast: dateObj < today, // Mark past days
+                        isPast: dateObj < today,
                         isToday: dateObj.getTime() === today.getTime()
                     });
                 }
 
-                // Move to next month
                 currentDate = new Date(year, month + 1, 1);
             } else {
                 currentDate.setDate(currentDate.getDate() + 1);
@@ -352,8 +333,34 @@ export default function BookMachine() {
 
             {!loading && (
                 <>
+                    {/* ✅ NEW: Search Bar */}
+                    <div className="mb-6">
+                        <div className="relative max-w-md">
+                            <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                            <input
+                                type="text"
+                                placeholder="Search machines by name..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white/80 backdrop-blur-sm"
+                            />
+                            {searchQuery && (
+                                <button
+                                    onClick={() => setSearchQuery('')}
+                                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            )}
+                        </div>
+                    </div>
+
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {machines.map((machine) => (
+                        {filteredMachines.map((machine) => (
                             <div
                                 key={machine.id}
                                 className="group bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden hover:-translate-y-1"
@@ -380,21 +387,27 @@ export default function BookMachine() {
                                         )}
                                     </div>
 
-                                    {/* Machine Image */}
+                                    {/* Machine Image - ✅ FIXED: Use image directly (already full URL) */}
                                     {machine.image ? (
                                         <img
-                                            src={`http://127.0.0.1:8000/storage/${machine.image}`}
+                                            src={machine.image}
                                             alt={machine.name}
                                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                            onError={(e) => {
+                                                e.target.onerror = null;
+                                                e.target.style.display = 'none';
+                                                e.target.nextSibling.style.display = 'flex';
+                                            }}
                                         />
-                                    ) : (
-                                        <div className="h-full bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center">
-                                            <svg className="w-16 h-16 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                            </svg>
-                                        </div>
-                                    )}
+                                    ) : null}
+
+                                    {/* Fallback placeholder */}
+                                    <div className={`h-full bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center ${machine.image ? 'hidden' : ''}`} style={{ display: machine.image ? 'none' : 'flex' }}>
+                                        <svg className="w-16 h-16 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                        </svg>
+                                    </div>
                                 </div>
 
                                 {/* Card Content */}
@@ -408,7 +421,6 @@ export default function BookMachine() {
                                     <div className="grid grid-cols-2 gap-3">
                                         <button
                                             onClick={() => handleBookNow(machine)}
-                                            // ✅ FIXED: Use updated canBookMachine logic (production team = always enabled)
                                             disabled={!canBookMachine(machine)}
                                             className={`py-2.5 px-3 rounded-xl font-medium text-sm transition-all duration-200 flex items-center justify-center gap-1.5 shadow-sm ${canBookMachine(machine)
                                                 ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:from-blue-600 hover:to-indigo-700 hover:shadow-lg transform hover:-translate-y-0.5'
@@ -438,28 +450,33 @@ export default function BookMachine() {
                         ))}
                     </div>
 
-                    {machines.length === 0 && (
+                    {/* ✅ UPDATED: Empty state with search awareness */}
+                    {filteredMachines.length === 0 && (
                         <div className="text-center py-16">
                             <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                                 <svg className="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
                             </div>
-                            <p className="text-gray-500 text-lg font-medium">No machines available right now</p>
-                            <p className="text-gray-400 text-sm mt-1">Check back later for new equipment!</p>
+                            <p className="text-gray-500 text-lg font-medium">
+                                {searchQuery ? 'No machines found matching your search' : 'No machines available right now'}
+                            </p>
+                            <p className="text-gray-400 text-sm mt-1">
+                                {searchQuery ? 'Try a different search term' : 'Check back later for new equipment!'}
+                            </p>
                         </div>
                     )}
                 </>
             )}
 
-            {/* ✨ MACHINE DETAILS MODAL - White Header */}
+            {/* MACHINE DETAILS MODAL - White Header */}
             {showDetailsModal && selectedMachine && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
                     <div
                         className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden animate-slide-up"
                         onClick={(e) => e.stopPropagation()}
                     >
-                        {/* ✅ WHITE HEADER */}
+                        {/* WHITE HEADER */}
                         <div className="relative bg-white px-6 py-5 border-b border-gray-100">
                             <div className="flex items-center justify-between">
                                 <div>
@@ -479,22 +496,28 @@ export default function BookMachine() {
 
                         {/* Content */}
                         <div className="p-6 overflow-y-auto flex-1 bg-gray-50">
-                            {/* Machine Image */}
+                            {/* Machine Image - ✅ FIXED: Use image directly */}
                             <div className="h-56 bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl mb-6 overflow-hidden shadow-inner">
                                 {selectedMachine.image ? (
                                     <img
-                                        src={`http://127.0.0.1:8000/storage/${selectedMachine.image}`}
+                                        src={selectedMachine.image}
                                         alt={selectedMachine.name}
                                         className="w-full h-full object-cover"
+                                        onError={(e) => {
+                                            e.target.onerror = null;
+                                            e.target.style.display = 'none';
+                                            e.target.nextSibling.style.display = 'flex';
+                                        }}
                                     />
-                                ) : (
-                                    <div className="h-full bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center">
-                                        <svg className="w-16 h-16 text-blue-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                        </svg>
-                                    </div>
-                                )}
+                                ) : null}
+
+                                {/* Fallback placeholder */}
+                                <div className={`h-full bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center ${selectedMachine.image ? 'hidden' : ''}`} style={{ display: selectedMachine.image ? 'none' : 'flex' }}>
+                                    <svg className="w-16 h-16 text-blue-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    </svg>
+                                </div>
                             </div>
 
                             {/* Info Cards Grid */}
@@ -548,7 +571,7 @@ export default function BookMachine() {
                                 </p>
                             </div>
 
-                            {/* ✅ FIXED: Training Status - Production team = always certified */}
+                            {/* Training Status */}
                             {userRole === 'production_team' ? (
                                 <div className="mb-6 p-5 bg-gradient-to-br from-purple-50 via-violet-50 to-fuchsia-50 rounded-2xl border-2 border-purple-100 shadow-sm">
                                     <div className="flex items-start gap-4">
@@ -636,14 +659,14 @@ export default function BookMachine() {
                 </div>
             )}
 
-            {/* ✨ BOOKING MODAL - White Header */}
+            {/* BOOKING MODAL - White Header */}
             {showBookingModal && selectedMachine && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-fade-in" onClick={closeBookingModal}>
                     <div
                         className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden animate-slide-up"
                         onClick={(e) => e.stopPropagation()}
                     >
-                        {/* ✅ WHITE HEADER */}
+                        {/* WHITE HEADER */}
                         <div className="relative bg-white px-6 py-5 border-b border-gray-100">
                             <div className="flex items-center justify-between">
                                 <div>
@@ -789,15 +812,11 @@ export default function BookMachine() {
                                                         let dayClass = 'bg-white border-gray-200 text-gray-700';
                                                         let isClickable = false;
 
-                                                        // ✅ Check booked FIRST - booked dates should always show red, even if past
                                                         if (isBooked) {
-                                                            // Booked days - red (highest priority)
                                                             dayClass = 'bg-red-50 border-red-200 text-red-400 cursor-not-allowed line-through font-semibold';
                                                         } else if (isPast) {
-                                                            // Past days - grayed out (only if not booked)
                                                             dayClass = 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed';
                                                         } else if (isSelected) {
-                                                            // Selected days - green
                                                             if (isStartDate || isEndDate) {
                                                                 dayClass = 'bg-gradient-to-br from-green-500 to-emerald-600 border-green-600 text-white font-bold shadow-md ring-2 ring-green-300';
                                                             } else {
@@ -805,7 +824,6 @@ export default function BookMachine() {
                                                             }
                                                             isClickable = true;
                                                         } else {
-                                                            // Available future days
                                                             dayClass = 'bg-white border-gray-200 text-gray-700 hover:bg-blue-50 hover:border-blue-300';
                                                             isClickable = true;
                                                         }
@@ -820,23 +838,18 @@ export default function BookMachine() {
             `}
                                                                 onClick={() => {
                                                                     if (isClickable && !isBooked && !isPast) {
-                                                                        // ✅ Case 1: No selection yet → set as start date
                                                                         if (!bookingData.start_date) {
                                                                             setBookingData(prev => ({ ...prev, start_date: dayInfo.date, end_date: '' }));
                                                                         }
-                                                                        // ✅ Case 2: Start date set, end date empty, clicking SAME date → single-day booking
                                                                         else if (bookingData.start_date === dayInfo.date && !bookingData.end_date) {
-                                                                            setBookingData(prev => ({ ...prev, end_date: dayInfo.date })); // ✅ End = Start
+                                                                            setBookingData(prev => ({ ...prev, end_date: dayInfo.date }));
                                                                         }
-                                                                        // ✅ Case 3: Start date set, end date empty, clicking LATER date → set end date
                                                                         else if (bookingData.start_date && !bookingData.end_date && dayInfo.date >= bookingData.start_date) {
                                                                             setBookingData(prev => ({ ...prev, end_date: dayInfo.date }));
                                                                         }
-                                                                        // ✅ Case 4: Start date set, end date empty, clicking EARLIER date → reset start to new date
                                                                         else if (bookingData.start_date && !bookingData.end_date && dayInfo.date < bookingData.start_date) {
                                                                             setBookingData(prev => ({ ...prev, start_date: dayInfo.date, end_date: '' }));
                                                                         }
-                                                                        // ✅ Case 5: Both dates set → start new selection
                                                                         else if (bookingData.start_date && bookingData.end_date) {
                                                                             setBookingData(prev => ({ ...prev, start_date: dayInfo.date, end_date: '' }));
                                                                         }

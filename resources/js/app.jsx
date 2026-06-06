@@ -49,6 +49,9 @@ import AdminProducts from './Pages/Admin/Products';
 import AdminLayout from './Pages/Admin/AdminLayout';
 import AdminProfile from './Pages/Admin/Profile';
 
+// ✅ NEW: User Layout
+import UserLayout from './Pages/User/UserLayout';
+
 // User Pages
 import UserDashboard from './Pages/User/Dashboard';
 import BookMachine from './Pages/User/BookMachine';
@@ -129,16 +132,31 @@ root.render(
                     <Route path="faq" element={<AdminFAQ />} />
                 </Route>
 
-                {/* User Pages */}
-                <Route path="/user/dashboard" element={<UserDashboard />} />
+                {/* ✅ UPDATED: User Pages - Now wrapped in UserLayout */}
+                <Route path="/user" element={<UserLayout />}>
+                    <Route path="dashboard" element={<UserDashboard />} />
 
-                {/* Tabbed Routes */}
-                <Route path="/user/shop-orders" element={<ShopOrders />} />
-                <Route path="/user/machines" element={<UserMachines />} />
-                <Route path="/user/learning" element={<Learning />} />
+                    {/* Tabbed Routes */}
+                    <Route path="shop-orders" element={<ShopOrders />} />
+                    <Route path="machines" element={<UserMachines />} />
+                    <Route path="learning" element={<Learning />} />
 
-                {/* ✅ NEW: User Projects Route */}
-                <Route path="/user/projects" element={<UserProjects />} />
+                    {/* User Projects Route */}
+                    <Route path="projects" element={<UserProjects />} />
+
+                    {/* Placeholder routes */}
+                    <Route path="explore" element={<div className="p-10 text-center text-2xl font-bold">Explore Page (Coming Soon)</div>} />
+                    <Route path="support" element={<div className="p-10 text-center text-2xl font-bold">Support Page (Coming Soon)</div>} />
+
+                    {/* Existing routes */}
+                    <Route path="book-machine" element={<BookMachine />} />
+                    <Route path="courses" element={<UserCourses />} />
+                    <Route path="custom-orders" element={<CustomOrders />} />
+                    <Route path="shop-products" element={<ShopProducts />} />
+                    <Route path="my-orders" element={<MyOrders />} />
+                    <Route path="my-bookings" element={<MyBookings />} />
+                    <Route path="my-enrollments" element={<MyEnrollments />} />
+                </Route>
 
                 {/* Production Team Routes */}
                 <Route path="/production-team" element={<ProductionTeamLayout />}>
@@ -149,24 +167,11 @@ root.render(
                     <Route path="inventory" element={<ProductionTeamInventory />} />
                     <Route path="assigned-orders" element={<AssignedOrders />} />
 
-                    {/* ✅ NEW: Production Team Machines & Products Routes */}
+                    {/* Production Team Machines & Products Routes */}
                     <Route path="machines" element={<ProductionTeamMachines />} />
                     <Route path="products" element={<ProductionTeamProducts />} />
                     <Route path="projects" element={<ProductionTeamProjects />} />
                 </Route>
-
-                {/* Placeholder routes */}
-                <Route path="/user/explore" element={<div className="p-10 text-center text-2xl font-bold">Explore Page (Coming Soon)</div>} />
-                <Route path="/user/support" element={<div className="p-10 text-center text-2xl font-bold">Support Page (Coming Soon)</div>} />
-
-                {/* Existing routes */}
-                <Route path="/user/book-machine" element={<BookMachine />} />
-                <Route path="/user/courses" element={<UserCourses />} />
-                <Route path="/user/custom-orders" element={<CustomOrders />} />
-                <Route path="/user/shop-products" element={<ShopProducts />} />
-                <Route path="/user/my-orders" element={<MyOrders />} />
-                <Route path="/user/my-bookings" element={<MyBookings />} />
-                <Route path="/user/my-enrollments" element={<MyEnrollments />} />
             </Routes>
         </BrowserRouter>
     </UniformDialogManager>

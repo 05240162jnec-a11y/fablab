@@ -16,14 +16,16 @@ class MachineMaintenanceNotification extends Mailable
 
     public $machine;
     public $booking;
+    public $notificationType; // 'cancelled' or 'available'
 
     /**
      * Create a new message instance.
      */
-    public function __construct(Machine $machine, Booking $booking)
+    public function __construct(Machine $machine, Booking $booking, string $notificationType = 'cancelled')
     {
         $this->machine = $machine;
         $this->booking = $booking;
+        $this->notificationType = $notificationType;
     }
 
     /**
@@ -31,8 +33,12 @@ class MachineMaintenanceNotification extends Mailable
      */
     public function envelope(): Envelope
     {
+        $subject = $this->notificationType === 'cancelled' 
+            ? '⚠️ Urgent: Your Booking Cancelled - Machine Under Maintenance'
+            : '✅ Machine Available Again - Re-booking Open';
+            
         return new Envelope(
-            subject: '⚠️ Machine Under Maintenance - Booking Update',
+            subject: $subject,
         );
     }
 
@@ -47,6 +53,8 @@ class MachineMaintenanceNotification extends Mailable
                 'machineName' => $this->machine->name,
                 'machineType' => $this->machine->type ?? 'Machine',
                 'bookingDates' => $this->formatBookingDates(),
+                'notificationType' => $this->notificationType,
+                'message' => $this->getMessage(),
             ],
         );
     }
@@ -70,5 +78,17 @@ class MachineMaintenanceNotification extends Mailable
             return $start . ' to ' . $end;
         }
         return 'Your upcoming booking';
+    }
+
+    /**
+     * Get appropriate message based on notification type
+     */
+    private function getMessage()
+    {
+        if ($this->notificationType === 'available') {
+            return "Good news! The machine you had booked is now back in service and available for booking.";
+        }
+        
+        return "Unfortunately, your booking has been cancelled due to unexpected maintenance requirements.";
     }
 }

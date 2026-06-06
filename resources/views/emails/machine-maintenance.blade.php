@@ -1,9 +1,42 @@
 @component('mail::message')
+
+@if($notificationType === 'available')
+# ✅ Machine Available Again - Re-booking Open
+
+Hello {{ $booking->user->name ?? 'User' }},
+
+{{ $message }}
+
+## Your Previous Booking Details:
+- **Machine:** {{ $machineName }}
+- **Type:** {{ $machineType }}
+- **Previously Booked Dates:** {{ $bookingDates }}
+
+## What You Can Do Now:
+- The machine is fully operational and ready for use
+- You can now re-book your preferred dates
+- No action is required from our side
+
+## Next Steps:
+1. Visit our [Book a Machine]({{ config('app.url') }}/user/book-machine) page
+2. Select your preferred dates and complete your booking
+3. Contact us if you need any assistance
+
+We're glad to have you back!
+
+Thank You,<br>
+{{ config('app.name') }} Team
+
+@component('mail::button', ['url' => config('app.url') . '/user/book-machine', 'color' => 'success'])
+Book Machine Now
+@endcomponent
+
+@else
 # ⚠️ Machine Under Maintenance
 
 Hello {{ $booking->user->name ?? 'User' }},
 
-We're writing to inform you that the machine you have booked, **{{ $machineName }}**, is currently under maintenance.
+{{ $message }}
 
 ## Your Booking Details:
 - **Machine:** {{ $machineName }}
@@ -28,6 +61,7 @@ Thank You,<br>
 @component('mail::button', ['url' => config('app.url') . '/user/book-machine'])
 Browse Available Machines
 @endcomponent
+@endif
 
 <small>If you have any questions, please contact our support team.</small>
 @endcomponent

@@ -4,11 +4,10 @@ import ProductionTeamSidebar from '../../Components/ProductionTeamSidebar';
 import NotificationBell from '../../Components/NotificationBell';
 
 export default function ProductionTeamLayout() {
-    // Sidebar state - for future expandable menus if needed
     const [expandedMenus, setExpandedMenus] = useState({});
     const navigate = useNavigate();
 
-    // Production team member data state
+    // ✅ FIXED: Production team member data state
     const [teamMember, setTeamMember] = useState(null);
 
     // Profile dropdown state
@@ -25,11 +24,29 @@ export default function ProductionTeamLayout() {
         }));
     };
 
-    // Fetch production team member data from localStorage
+    // ✅ FIXED: Fetch production team member data from sessionStorage
     useEffect(() => {
-        const storedMember = JSON.parse(localStorage.getItem('production_team_data') || '{}');
-        if (storedMember && storedMember.name) {
-            setTeamMember(storedMember);
+        // Try sessionStorage first (unified login)
+        const storedUser = sessionStorage.getItem('user');
+
+        if (storedUser) {
+            try {
+                const parsed = JSON.parse(storedUser);
+                setTeamMember(parsed);
+            } catch (e) {
+                console.error('Error parsing user data:', e);
+            }
+        } else {
+            // Fallback to localStorage for backward compatibility
+            const legacyData = localStorage.getItem('production_team_data');
+            if (legacyData) {
+                try {
+                    const parsed = JSON.parse(legacyData);
+                    setTeamMember(parsed);
+                } catch (e) {
+                    console.error('Error parsing legacy data:', e);
+                }
+            }
         }
     }, []);
 
@@ -49,12 +66,14 @@ export default function ProductionTeamLayout() {
         setShowProfileDropdown(false);
     };
 
+    // ✅ FIXED: Clear sessionStorage on logout
     const confirmLogout = () => {
-        // Clear production-team-specific keys first
+        // Clear session storage (unified auth)
+        sessionStorage.clear();
+
+        // Also clear any legacy localStorage keys
         localStorage.removeItem('production_team_token');
         localStorage.removeItem('production_team_data');
-
-        // Also clear legacy/shared keys for backward compatibility
         localStorage.removeItem('auth_token');
         localStorage.removeItem('admin_token');
         localStorage.removeItem('user_token');
@@ -66,7 +85,6 @@ export default function ProductionTeamLayout() {
         localStorage.removeItem('courses');
         localStorage.removeItem('bookings');
         localStorage.removeItem('machines');
-        sessionStorage.clear();
 
         navigate('/login', { replace: true });
     };
@@ -83,7 +101,11 @@ export default function ProductionTeamLayout() {
     // Get team member initials
     const getInitials = () => {
         if (teamMember?.name) {
-            return teamMember.name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
+            const names = teamMember.name.split(' ');
+            if (names.length >= 2) {
+                return (names[0][0] + names[names.length - 1][0]).toUpperCase();
+            }
+            return names[0].substring(0, 2).toUpperCase();
         }
         return 'PT';
     };
@@ -117,7 +139,8 @@ export default function ProductionTeamLayout() {
                                     onClick={() => setShowProfileDropdown(!showProfileDropdown)}
                                     className="flex items-center gap-3 focus:outline-none"
                                 >
-                                    <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-pink-600 rounded-full flex items-center justify-center text-white font-bold text-sm cursor-pointer hover:shadow-md transition-shadow">
+                                    {/* ✅ Blue gradient avatar */}
+                                    <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-cyan-600 rounded-full flex items-center justify-center text-white font-bold text-sm cursor-pointer hover:shadow-md transition-shadow">
                                         {getInitials()}
                                     </div>
                                     <div className="hidden md:block text-left">
@@ -133,7 +156,7 @@ export default function ProductionTeamLayout() {
                                         <div className="px-4 py-3 border-b border-gray-100">
                                             <p className="font-semibold text-gray-900">{teamMember?.name || 'Team Member'}</p>
                                             <p className="text-sm text-gray-500 truncate">{teamMember?.email || 'team@fablab.jnec.rub.edu.bt'}</p>
-                                            <span className="inline-flex mt-1 px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700">
+                                            <span className="inline-flex mt-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
                                                 Production Team
                                             </span>
                                         </div>
@@ -142,7 +165,7 @@ export default function ProductionTeamLayout() {
                                         <div className="py-1">
                                             <button
                                                 onClick={handleProfileClick}
-                                                className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-600 transition-colors flex items-center gap-2"
+                                                className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors flex items-center gap-2"
                                             >
                                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />

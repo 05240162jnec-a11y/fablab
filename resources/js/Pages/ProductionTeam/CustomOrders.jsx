@@ -8,6 +8,10 @@ export default function ProductionTeamCustomOrders() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
+    // ✅ NEW: Modal State
+    const [showModal, setShowModal] = useState(false);
+    const [selectedOrder, setSelectedOrder] = useState(null);
+
     useEffect(() => {
         const fetchAllOrders = async () => {
             if (activeTab !== 'all') return;
@@ -27,6 +31,62 @@ export default function ProductionTeamCustomOrders() {
 
         fetchAllOrders();
     }, [activeTab]);
+
+    // ✅ NEW: Open modal with order details
+    const handleViewOrder = (order) => {
+        setSelectedOrder(order);
+        setShowModal(true);
+    };
+
+    // ✅ NEW: Close modal
+    const closeModal = () => {
+        setShowModal(false);
+        setSelectedOrder(null);
+    };
+
+    // ✅ NEW: Download single image
+    const downloadImage = async (imageUrl, filename) => {
+        try {
+            const response = await axios.get(imageUrl, { responseType: 'blob' });
+            const blob = new Blob([response.data]);
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error('Download error:', error);
+            alert('Failed to download image');
+        }
+    };
+
+    // ✅ NEW: Download all images as ZIP
+    const downloadAllImages = async (order) => {
+        try {
+            // For now, download individual images
+            // In production, you'd use a library like JSZip to create a ZIP file
+            const images = order.design_images || (order.design_image ? [order.design_image] : []);
+
+            if (images.length === 0) {
+                alert('No images available to download');
+                return;
+            }
+
+            for (let i = 0; i < images.length; i++) {
+                const imageUrl = `http://127.0.0.1:8000/storage/${images[i]}`;
+                const filename = `order-${order.id}-image-${i + 1}.jpg`;
+                await downloadImage(imageUrl, filename);
+                // Small delay between downloads
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+        } catch (error) {
+            console.error('Download all error:', error);
+            alert('Failed to download images');
+        }
+    };
 
     const getStatusBadge = (status) => {
         const styles = {
@@ -59,14 +119,14 @@ export default function ProductionTeamCustomOrders() {
                     <p className="text-sm text-gray-600">View fabrication requests and manage your assigned tasks</p>
                 </div>
 
-                {/* ✅ Tab Navigation - Changed Purple to Blue */}
+                {/* ✅ Tab Navigation */}
                 <div className="px-6 border-b border-gray-200">
                     <nav className="flex gap-6">
                         <button
                             onClick={() => setActiveTab('all')}
                             className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${activeTab === 'all'
-                                    ? 'border-blue-600 text-blue-600'
-                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                ? 'border-blue-600 text-blue-600'
+                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                                 }`}
                         >
                             All Orders
@@ -74,8 +134,8 @@ export default function ProductionTeamCustomOrders() {
                         <button
                             onClick={() => setActiveTab('assigned')}
                             className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${activeTab === 'assigned'
-                                    ? 'border-blue-600 text-blue-600'
-                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                ? 'border-blue-600 text-blue-600'
+                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                                 }`}
                         >
                             My Assigned Orders
@@ -103,6 +163,7 @@ export default function ProductionTeamCustomOrders() {
                         {!loading && !error && (
                             <div className="overflow-x-auto">
                                 <table className="w-full text-left">
+                                    {/* Remove the Actions column header */}
                                     <thead className="bg-gray-50 border-b border-gray-200">
                                         <tr>
                                             <th className="px-6 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider">Order</th>
@@ -111,12 +172,16 @@ export default function ProductionTeamCustomOrders() {
                                             <th className="px-6 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider">Payment</th>
                                             <th className="px-6 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider">Assigned</th>
                                             <th className="px-6 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
-                                            <th className="px-6 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider text-right">Actions</th>
                                         </tr>
                                     </thead>
+
                                     <tbody className="divide-y divide-gray-100">
                                         {orders.map((order) => (
-                                            <tr key={order.id} className="hover:bg-gray-50 transition-colors">
+                                            <tr
+                                                key={order.id}
+                                                className="hover:bg-gray-50 transition-colors cursor-pointer"
+                                                onClick={() => handleViewOrder(order)}
+                                            >
                                                 <td className="px-6 py-4">
                                                     <div className="flex items-center gap-3">
                                                         {order.design_image ? (
@@ -155,6 +220,7 @@ export default function ProductionTeamCustomOrders() {
                                                             target="_blank"
                                                             rel="noopener noreferrer"
                                                             className="text-blue-600 hover:text-blue-800 text-sm font-medium underline"
+                                                            onClick={(e) => e.stopPropagation()}
                                                         >
                                                             View Screenshot
                                                         </a>
@@ -173,19 +239,6 @@ export default function ProductionTeamCustomOrders() {
 
                                                 <td className="px-6 py-4">
                                                     {getStatusBadge(order.status)}
-                                                </td>
-
-                                                <td className="px-6 py-4 text-right">
-                                                    <button
-                                                        className="text-gray-500 hover:text-blue-600 transition-colors"
-                                                        title="View Details (Read-Only)"
-                                                        onClick={() => alert(`Viewing Order #${order.id}\nTitle: ${order.title}\nDescription: ${order.description}`)}
-                                                    >
-                                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                                        </svg>
-                                                    </button>
                                                 </td>
                                             </tr>
                                         ))}
@@ -208,6 +261,126 @@ export default function ProductionTeamCustomOrders() {
                     <AssignedOrders />
                 )}
             </div>
+
+            {/* ✅ NEW: Order Details Modal */}
+            {showModal && selectedOrder && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={closeModal}>
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                        {/* Modal Header */}
+                        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10">
+                            <div>
+                                <h3 className="text-xl font-bold text-gray-900">Order Details</h3>
+                                <p className="text-sm text-gray-500 mt-1">Order #{String(selectedOrder.id).padStart(4, '0')}</p>
+                            </div>
+                            <button onClick={closeModal} className="w-10 h-10 bg-gray-100 hover:bg-gray-200 rounded-full flex items-center justify-center transition-colors">
+                                <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        {/* Modal Content */}
+                        <div className="p-6 space-y-6">
+                            {/* Order Info */}
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="bg-gray-50 rounded-lg p-4">
+                                    <p className="text-xs text-gray-500 mb-1">Title</p>
+                                    <p className="font-semibold text-gray-900">{selectedOrder.title || 'Untitled'}</p>
+                                </div>
+                                <div className="bg-gray-50 rounded-lg p-4">
+                                    <p className="text-xs text-gray-500 mb-1">Status</p>
+                                    <div className="mt-1">{getStatusBadge(selectedOrder.status)}</div>
+                                </div>
+                                <div className="bg-gray-50 rounded-lg p-4">
+                                    <p className="text-xs text-gray-500 mb-1">Customer</p>
+                                    <p className="font-semibold text-gray-900">{selectedOrder.user?.name || 'Unknown'}</p>
+                                    <p className="text-xs text-gray-500">{selectedOrder.user?.email || '—'}</p>
+                                </div>
+                                <div className="bg-gray-50 rounded-lg p-4">
+                                    <p className="text-xs text-gray-500 mb-1">Price</p>
+                                    <p className="font-semibold text-green-700">Nu. {selectedOrder.estimated_price ? parseFloat(selectedOrder.estimated_price).toFixed(2) : '0.00'}</p>
+                                </div>
+                            </div>
+
+                            {/* Description */}
+                            <div>
+                                <h4 className="font-semibold text-gray-900 mb-2">Description</h4>
+                                <p className="text-gray-700 bg-gray-50 rounded-lg p-4">{selectedOrder.description || 'No description provided'}</p>
+                            </div>
+
+                            {/* Design Images */}
+                            <div>
+                                <div className="flex items-center justify-between mb-3">
+                                    <h4 className="font-semibold text-gray-900">Design Images</h4>
+                                    {(selectedOrder.design_images || (selectedOrder.design_image ? [selectedOrder.design_image] : [])).length > 0 && (
+                                        <button
+                                            onClick={() => downloadAllImages(selectedOrder)}
+                                            className="text-sm text-blue-600 hover:text-blue-800 font-medium flex items-center gap-2"
+                                        >
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                            </svg>
+                                            Download All
+                                        </button>
+                                    )}
+                                </div>
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                    {(selectedOrder.design_images || (selectedOrder.design_image ? [selectedOrder.design_image] : [])).map((img, index) => (
+                                        <div key={index} className="relative group">
+                                            <img
+                                                src={`http://127.0.0.1:8000/storage/${img}`}
+                                                alt={`Design ${index + 1}`}
+                                                className="w-full h-48 object-cover rounded-lg border border-gray-200"
+                                            />
+                                            <button
+                                                onClick={() => downloadImage(`http://127.0.0.1:8000/storage/${img}`, `order-${selectedOrder.id}-image-${index + 1}.jpg`)}
+                                                className="absolute bottom-2 right-2 bg-white/90 hover:bg-white text-gray-700 px-3 py-1.5 rounded-lg text-sm font-medium shadow-lg opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1"
+                                            >
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                                </svg>
+                                                Download
+                                            </button>
+                                        </div>
+                                    ))}
+                                    {(!selectedOrder.design_images && !selectedOrder.design_image) && (
+                                        <div className="col-span-3 text-center py-12 text-gray-400 bg-gray-50 rounded-lg">
+                                            <svg className="w-12 h-12 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                            </svg>
+                                            <p>No design images uploaded</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Payment Screenshot */}
+                            {selectedOrder.payment_screenshot && (
+                                <div>
+                                    <h4 className="font-semibold text-gray-900 mb-2">Payment Screenshot</h4>
+                                    <div className="bg-gray-50 rounded-lg p-4 flex justify-center">
+                                        <img
+                                            src={`http://127.0.0.1:8000/storage/${selectedOrder.payment_screenshot}`}
+                                            alt="Payment"
+                                            className="max-w-md h-auto rounded-lg border border-gray-200"
+                                        />
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Modal Footer */}
+                        <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 px-6 py-4 flex justify-end">
+                            <button
+                                onClick={closeModal}
+                                className="px-6 py-2.5 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors font-medium"
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

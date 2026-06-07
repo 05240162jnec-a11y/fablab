@@ -219,9 +219,9 @@ export default function MyBookings() {
                             </div>
                             <p className="text-gray-500 text-lg font-medium">{filterStatus === 'booked' ? 'No booked machines' : 'No cancelled bookings'}</p>
                             <p className="text-gray-400 text-sm mt-1">{filterStatus === 'booked' ? 'Book a machine to see your bookings here' : 'Cancelled bookings will appear here'}</p>
-                            {filterStatus === 'booked' && (
-                                <Link to="/user/book-machine" className="inline-block mt-4 px-6 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all shadow-md hover:shadow-lg font-medium">Book a Machine</Link>
-                            )}
+                                {filterStatus === 'booked' && (
+                                    <Link to="/user/machines?tab=book" className="inline-block mt-4 px-6 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all shadow-md hover:shadow-lg font-medium">Book a Machine</Link>
+                                )}
                         </div>
                     ) : (
                         <div className="space-y-4">

@@ -155,14 +155,51 @@ class UserCourseController extends Controller
             $user = Auth::user();
             $course = Course::findOrFail($id);
 
+            // ✅ NEW: Check if course has ended (on-demand check)
+            if ($course->end_date && now()->isAfter($course->end_date)) {
+                // Auto-close registration if not already closed
+                if ($course->registration_open) {
+                    $course->registration_open = false;
+                    $course->registration_status = 'closed';
+                    $course->save();
+                }
+                
+                return response()->json([
+                    'message' => 'Sorry, this course is no longer available.'
+                ], 422);
+            }
+
+            // ✅ NEW: Check if course start date has been reached (auto-close registration)
+            if ($course->start_date && now()->isAfter($course->start_date)) {
+                // Auto-close registration if not already closed
+                if ($course->registration_open) {
+                    $course->registration_open = false;
+                    $course->registration_status = 'closed';
+                    $course->save();
+                }
+                
+                return response()->json([
+                    'message' => 'Sorry, this course has already started. Registration is closed.'
+                ], 422);
+            }
+
             // Check if registration is open
             if (!$course->registration_open) {
-                return response()->json(['message' => 'Registration is closed for this course.'], 422);
+                return response()->json([
+                    'message' => 'Registration is closed for this course.'
+                ], 422);
             }
 
             // Check if seats are available
             if ($course->enrollment >= $course->seat_limit) {
-                return response()->json(['message' => 'No seats available for this course.'], 422);
+                // ✅ Auto-close registration when full
+                $course->registration_open = false;
+                $course->registration_status = 'closed';
+                $course->save();
+                
+                return response()->json([
+                    'message' => 'No seats available for this course. Registration is now closed.'
+                ], 422);
             }
 
             // Check for ACTIVE enrollment only
@@ -172,7 +209,9 @@ class UserCourseController extends Controller
                 ->first();
 
             if ($existingEnrollment) {
-                return response()->json(['message' => 'You are already enrolled in this course.'], 422);
+                return response()->json([
+                    'message' => 'You are already enrolled in this course.'
+                ], 422);
             }
 
             // Validate enrollment data
@@ -215,6 +254,14 @@ class UserCourseController extends Controller
                 // ✅ Always increment enrollment count (with safety check)
                 if ($course->enrollment < $course->seat_limit) {
                     $course->increment('enrollment');
+                }
+                
+                // ✅ Auto-close registration if course is now full
+                $course->refresh();
+                if ($course->enrollment >= $course->seat_limit) {
+                    $course->registration_open = false;
+                    $course->registration_status = 'closed';
+                    $course->save();
                 }
             });
 

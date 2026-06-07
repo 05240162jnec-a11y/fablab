@@ -15,6 +15,17 @@ export default function Products() {
     // ✅ NEW: Carousel State
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
+    // ✅ NEW: Confirmation Modal State
+    const [showConfirmModal, setShowConfirmModal] = useState(false);
+    const [confirmConfig, setConfirmConfig] = useState({
+        title: '',
+        message: '',
+        onConfirm: null,
+        confirmText: 'Confirm',
+        cancelText: 'Cancel',
+        type: 'danger' // 'danger' | 'warning' | 'info'
+    });
+
     // Filter & Search States
     const [searchQuery, setSearchQuery] = useState('');
     const [filterStatus, setFilterStatus] = useState('all');
@@ -86,6 +97,19 @@ export default function Products() {
         setTimeout(() => {
             setToast({ show: false, message: '', type: 'success' });
         }, 3000);
+    };
+
+    // ✅ NEW: Custom confirmation modal
+    const showCustomConfirm = (config) => {
+        setConfirmConfig({
+            title: config.title || 'Confirm Action',
+            message: config.message || 'Are you sure?',
+            onConfirm: config.onConfirm,
+            confirmText: config.confirmText || 'Confirm',
+            cancelText: config.cancelText || 'Cancel',
+            type: config.type || 'danger'
+        });
+        setShowConfirmModal(true);
     };
 
     // ✅ UPDATED: Update Payment Deadline Setting
@@ -275,11 +299,17 @@ export default function Products() {
     // Check for unsaved changes before closing modal
     const checkUnsavedChanges = (callback) => {
         if (hasUnsavedChanges) {
-            const confirmed = window.confirm('You have unsaved changes. Are you sure you want to discard them and close?');
-            if (confirmed) {
-                resetForm();
-                callback();
-            }
+            showCustomConfirm({
+                title: 'Unsaved Changes',
+                message: 'You have unsaved changes. Are you sure you want to discard them and close?',
+                onConfirm: () => {
+                    resetForm();
+                    callback();
+                },
+                confirmText: 'Discard Changes',
+                cancelText: 'Keep Editing',
+                type: 'warning'
+            });
         } else {
             callback();
         }
@@ -320,32 +350,37 @@ export default function Products() {
 
     // Delete product via API
     const handleDelete = async (productId) => {
-        if (!confirm('Are you sure you want to delete this product? This action cannot be undone.')) {
-            return;
-        }
+        showCustomConfirm({
+            title: 'Delete Product',
+            message: 'Are you sure you want to delete this product? This action cannot be undone.',
+            onConfirm: async () => {
+                try {
+                    const adminToken = localStorage.getItem('admin_token');
 
-        try {
-            const adminToken = localStorage.getItem('admin_token');
+                    const response = await axios.delete(
+                        `http://127.0.0.1:8000/api/admin/products/${productId}`,
+                        {
+                            headers: {
+                                'Accept': 'application/json',
+                                'Authorization': `Bearer ${adminToken}`
+                            }
+                        }
+                    );
 
-            const response = await axios.delete(
-                `http://127.0.0.1:8000/api/admin/products/${productId}`,
-                {
-                    headers: {
-                        'Accept': 'application/json',
-                        'Authorization': `Bearer ${adminToken}`
+                    if (response.data.success) {
+                        setProducts(products.filter(p => p.id !== productId));
+                        setShowDetailsModal(false);
+                        showToast('✅ Product deleted successfully!');
                     }
+                } catch (err) {
+                    console.error('Error deleting product:', err);
+                    showToast('❌ Failed to delete product', 'error');
                 }
-            );
-
-            if (response.data.success) {
-                setProducts(products.filter(p => p.id !== productId));
-                setShowDetailsModal(false);
-                showToast('✅ Product deleted successfully!');
-            }
-        } catch (err) {
-            console.error('Error deleting product:', err);
-            showToast('❌ Failed to delete product', 'error');
-        }
+            },
+            confirmText: 'Delete Product',
+            cancelText: 'Cancel',
+            type: 'danger'
+        });
     };
 
     // Add new product via API
@@ -493,6 +528,16 @@ export default function Products() {
         lowStock: products.filter(p => p.stock > 0 && p.stock <= stockAlertThreshold).length,
     };
 
+    // ✅ NEW: Handle numeric input (prevent non-numeric characters)
+    const handleNumericInput = (e, fieldName) => {
+        const value = e.target.value;
+        // Allow empty string or positive numbers
+        if (value === '' || /^\d*\.?\d*$/.test(value)) {
+            setFormData(prev => ({ ...prev, [fieldName]: value }));
+            setHasUnsavedChanges(true);
+        }
+    };
+
     return (
         <div className="flex-1">
             <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
@@ -611,7 +656,7 @@ export default function Products() {
                                                 const value = e.target.value;
                                                 if (value === '') {
                                                     setStockAlertThreshold(0);
-                                                } else {
+                                                } else if (/^\d+$/.test(value)) {
                                                     const num = parseInt(value) || 0;
                                                     setStockAlertThreshold(num);
                                                 }
@@ -644,7 +689,7 @@ export default function Products() {
                                                 const value = e.target.value;
                                                 if (value === '') {
                                                     setPaymentDeadlineHours(0);
-                                                } else {
+                                                } else if (/^\d+$/.test(value)) {
                                                     const num = parseInt(value) || 0;
                                                     setPaymentDeadlineHours(num);
                                                 }
@@ -1052,15 +1097,13 @@ export default function Products() {
                                             <div>
                                                 <label className="block text-sm font-semibold text-gray-700 mb-2">Price (Nu.) *</label>
                                                 <input
-                                                    type="number"
+                                                    type="text"
                                                     name="price"
                                                     value={formData.price}
-                                                    onChange={handleInputChange}
+                                                    onChange={(e) => handleNumericInput(e, 'price')}
                                                     required
                                                     placeholder="Enter price"
-                                                    min="0"
-                                                    step="0.01"
-                                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                                 />
                                             </div>
                                         </div>
@@ -1068,14 +1111,13 @@ export default function Products() {
                                         <div>
                                             <label className="block text-sm font-semibold text-gray-700 mb-2">Stock Quantity *</label>
                                             <input
-                                                type="number"
+                                                type="text"
                                                 name="stock"
                                                 value={formData.stock}
-                                                onChange={handleInputChange}
+                                                onChange={(e) => handleNumericInput(e, 'stock')}
                                                 required
                                                 placeholder="Enter stock quantity"
-                                                min="0"
-                                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                             />
                                         </div>
                                     </div>
@@ -1282,15 +1324,13 @@ export default function Products() {
                                         <div>
                                             <label className="block text-sm font-semibold text-gray-700 mb-2">Price (Nu.) *</label>
                                             <input
-                                                type="number"
+                                                type="text"
                                                 name="price"
                                                 value={formData.price}
-                                                onChange={handleInputChange}
+                                                onChange={(e) => handleNumericInput(e, 'price')}
                                                 required
                                                 placeholder="Enter price"
-                                                min="0"
-                                                step="0.01"
-                                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                             />
                                         </div>
                                     </div>
@@ -1298,14 +1338,13 @@ export default function Products() {
                                     <div>
                                         <label className="block text-sm font-semibold text-gray-700 mb-2">Stock Quantity *</label>
                                         <input
-                                            type="number"
+                                            type="text"
                                             name="stock"
                                             value={formData.stock}
-                                            onChange={handleInputChange}
+                                            onChange={(e) => handleNumericInput(e, 'stock')}
                                             required
                                             placeholder="Enter stock quantity"
-                                            min="0"
-                                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                         />
                                     </div>
                                 </div>
@@ -1393,6 +1432,61 @@ export default function Products() {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* ✅ NEW: Custom Confirmation Modal */}
+            {showConfirmModal && (
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-fade-in">
+                        {/* Modal Header */}
+                        <div className={`px-6 py-4 ${confirmConfig.type === 'danger' ? 'bg-red-50' : confirmConfig.type === 'warning' ? 'bg-yellow-50' : 'bg-blue-50'}`}>
+                            <div className="flex items-center gap-3">
+                                <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${confirmConfig.type === 'danger' ? 'bg-red-100' : confirmConfig.type === 'warning' ? 'bg-yellow-100' : 'bg-blue-100'}`}>
+                                    {confirmConfig.type === 'danger' ? (
+                                        <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                        </svg>
+                                    ) : confirmConfig.type === 'warning' ? (
+                                        <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                    ) : (
+                                        <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                    )}
+                                </div>
+                                <h3 className="text-lg font-bold text-gray-900">{confirmConfig.title}</h3>
+                            </div>
+                        </div>
+
+                        {/* Modal Body */}
+                        <div className="p-6">
+                            <p className="text-gray-600 mb-6">{confirmConfig.message}</p>
+
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => setShowConfirmModal(false)}
+                                    className="flex-1 px-4 py-2 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-semibold"
+                                >
+                                    {confirmConfig.cancelText}
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setShowConfirmModal(false);
+                                        if (confirmConfig.onConfirm) {
+                                            confirmConfig.onConfirm();
+                                        }
+                                    }}
+                                    className={`flex-1 px-4 py-2 text-white rounded-lg transition-colors font-semibold shadow-lg ${confirmConfig.type === 'danger' ? 'bg-red-600 hover:bg-red-700' : confirmConfig.type === 'warning' ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-blue-600 hover:bg-blue-700'
+                                        }`}
+                                >
+                                    {confirmConfig.confirmText}
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}

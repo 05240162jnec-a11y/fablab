@@ -512,7 +512,7 @@ export default function MyOrders() {
                     <p className="text-gray-500 text-lg font-medium">No orders yet</p>
                     <p className="text-gray-400 text-sm mt-1 mb-4">Start shopping to see your orders here</p>
                     <Link
-                        to="/user/shop-products"
+                        to="/user/shop-orders?tab=products"
                         className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
                     >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -30,6 +30,26 @@ export default function ShopOrders() {
     const [cartProductIds, setCartProductIds] = useState([]);
     const [showCartDrawer, setShowCartDrawer] = useState(false);
 
+    // ✅ NEW: Load cart from localStorage on mount
+    useEffect(() => {
+        const user = JSON.parse(localStorage.getItem('user'));
+        if (user?.id) {
+            const cartKey = `cart_${user.id}`;
+            const savedCart = localStorage.getItem(cartKey);
+            if (savedCart) {
+                try {
+                    const parsedCart = JSON.parse(savedCart);
+                    setCart(parsedCart);
+                    setCartProductIds(parsedCart.map(item => item.id));
+                } catch (e) {
+                    console.error('Failed to parse cart data:', e);
+                    setCart([]);
+                    setCartProductIds([]);
+                }
+            }
+        }
+    }, []);
+
     const tabs = [
         { value: 'products', label: 'Product List' },
         { value: 'orders', label: 'My Orders' },

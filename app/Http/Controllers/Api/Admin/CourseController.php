@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Course;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
@@ -34,32 +35,67 @@ class CourseController extends Controller
         ]);
     }
 
-    // Create new course - ✅ REMOVED duration & schedule
+        /**
+     * Get production team members for instructor dropdown
+     */
+    public function getProductionTeam()
+    {
+        try {
+            $productionTeam = User::where('role', 'production_team')
+                ->where('is_active', 1)  // ✅ Changed from 'status' => 'active'
+                ->select('id', 'name', 'email')
+                ->orderBy('name', 'asc')
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'data' => $productionTeam
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Get production team error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch production team'
+            ], 500);
+        }
+    }
+
+    // Create new course - ✅ UPDATED: Allow same date, optional status/registration
     public function store(Request $request)
     {
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'instructor' => 'required|string|max:255',
-            // ❌ REMOVED: 'duration' => 'required|string',
             
-            // ✅ Date fields for auto-complete
+            // ✅ Date fields - allow same start and end date
             'start_date' => 'required|date',
-            'end_date' => 'required|date|after:start_date',
-            
-            // ❌ REMOVED: 'schedule' => 'nullable|string|max:255',
+            'end_date' => 'required|date|after_or_equal:start_date', // ✅ Changed from after:start_date
             
             'seat_limit' => 'required|integer|min:1',
-            'status' => 'required|in:upcoming,active,completed',
-            'registration_status' => 'required|in:open,closed',
+            // ✅ Make status and registration optional
+            'status' => 'nullable|in:upcoming,active,completed',
+            'registration_status' => 'nullable|in:open,closed',
             'description' => 'nullable|string',
             'image' => 'nullable|image|max:5120', // 5MB max
         ]);
+
+        // ✅ Set defaults if not provided
+        if (!isset($validated['status'])) {
+            $validated['status'] = 'active';
+        }
+        if (!isset($validated['registration_status'])) {
+            $validated['registration_status'] = 'open';
+        }
 
         // Handle image upload
         if ($request->hasFile('image')) {
             $validated['image'] = $request->file('image')->store('courses', 'public');
         }
 
+        // Set initial enrollment count
+        $validated['enrollment'] = 0;
+        
         $course = Course::create($validated);
 
         return response()->json([
@@ -69,7 +105,7 @@ class CourseController extends Controller
         ], 201);
     }
 
-    // Update course - ✅ REMOVED duration & schedule
+    // Update course - ✅ UPDATED: Allow same date
     public function update(Request $request, $id)
     {
         $course = Course::findOrFail($id);
@@ -77,18 +113,15 @@ class CourseController extends Controller
         $validated = $request->validate([
             'title' => 'sometimes|required|string|max:255',
             'instructor' => 'sometimes|required|string|max:255',
-            // ❌ REMOVED: 'duration' => 'sometimes|required|string',
             
-            // ✅ Date fields (required if provided)
+            // ✅ Date fields - allow same start and end date
             'start_date' => 'sometimes|required|date',
-            'end_date' => 'sometimes|required|date|after:start_date',
-            
-            // ❌ REMOVED: 'schedule' => 'sometimes|nullable|string|max:255',
+            'end_date' => 'sometimes|required|date|after_or_equal:start_date', // ✅ Changed from after:start_date
             
             'seat_limit' => 'sometimes|required|integer|min:1',
             'enrollment' => 'sometimes|integer|min:0',
-            'status' => 'sometimes|required|in:upcoming,active,completed',
-            'registration_status' => 'sometimes|required|in:open,closed',
+            'status' => 'nullable|in:upcoming,active,completed',
+            'registration_status' => 'nullable|in:open,closed',
             'description' => 'sometimes|nullable|string',
             'image' => 'sometimes|nullable|image|max:5120',
         ]);
@@ -241,7 +274,7 @@ class CourseController extends Controller
         ]);
     }
 
-    // NEW: Duplicate a course for a new semester - ✅ REMOVED duration & schedule
+    // NEW: Duplicate a course for a new semester - ✅ UPDATED: Allow same date
     public function duplicate(Request $request, $id)
     {
         $original = Course::findOrFail($id);
@@ -250,18 +283,16 @@ class CourseController extends Controller
         $validated = $request->validate([
             'new_title' => 'required|string|max:255',
             'new_start_date' => 'required|date|after:today',
-            'new_end_date' => 'required|date|after:new_start_date',
+            'new_end_date' => 'required|date|after_or_equal:new_start_date', // ✅ Allow same date
             'seat_limit' => 'required|integer|min:1',
         ]);
         
-        // Create new course with copied data - ✅ REMOVED duration & schedule
+        // Create new course with copied data
         $newCourse = Course::create([
             'title' => $validated['new_title'],
             'instructor' => $original->instructor,
-            // ❌ REMOVED: 'duration' => $original->duration,
             'start_date' => $validated['new_start_date'],
             'end_date' => $validated['new_end_date'],
-            // ❌ REMOVED: 'schedule' => $original->schedule,
             'seat_limit' => $validated['seat_limit'],
             'status' => 'upcoming',
             'registration_open' => false,
@@ -374,5 +405,80 @@ class CourseController extends Controller
             'message' => "Cleared {$count} active enrollment(s). Completion records preserved!",
             'cleared' => $count
         ]);
+    }
+
+    /**
+     * Bulk update enrollment statuses (attendance marking)
+     */
+    public function bulkUpdateEnrollments(Request $request, $courseId)
+    {
+        try {
+            // Validate request
+            $validated = $request->validate([
+                'updates' => 'required|array',
+                'updates.*.enrollment_id' => 'required|integer',
+                'updates.*.status' => 'required|in:completed,absent',
+            ]);
+
+            $updates = $validated['updates'];
+            $updatedCount = 0;
+            $removedCount = 0;
+
+            foreach ($updates as $update) {
+                $enrollmentId = $update['enrollment_id'];
+                $newStatus = $update['status'];
+
+                // Find the enrollment
+                $enrollment = \App\Models\CourseEnrollment::where('id', $enrollmentId)
+                    ->where('course_id', $courseId)
+                    ->first();
+
+                if (!$enrollment) {
+                    \Log::warning("Enrollment not found: ID {$enrollmentId}, Course ID {$courseId}");
+                    continue;
+                }
+
+                if ($newStatus === 'completed') {
+                    $enrollment->status = 'completed';
+                    $enrollment->save();
+                    $updatedCount++;
+                } elseif ($newStatus === 'absent') {
+                    $enrollment->delete();
+                    $removedCount++;
+                }
+            }
+
+            // Use direct DB query instead of relationship
+            $enrollmentCount = \App\Models\CourseEnrollment::where('course_id', $courseId)
+                ->where('status', 'enrolled')
+                ->count();
+            
+            // Update course enrollment count
+            \App\Models\Course::where('id', $courseId)->update(['enrollment' => $enrollmentCount]);
+
+            return response()->json([
+                'success' => true,
+                'message' => "Attendance saved! {$updatedCount} user(s) marked as completed, {$removedCount} user(s) marked as absent.",
+                'updated_count' => $updatedCount,
+                'removed_count' => $removedCount
+            ]);
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed: ' . implode(', ', $e->errors()['updates'] ?? ['Invalid data'])
+            ], 422);
+        } catch (\Exception $e) {
+            \Log::error('Bulk update enrollments error: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+                'course_id' => $courseId,
+                'request' => $request->all()
+            ]);
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to save attendance: ' . $e->getMessage()
+            ], 500);
+        }
     }
 }

@@ -10,6 +10,15 @@ Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 
 // ==========================================
+// PUBLIC ROUTES (No Authentication Required)
+// ==========================================
+
+// Public home page data
+Route::get('/home/machines', [\App\Http\Controllers\Api\Admin\MachineController::class, 'index']);
+Route::get('/home/courses', [\App\Http\Controllers\Api\Admin\CourseController::class, 'index']);
+Route::get('/home/users', [\App\Http\Controllers\Api\Admin\UserController::class, 'index']);
+
+// ==========================================
 // ADMIN ROUTES (Now uses unified auth)
 // ==========================================
 Route::prefix('admin')->middleware('auth:sanctum')->group(function () {
@@ -60,7 +69,8 @@ Route::prefix('admin')->middleware('auth:sanctum')->group(function () {
     Route::post('/custom-orders/{id}/reject-design', [\App\Http\Controllers\Api\Admin\CustomOrderController::class, 'rejectDesign']);
     Route::post('/custom-orders/bulk-delete', [\App\Http\Controllers\Api\Admin\CustomOrderController::class, 'bulkDelete']);
     
-    // Courses
+        // Courses - ✅ Custom routes MUST come BEFORE apiResource
+    Route::get('courses/production-team', [\App\Http\Controllers\Api\Admin\CourseController::class, 'getProductionTeam']);
     Route::apiResource('courses', \App\Http\Controllers\Api\Admin\CourseController::class);
     Route::post('courses/{id}/toggle-registration', [\App\Http\Controllers\Api\Admin\CourseController::class, 'toggleRegistration']);
     Route::get('courses/{id}/enrollments', [\App\Http\Controllers\Api\Admin\CourseController::class, 'getEnrollments']);
@@ -68,6 +78,7 @@ Route::prefix('admin')->middleware('auth:sanctum')->group(function () {
     Route::get('courses/{id}/enrollments/download', [\App\Http\Controllers\Api\Admin\CourseController::class, 'downloadEnrollments']);
     Route::post('courses/{id}/enrollments/clear', [\App\Http\Controllers\Api\Admin\CourseController::class, 'clearActiveEnrollments']);
     Route::post('courses/{id}/duplicate', [\App\Http\Controllers\Api\Admin\CourseController::class, 'duplicate']);
+    Route::put('courses/{courseId}/enrollments/bulk-update', [\App\Http\Controllers\Api\Admin\CourseController::class, 'bulkUpdateEnrollments']);
 
     // Inventory routes
     Route::get('inventory', [\App\Http\Controllers\Api\Admin\InventoryController::class, 'index']);
@@ -80,6 +91,11 @@ Route::prefix('admin')->middleware('auth:sanctum')->group(function () {
     Route::get('inventory/threshold', [\App\Http\Controllers\Api\Admin\InventoryController::class, 'getStockAlertThreshold']);
     Route::post('inventory/threshold', [\App\Http\Controllers\Api\Admin\InventoryController::class, 'updateStockAlertThreshold']);
     Route::get('inventory/departments-users', [\App\Http\Controllers\Api\Admin\InventoryController::class, 'getDepartmentsAndUsers']);
+    // Users
+    Route::apiResource('users', \App\Http\Controllers\Api\Admin\UserController::class)
+    ->only(['index', 'show', 'update', 'destroy']);
+    Route::post('users/{id}/toggle-status', [\App\Http\Controllers\Api\Admin\UserController::class, 'toggleStatus']);
+    
     
     // ==========================================
     // ✅ ADMIN PROJECT ROUTES (NEW)
@@ -115,6 +131,12 @@ Route::prefix('admin')->middleware('auth:sanctum')->group(function () {
     // Admin Dashboard Stats
     Route::get('/dashboard/stats', [App\Http\Controllers\Api\Admin\DashboardController::class, 'index']);
 
+    // ✅ NEW: Chart Data Endpoints
+    Route::get('/dashboard/user-distribution', [App\Http\Controllers\Api\Admin\DashboardController::class, 'getUserDistribution']);
+    Route::get('/dashboard/top-products', [App\Http\Controllers\Api\Admin\DashboardController::class, 'getTopSellingProducts']);
+    Route::get('/dashboard/monthly-revenue', [App\Http\Controllers\Api\Admin\DashboardController::class, 'getMonthlyRevenue']);
+    Route::get('/dashboard/most-booked-machines', [App\Http\Controllers\Api\Admin\DashboardController::class, 'getMostBookedMachines']);
+
     // ✅ NEW: Settings Routes
     Route::get('/settings', [App\Http\Controllers\Api\Admin\SettingController::class, 'index']);
     Route::get('/settings/{key}', [App\Http\Controllers\Api\Admin\SettingController::class, 'show']);
@@ -137,6 +159,10 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // User Profile
     Route::get('/user/profile', [App\Http\Controllers\Api\UserController::class, 'profile']);
+    // User Profile Routes
+    Route::get('/user/profile', [\App\Http\Controllers\Api\User\ProfileController::class, 'show']);
+    Route::post('/user/profile/update', [\App\Http\Controllers\Api\User\ProfileController::class, 'update']);
+    Route::post('/user/profile/change-password', [\App\Http\Controllers\Api\User\ProfileController::class, 'changePassword']);
 
     // User Products (Shop)
     Route::get('/user/products', [App\Http\Controllers\Api\Admin\ProductController::class, 'index']);

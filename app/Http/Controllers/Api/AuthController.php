@@ -169,48 +169,56 @@ class AuthController extends Controller
         }
     }
 
-    public function login(Request $request)
-    {
-        $request->validate([
-            'email' => 'required|email',
-            'password' => 'required',
+        public function login(Request $request)
+{
+    $request->validate([
+        'email' => 'required|email',
+        'password' => 'required',
+    ]);
+
+    // ✅ Use withTrashed() to include soft-deleted users
+    $user = User::where('email', $request->email)->first();
+
+    if (!$user || !Hash::check($request->password, $user->password)) {
+        throw ValidationException::withMessages([
+            'email' => ['Invalid credentials'],
         ]);
-
-        $user = User::where('email', $request->email)->first();
-
-        if (!$user || !Hash::check($request->password, $user->password)) {
-            throw ValidationException::withMessages([
-                'email' => ['Invalid credentials'],
-            ]);
-        }
-
-        // ✅ NEW: Track first login for production team members
-        if ($user->role === 'production_team' && $user->email_verified_at === null) {
-            $user->email_verified_at = Carbon::now();
-            $user->save();
-        }
-
-        // ← 🔐 CRITICAL: Check if email is verified (SKIP for admin & production_team)
-        if (!$user->hasVerifiedEmail() && !in_array($user->role, ['admin', 'production_team'])) {
-            return response()->json([
-                'message' => 'Please verify your email first. Check your inbox for the verification link.',
-            ], 403);
-        }
-
-        // Create token
-        $token = $user->createToken('auth_token')->plainTextToken;
-
-        return response()->json([
-            'message' => 'Login successful',
-            'user' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'role' => $user->role,
-                'email_verified' => $user->email_verified_at !== null,
-            ],
-            'token' => $token,
-            'token_type' => 'Bearer',
-        ], 200);
     }
+
+    // ✅ Check if user account is disabled (is_active = false)
+    if (!$user->is_active) {
+        return response()->json([
+            'message' => 'Your account has been disabled. Please contact the administrator for assistance.',
+        ], 403);
+    }
+
+    // ✅ Track first login for production team members
+    if ($user->role === 'production_team' && $user->email_verified_at === null) {
+        $user->email_verified_at = Carbon::now();
+        $user->save();
+    }
+
+    // 🔐 Check if email is verified (SKIP for admin & production_team)
+    if (!$user->hasVerifiedEmail() && !in_array($user->role, ['admin', 'production_team'])) {
+        return response()->json([
+            'message' => 'Please verify your email first. Check your inbox for the verification link.',
+        ], 403);
+    }
+
+    // Create token
+    $token = $user->createToken('auth_token')->plainTextToken;
+
+    return response()->json([
+        'message' => 'Login successful',
+        'user' => [
+            'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+            'role' => $user->role,
+            'email_verified' => $user->email_verified_at !== null,
+        ],
+        'token' => $token,
+        'token_type' => 'Bearer',
+    ], 200);
+}
 }

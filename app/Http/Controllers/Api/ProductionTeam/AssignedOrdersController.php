@@ -10,36 +10,36 @@ use Illuminate\Support\Facades\Auth;
 class AssignedOrdersController extends Controller
 {
     /**
-     * Get all custom orders assigned to the logged-in production team member
-     */
-    public function index()
-    {
-        $user = Auth::user();
+ * Get all custom orders assigned to the logged-in production team member
+ */
+public function index()
+{
+    $user = Auth::user();
 
-        // 🔍 Fetch orders assigned to this specific production team user
-        $orders = CustomOrder::where('assigned_to', $user->id)
-            ->orderBy('deadline', 'asc')
-            ->get();
+    // 🔍 Fetch orders assigned to this specific production team user
+    $orders = CustomOrder::where('assigned_to', $user->id)
+        ->orderBy('deadline', 'asc')
+        ->get();
 
-        // 📦 Format response for frontend
-        $formatted = $orders->map(function ($order) {
-            return [
-                'id' => $order->id,
-                'user_name' => $order->user->name ?? 'Unknown Customer', // Requires $order->user relation in model
-                'description' => $order->description,
-                'status' => $order->status, // e.g., 'assigned', 'in_progress', 'completed'
-                'deadline' => $order->deadline ? $order->deadline->format('Y-m-d') : null,
-                'design_image' => $order->design_image ?? null,  // ✅ Matches your model
-                'created_at' => $order->created_at->format('M d, Y'),
-            ];
-        });
+    // 📦 Format response for frontend
+    $formatted = $orders->map(function ($order) {
+        return [
+            'id' => $order->id,
+            'user_name' => $order->user->name ?? 'Unknown Customer',
+            'description' => $order->description,
+            'status' => $order->status,
+            'deadline' => $order->deadline ? $order->deadline->format('Y-m-d') : null,
+            'design_image' => $order->design_image,
+            'design_images' => $order->design_images ?? [],  // ✅ Already an array from model cast!
+            'created_at' => $order->created_at->format('M d, Y'),
+        ];
+    });
 
-        return response()->json(['orders' => $formatted]);
-    }
+    return response()->json(['orders' => $formatted]);
+}
 
-    /**
+/**
  * Get ALL custom orders (read-only view for production team)
- * Shows all orders regardless of status
  */
 public function getAllCustomOrders()
 {
@@ -52,12 +52,13 @@ public function getAllCustomOrders()
     $formatted = $orders->map(function ($order) {
         return [
             'id' => $order->id,
-            'order_number' => $order->id, // Or use a custom order number field if you have one
+            'order_number' => $order->id,
             'title' => $order->title ?? 'Untitled Order',
             'description' => $order->description,
             'quantity' => $order->quantity,
             'design_image' => $order->design_image,
-            'status' => $order->status, // pending, paid, in_progress, completed
+            'design_images' => $order->design_images ?? [],  // ✅ Already an array from model cast!
+            'status' => $order->status,
             'estimated_price' => $order->estimated_price,
             'user' => [
                 'id' => $order->user->id ?? null,

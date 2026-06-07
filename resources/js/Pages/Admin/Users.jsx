@@ -7,23 +7,25 @@ export default function Users() {
     const [searchTerm, setSearchTerm] = useState('');
     const [roleFilter, setRoleFilter] = useState('all');
 
+    // Tab State
+    const [activeTab, setActiveTab] = useState('active'); // 'active' or 'disabled'
+
     // Modal States
     const [showViewModal, setShowViewModal] = useState(false);
     const [showEditModal, setShowEditModal] = useState(false);
-    const [showToggleModal, setShowToggleModal] = useState(false); // ✅ Changed from showDeleteModal
+    const [showToggleModal, setShowToggleModal] = useState(false);
     const [selectedUser, setSelectedUser] = useState(null);
 
     // Dropdown States
-    const [showRoleDropdown, setShowRoleDropdown] = useState(false);
     const [showFilterDropdown, setShowFilterDropdown] = useState(false);
 
-    // ✅ Profile Dropdown State
+    // Profile Dropdown State
     const [admin, setAdmin] = useState(null);
     const [showDropdown, setShowDropdown] = useState(false);
     const dropdownRef = useRef(null);
     const navigate = useNavigate();
 
-    // ✅ Toast State
+    // Toast State
     const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
 
     // Edit Form State
@@ -41,7 +43,7 @@ export default function Users() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    // ✅ Show toast notification
+    // Show toast notification
     const showToast = (message, type = 'success') => {
         setToast({ show: true, message, type });
         setTimeout(() => {
@@ -49,7 +51,7 @@ export default function Users() {
         }, 3000);
     };
 
-    // ✅ Fetch admin data from localStorage
+    // Fetch admin data from localStorage
     useEffect(() => {
         const storedAdmin = JSON.parse(localStorage.getItem('admin'));
         if (storedAdmin) {
@@ -57,7 +59,7 @@ export default function Users() {
         }
     }, []);
 
-    // ✅ Close dropdown when clicking outside
+    // Close dropdown when clicking outside
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -68,13 +70,13 @@ export default function Users() {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    // ✅ Profile click handler
+    // Profile click handler
     const handleProfileClick = () => {
         setShowDropdown(false);
         navigate('/admin/profile');
     };
 
-    // ✅ Logout handler
+    // Logout handler
     const handleLogout = () => {
         localStorage.removeItem('auth_token');
         localStorage.removeItem('admin_token');
@@ -104,6 +106,7 @@ export default function Users() {
                 params: {
                     search: searchTerm || null,
                     role: roleFilter !== 'all' ? roleFilter : null,
+                    status: activeTab,
                 }
             });
 
@@ -120,10 +123,10 @@ export default function Users() {
         }
     };
 
-    // Fetch on mount and when filters change
+    // Fetch on mount and when filters/tabs change
     useEffect(() => {
         fetchUsers();
-    }, [searchTerm, roleFilter]);
+    }, [searchTerm, roleFilter, activeTab]);
 
     // Filter users (client-side for better UX)
     const filteredUsers = users.filter(user => {
@@ -133,7 +136,7 @@ export default function Users() {
         return matchesSearch && matchesRole;
     });
 
-    // ✅ Get role badge color - Changed to black/gray
+    // Get role badge color
     const getRoleBadgeClass = (role) => {
         switch (role) {
             case 'faculty':
@@ -183,13 +186,13 @@ export default function Users() {
         setShowEditModal(true);
     };
 
-    // ✅ Open Toggle Status Modal
+    // Open Toggle Status Modal
     const handleToggleStatus = (user) => {
         setSelectedUser(user);
         setShowToggleModal(true);
     };
 
-    // ✅ Confirm Toggle Status
+    // Confirm Toggle Status
     const confirmToggleStatus = async () => {
         try {
             const token = localStorage.getItem('admin_token');
@@ -230,7 +233,7 @@ export default function Users() {
             showToast('✅ User updated successfully!', 'success');
         } catch (err) {
             console.error('Update error:', err);
-            showToast('❌ Failed to update user', 'error');
+            showToast(' Failed to update user', 'error');
         }
     };
 
@@ -260,9 +263,34 @@ export default function Users() {
                 <main className="p-6">
                     {/* Stats and Filters */}
                     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
+
+                        {/* Tabs for Active/Disabled */}
+                        <div className="flex gap-6 mb-6 border-b border-gray-200">
+                            <button
+                                onClick={() => setActiveTab('active')}
+                                className={`pb-3 px-1 text-sm font-medium transition-colors border-b-2 ${activeTab === 'active'
+                                        ? 'border-blue-600 text-blue-600'
+                                        : 'border-transparent text-gray-500 hover:text-gray-700'
+                                    }`}
+                            >
+                                Active Users ({stats.active})
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('disabled')}
+                                className={`pb-3 px-1 text-sm font-medium transition-colors border-b-2 ${activeTab === 'disabled'
+                                        ? 'border-blue-600 text-blue-600'
+                                        : 'border-transparent text-gray-500 hover:text-gray-700'
+                                    }`}
+                            >
+                                Disabled Users ({stats.inactive})
+                            </button>
+                        </div>
+
                         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
                             <div>
-                                <h3 className="text-lg font-bold text-gray-900">All Users ({stats.total})</h3>
+                                <h3 className="text-lg font-bold text-gray-900">
+                                    {activeTab === 'active' ? 'Active Users' : 'Disabled Users'} ({stats[activeTab === 'active' ? 'active' : 'inactive']})
+                                </h3>
                             </div>
                             <div className="flex flex-col sm:flex-row gap-3">
                                 {/* Search */}
@@ -297,63 +325,38 @@ export default function Users() {
                                         <div className="absolute right-0 mt-2 w-40 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
                                             <button
                                                 onClick={() => { setRoleFilter('all'); setShowFilterDropdown(false); }}
-                                                className={`w-full px-4 py-2 text-left text-sm flex items-center justify-between ${roleFilter === 'all' ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-gray-50'
-                                                    }`}
+                                                className={`w-full px-4 py-2 text-left text-sm flex items-center justify-between ${roleFilter === 'all' ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-gray-50'}`}
                                             >
                                                 All Roles
-                                                {roleFilter === 'all' && (
-                                                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                                    </svg>
-                                                )}
+                                                {roleFilter === 'all' && <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>}
                                             </button>
                                             <button
                                                 onClick={() => { setRoleFilter('student'); setShowFilterDropdown(false); }}
-                                                className={`w-full px-4 py-2 text-left text-sm flex items-center justify-between ${roleFilter === 'student' ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-gray-50'
-                                                    }`}
+                                                className={`w-full px-4 py-2 text-left text-sm flex items-center justify-between ${roleFilter === 'student' ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-gray-50'}`}
                                             >
                                                 Student
-                                                {roleFilter === 'student' && (
-                                                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                                    </svg>
-                                                )}
+                                                {roleFilter === 'student' && <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>}
                                             </button>
                                             <button
                                                 onClick={() => { setRoleFilter('faculty'); setShowFilterDropdown(false); }}
-                                                className={`w-full px-4 py-2 text-left text-sm flex items-center justify-between ${roleFilter === 'faculty' ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-gray-50'
-                                                    }`}
+                                                className={`w-full px-4 py-2 text-left text-sm flex items-center justify-between ${roleFilter === 'faculty' ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-gray-50'}`}
                                             >
                                                 Faculty
-                                                {roleFilter === 'faculty' && (
-                                                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                                    </svg>
-                                                )}
+                                                {roleFilter === 'faculty' && <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>}
                                             </button>
                                             <button
                                                 onClick={() => { setRoleFilter('production_team'); setShowFilterDropdown(false); }}
-                                                className={`w-full px-4 py-2 text-left text-sm flex items-center justify-between ${roleFilter === 'production_team' ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-gray-50'
-                                                    }`}
+                                                className={`w-full px-4 py-2 text-left text-sm flex items-center justify-between ${roleFilter === 'production_team' ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-gray-50'}`}
                                             >
                                                 Production Team
-                                                {roleFilter === 'production_team' && (
-                                                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                                    </svg>
-                                                )}
+                                                {roleFilter === 'production_team' && <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>}
                                             </button>
                                             <button
                                                 onClick={() => { setRoleFilter('outsider'); setShowFilterDropdown(false); }}
-                                                className={`w-full px-4 py-2 text-left text-sm flex items-center justify-between ${roleFilter === 'outsider' ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-gray-50'
-                                                    }`}
+                                                className={`w-full px-4 py-2 text-left text-sm flex items-center justify-between ${roleFilter === 'outsider' ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-gray-50'}`}
                                             >
                                                 Outsider
-                                                {roleFilter === 'outsider' && (
-                                                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                                    </svg>
-                                                )}
+                                                {roleFilter === 'outsider' && <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>}
                                             </button>
                                         </div>
                                     )}
@@ -375,7 +378,7 @@ export default function Users() {
                             </div>
                         )}
 
-                        {/* Users Table - ✅ Removed Actions Column */}
+                        {/* Users Table */}
                         {!loading && !error && (
                             <div className="overflow-x-auto">
                                 <table className="w-full">
@@ -383,16 +386,14 @@ export default function Users() {
                                         <tr className="border-b border-gray-100">
                                             <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">User</th>
                                             <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Role</th>
-                                            <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Status</th>
                                             <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Joined</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-100">
                                         {filteredUsers.map((user) => (
-                                            <tr key={user.id} className="hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => handleViewUser(user)}>
-                                                <td className="py-4 px-4">
+                                            <tr key={user.id} className="hover:bg-gray-50 transition-colors">
+                                                <td className="py-4 px-4 cursor-pointer" onClick={() => handleViewUser(user)}>
                                                     <div className="flex items-center gap-3">
-                                                        {/* ✅ Changed avatar color to black */}
                                                         <div className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center text-white font-semibold text-xs flex-shrink-0">
                                                             {getInitials(user.name)}
                                                         </div>
@@ -402,18 +403,12 @@ export default function Users() {
                                                         </div>
                                                     </div>
                                                 </td>
-                                                <td className="py-4 px-4">
-                                                    {/* ✅ Changed role badge color to black */}
+                                                <td className="py-4 px-4 cursor-pointer" onClick={() => handleViewUser(user)}>
                                                     <span className={`inline-flex px-3 py-1 rounded-full text-xs font-medium ${getRoleBadgeClass(user.role)}`}>
                                                         {user.role === 'production_team' ? 'Production Team' : capitalize(user.role)}
                                                     </span>
                                                 </td>
-                                                <td className="py-4 px-4">
-                                                    <span className={`inline-flex px-3 py-1 rounded-full text-xs font-medium ${user.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                                        {user.is_active ? 'Active' : 'Disabled'}
-                                                    </span>
-                                                </td>
-                                                <td className="py-4 px-4 text-sm text-gray-600">
+                                                <td className="py-4 px-4 text-sm text-gray-600 cursor-pointer" onClick={() => handleViewUser(user)}>
                                                     {formatDate(user.created_at)}
                                                 </td>
                                             </tr>
@@ -440,74 +435,52 @@ export default function Users() {
             {showViewModal && selectedUser && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
-                        {/* Modal Header */}
                         <div className="flex items-center justify-between p-6 border-b border-gray-100">
                             <div>
                                 <h3 className="text-xl font-bold text-gray-900">User Details</h3>
                                 <p className="text-sm text-gray-500 mt-1">View detailed information about this user</p>
                             </div>
                             <button onClick={closeAllModals} className="text-gray-400 hover:text-gray-600">
-                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                                </svg>
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
                             </button>
                         </div>
-
-                        {/* Modal Content */}
                         <div className="p-6">
-                            {/* User Info */}
                             <div className="flex items-center gap-4 mb-6">
-                                {/* ✅ Changed avatar color to black */}
                                 <div className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center text-white font-bold text-lg">
                                     {getInitials(selectedUser.name)}
                                 </div>
                                 <div>
                                     <h4 className="text-lg font-bold text-gray-900">{selectedUser.name}</h4>
-                                    {/* ✅ Changed role badge color to black */}
                                     <span className={`inline-flex px-3 py-1 rounded-full text-xs font-medium ${getRoleBadgeClass(selectedUser.role)}`}>
                                         {selectedUser.role === 'production_team' ? 'Production Team' : capitalize(selectedUser.role)}
                                     </span>
                                 </div>
                             </div>
-
                             <hr className="border-gray-100 mb-6" />
-
-                            {/* Details */}
                             <div className="space-y-4">
                                 <div className="flex items-start gap-3">
-                                    <svg className="w-5 h-5 text-gray-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                                    </svg>
+                                    <svg className="w-5 h-5 text-gray-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
                                     <div>
                                         <p className="text-sm text-gray-500">Gender</p>
                                         <p className="text-gray-900 font-medium">{capitalize(selectedUser.gender || 'N/A')}</p>
                                     </div>
                                 </div>
-
                                 <div className="flex items-start gap-3">
-                                    <svg className="w-5 h-5 text-gray-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                                    </svg>
+                                    <svg className="w-5 h-5 text-gray-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
                                     <div>
                                         <p className="text-sm text-gray-500">Email</p>
                                         <p className="text-gray-900 font-medium">{selectedUser.email}</p>
                                     </div>
                                 </div>
-
                                 <div className="flex items-start gap-3">
-                                    <svg className="w-5 h-5 text-gray-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                                    </svg>
+                                    <svg className="w-5 h-5 text-gray-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
                                     <div>
                                         <p className="text-sm text-gray-500">Phone Number</p>
                                         <p className="text-gray-900 font-medium">{selectedUser.phone || 'N/A'}</p>
                                     </div>
                                 </div>
-
                                 <div className="flex items-start gap-3">
-                                    <svg className="w-5 h-5 text-gray-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 01-18 0z" />
-                                    </svg>
+                                    <svg className="w-5 h-5 text-gray-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 01-18 0z" /></svg>
                                     <div>
                                         <p className="text-sm text-gray-500">Status</p>
                                         <span className={`inline-flex px-3 py-1 rounded-full text-xs font-medium ${selectedUser.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
@@ -517,28 +490,14 @@ export default function Users() {
                                 </div>
                             </div>
                         </div>
-
-                        {/* Modal Footer - ✅ Changed Delete to Disable/Enable */}
                         <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-100">
-                            <button
-                                onClick={() => { closeAllModals(); handleEditUser(selectedUser); }}
-                                className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
-                            >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                                </svg>
+                            <button onClick={() => { closeAllModals(); handleEditUser(selectedUser); }} className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                                 Edit
                             </button>
-                            <button
-                                onClick={() => { closeAllModals(); handleToggleStatus(selectedUser); }}
-                                className={`flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-colors ${selectedUser.is_active ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'}`}
-                            >
+                            <button onClick={() => { closeAllModals(); handleToggleStatus(selectedUser); }} className={`flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-colors ${selectedUser.is_active ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'}`}>
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    {selectedUser.is_active ? (
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-                                    ) : (
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    )}
+                                    {selectedUser.is_active ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /> : <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />}
                                 </svg>
                                 {selectedUser.is_active ? 'Disable' : 'Enable'}
                             </button>
@@ -551,41 +510,24 @@ export default function Users() {
             {showEditModal && selectedUser && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
-                        {/* Modal Header */}
                         <div className="flex items-center justify-between p-6 border-b border-gray-100">
                             <div>
                                 <h3 className="text-xl font-bold text-gray-900">Edit User</h3>
                                 <p className="text-sm text-gray-500 mt-1">Update user information</p>
                             </div>
                             <button onClick={closeAllModals} className="text-gray-400 hover:text-gray-600">
-                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                                </svg>
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
                             </button>
                         </div>
-
-                        {/* Modal Content */}
                         <div className="p-6 space-y-4">
-                            {/* Full Name */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
-                                <input
-                                    type="text"
-                                    value={editForm.name}
-                                    onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                />
+                                <input type="text" value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
                             </div>
-
-                            {/* Gender & Role */}
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-2">Gender</label>
-                                    <select
-                                        value={editForm.gender}
-                                        onChange={(e) => setEditForm({ ...editForm, gender: e.target.value })}
-                                        className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                                    >
+                                    <select value={editForm.gender} onChange={(e) => setEditForm({ ...editForm, gender: e.target.value })} className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
                                         <option value="male">Male</option>
                                         <option value="female">Female</option>
                                         <option value="other">Other</option>
@@ -593,11 +535,7 @@ export default function Users() {
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-2">Role</label>
-                                    <select
-                                        value={editForm.role}
-                                        onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}
-                                        className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                                    >
+                                    <select value={editForm.role} onChange={(e) => setEditForm({ ...editForm, role: e.target.value })} className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
                                         <option value="student">Student</option>
                                         <option value="faculty">Faculty</option>
                                         <option value="production_team">Production Team</option>
@@ -605,44 +543,18 @@ export default function Users() {
                                     </select>
                                 </div>
                             </div>
-
-                            {/* Email */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
-                                <input
-                                    type="email"
-                                    value={editForm.email}
-                                    onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                />
+                                <input type="email" value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
                             </div>
-
-                            {/* Phone */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
-                                <input
-                                    type="tel"
-                                    value={editForm.phone}
-                                    onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
-                                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                />
+                                <input type="tel" value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
                             </div>
                         </div>
-
-                        {/* Modal Footer */}
                         <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-100">
-                            <button
-                                onClick={closeAllModals}
-                                className="px-4 py-2 border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={handleSaveEdit}
-                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                            >
-                                Save Changes
-                            </button>
+                            <button onClick={closeAllModals} className="px-4 py-2 border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">Cancel</button>
+                            <button onClick={handleSaveEdit} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">Save Changes</button>
                         </div>
                     </div>
                 </div>
@@ -652,57 +564,31 @@ export default function Users() {
             {showToggleModal && selectedUser && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full">
-                        {/* Modal Header */}
                         <div className="p-6 text-center">
                             <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${selectedUser.is_active ? 'bg-red-100' : 'bg-green-100'}`}>
                                 <svg className={`w-8 h-8 ${selectedUser.is_active ? 'text-red-600' : 'text-green-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    {selectedUser.is_active ? (
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-                                    ) : (
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    )}
+                                    {selectedUser.is_active ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /> : <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />}
                                 </svg>
                             </div>
-                            <h3 className="text-xl font-bold text-gray-900 mb-2">
-                                {selectedUser.is_active ? 'Disable' : 'Enable'} User?
-                            </h3>
-                            <p className="text-gray-600">
-                                Are you sure you want to {selectedUser.is_active ? 'disable' : 'enable'} <span className="font-semibold">{selectedUser.name}</span>?
-                                {selectedUser.is_active && ' The user will not be able to log in.'}
-                            </p>
+                            <h3 className="text-xl font-bold text-gray-900 mb-2">{selectedUser.is_active ? 'Disable' : 'Enable'} User?</h3>
+                            <p className="text-gray-600">Are you sure you want to {selectedUser.is_active ? 'disable' : 'enable'} <span className="font-semibold">{selectedUser.name}</span>? {selectedUser.is_active && 'The user will not be able to log in.'}</p>
                         </div>
-
-                        {/* Modal Footer */}
                         <div className="flex items-center justify-center gap-3 p-6 border-t border-gray-100">
-                            <button
-                                onClick={closeAllModals}
-                                className="px-6 py-2 border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={confirmToggleStatus}
-                                className={`px-6 py-2 text-white rounded-lg transition-colors ${selectedUser.is_active ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'}`}
-                            >
-                                {selectedUser.is_active ? 'Disable' : 'Enable'}
-                            </button>
+                            <button onClick={closeAllModals} className="px-6 py-2 border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">Cancel</button>
+                            <button onClick={confirmToggleStatus} className={`px-6 py-2 text-white rounded-lg transition-colors ${selectedUser.is_active ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'}`}>{selectedUser.is_active ? 'Disable' : 'Enable'}</button>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* ✅ Toast Notification */}
+            {/* Toast Notification */}
             {toast.show && (
                 <div className={`fixed bottom-6 right-6 z-[100] px-6 py-3 rounded-lg shadow-lg text-white font-medium animate-slide-in ${toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'}`}>
                     <div className="flex items-center gap-2">
                         {toast.type === 'success' ? (
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                         ) : (
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                         )}
                         {toast.message}
                     </div>

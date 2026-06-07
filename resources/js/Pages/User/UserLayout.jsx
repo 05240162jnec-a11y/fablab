@@ -16,11 +16,16 @@ export default function UserLayout() {
     // Logout confirmation
     const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
-    // Fetch user data from localStorage
+    // Fetch user data from sessionStorage (unified login)
     useEffect(() => {
-        const storedUser = JSON.parse(localStorage.getItem('user'));
+        const storedUser = sessionStorage.getItem('user');
         if (storedUser) {
-            setUser(storedUser);
+            try {
+                const parsed = JSON.parse(storedUser);
+                setUser(parsed);
+            } catch (e) {
+                console.error('Error parsing user data:', e);
+            }
         }
     }, []);
 
@@ -41,19 +46,26 @@ export default function UserLayout() {
     };
 
     const confirmLogout = () => {
-        // Clear ALL user data
+        // Clear session storage (unified auth)
+        sessionStorage.clear();
+
+        // Also clear any legacy localStorage keys
+        localStorage.removeItem('production_team_token');
+        localStorage.removeItem('production_team_data');
         localStorage.removeItem('auth_token');
+        localStorage.removeItem('admin_token');
+        localStorage.removeItem('user_token');
         localStorage.removeItem('user');
+        localStorage.removeItem('admin');
+        localStorage.removeItem('admin_data');
         localStorage.removeItem('user_data');
         localStorage.removeItem('enrollments');
         localStorage.removeItem('courses');
         localStorage.removeItem('bookings');
         localStorage.removeItem('machines');
-        localStorage.removeItem('dashboard_data');
         localStorage.removeItem('cart_items');
         localStorage.removeItem('user_profile');
         localStorage.removeItem('booking_data');
-        sessionStorage.clear();
 
         navigate('/login', { replace: true });
     };
@@ -70,7 +82,11 @@ export default function UserLayout() {
     // Get user initials
     const getUserInitials = () => {
         if (user?.name) {
-            return user.name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
+            const names = user.name.split(' ');
+            if (names.length >= 2) {
+                return (names[0][0] + names[names.length - 1][0]).toUpperCase();
+            }
+            return names[0].substring(0, 2).toUpperCase();
         }
         return 'U';
     };
@@ -100,6 +116,7 @@ export default function UserLayout() {
                                     onClick={() => setShowProfileDropdown(!showProfileDropdown)}
                                     className="flex items-center gap-3 focus:outline-none"
                                 >
+                                    {/* ✅ UPDATED: Blue gradient avatar */}
                                     <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-cyan-600 rounded-full flex items-center justify-center text-white font-bold text-sm cursor-pointer hover:shadow-md transition-shadow">
                                         {getUserInitials()}
                                     </div>

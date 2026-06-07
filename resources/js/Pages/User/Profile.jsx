@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
-export default function ProductionTeamProfile() {
+export default function UserProfile() {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -23,12 +23,12 @@ export default function ProductionTeamProfile() {
     const [editLoading, setEditLoading] = useState(false);
     const [passwordLoading, setPasswordLoading] = useState(false);
 
-    // ✅ FIXED: Fetch current production team profile
+    // Fetch current user profile
     const fetchProfile = async () => {
         try {
             setLoading(true);
-            const token = localStorage.getItem('production_team_token');
-            const response = await axios.get('http://127.0.0.1:8000/api/production-team/profile', {
+            const token = sessionStorage.getItem('auth_token');
+            const response = await axios.get('http://127.0.0.1:8000/api/user/profile', {
                 headers: {
                     'Accept': 'application/json',
                     'Authorization': `Bearer ${token}`,
@@ -70,15 +70,16 @@ export default function ProductionTeamProfile() {
         setEditForm(prev => ({ ...prev, [name]: value }));
     };
 
-    // ✅ FIXED: Save profile updates with production team token
+    // Save profile updates
     const handleSaveProfile = async (e) => {
         e.preventDefault();
         setEditLoading(true);
         setSuccessMessage(null);
+        setError(null);
 
         try {
-            const token = localStorage.getItem('production_team_token');
-            await axios.post('http://127.0.0.1:8000/api/production-team/profile/update', {
+            const token = sessionStorage.getItem('auth_token');
+            await axios.post('http://127.0.0.1:8000/api/user/profile/update', {
                 phone: editForm.phone,
                 gender: editForm.gender,
             }, {
@@ -99,11 +100,12 @@ export default function ProductionTeamProfile() {
         }
     };
 
-    // ✅ FIXED: Handle password change with production team token
+    // Handle password change
     const handlePasswordChange = async (e) => {
         e.preventDefault();
         setPasswordLoading(true);
         setSuccessMessage(null);
+        setError(null);
 
         if (passwordForm.new_password !== passwordForm.new_password_confirmation) {
             setError('New passwords do not match');
@@ -112,8 +114,8 @@ export default function ProductionTeamProfile() {
         }
 
         try {
-            const token = localStorage.getItem('production_team_token');
-            await axios.post('http://127.0.0.1:8000/api/production-team/profile/change-password', {
+            const token = sessionStorage.getItem('auth_token');
+            await axios.post('http://127.0.0.1:8000/api/user/profile/change-password', {
                 current_password: passwordForm.current_password,
                 new_password: passwordForm.new_password,
                 new_password_confirmation: passwordForm.new_password_confirmation,
@@ -139,6 +141,28 @@ export default function ProductionTeamProfile() {
         }
     };
 
+    // Get role display name
+    const getRoleDisplay = (role) => {
+        const roles = {
+            'student': 'Student',
+            'faculty': 'Faculty',
+            'outsider': 'Outsider',
+            'production_team': 'Production Team',
+            'admin': 'Administrator',
+        };
+        return roles[role] || role;
+    };
+
+    // Get role badge color
+    const getRoleBadgeColor = (role) => {
+        const colors = {
+            'student': 'bg-blue-100 text-blue-700 border-blue-200',
+            'faculty': 'bg-purple-100 text-purple-700 border-purple-200',
+            'outsider': 'bg-amber-100 text-amber-700 border-amber-200',
+        };
+        return colors[role] || 'bg-blue-100 text-blue-700 border-blue-200';
+    };
+
     if (loading) {
         return (
             <div className="p-6 flex items-center justify-center h-64">
@@ -159,7 +183,7 @@ export default function ProductionTeamProfile() {
 
     return (
         <div className="min-h-screen bg-gray-50">
-            {/* ✅ Sticky Page Header */}
+            {/* Sticky Page Header */}
             <div className="sticky top-0 z-20 bg-gray-50 pb-4 mb-6 border-b border-gray-200">
                 <div className="p-6">
                     <h2 className="text-xl font-semibold text-gray-800">My Profile</h2>
@@ -185,14 +209,14 @@ export default function ProductionTeamProfile() {
                 {/* Profile Header Card */}
                 <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
                     <div className="flex items-center gap-4">
-                        <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white text-xl font-bold">
-                            {user?.name?.charAt(0) || 'P'}
+                        <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-full flex items-center justify-center text-white text-xl font-bold shadow-md">
+                            {user?.name?.charAt(0) || 'U'}
                         </div>
                         <div>
                             <h3 className="text-lg font-bold text-gray-900">{user?.name}</h3>
                             <p className="text-sm text-gray-600">{user?.email}</p>
-                            <span className="inline-flex mt-1 px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700 border border-blue-200">
-                                Production Team
+                            <span className={`inline-flex mt-1 px-3 py-1 rounded-full text-xs font-medium border ${getRoleBadgeColor(user?.role)}`}>
+                                {getRoleDisplay(user?.role)}
                             </span>
                         </div>
                     </div>
@@ -201,7 +225,7 @@ export default function ProductionTeamProfile() {
                 {/* Two Column Layout */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-                    {/* ✅ Editable Profile Section */}
+                    {/* Editable Profile Section */}
                     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
                         <h4 className="text-lg font-bold text-gray-900 mb-4">Personal Information</h4>
 
@@ -250,12 +274,18 @@ export default function ProductionTeamProfile() {
                                     </div>
                                     <div>
                                         <p className="text-gray-500">Role</p>
-                                        <p className="font-medium text-gray-900">Production Team</p>
+                                        <p className="font-medium text-gray-900">{getRoleDisplay(user?.role)}</p>
                                     </div>
+                                    {user?.department && (
+                                        <div>
+                                            <p className="text-gray-500">Department</p>
+                                            <p className="font-medium text-gray-900">{user.department}</p>
+                                        </div>
+                                    )}
                                     <div>
                                         <p className="text-gray-500">Member Since</p>
                                         <p className="font-medium text-gray-900">
-                                            {user?.created_at ? new Date(user.created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : 'N/A'}
+                                            {user?.created_at || 'N/A'}
                                         </p>
                                     </div>
                                 </div>
@@ -285,7 +315,7 @@ export default function ProductionTeamProfile() {
                         </form>
                     </div>
 
-                    {/* ✅ Change Password Section */}
+                    {/* Change Password Section */}
                     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
                         <h4 className="text-lg font-bold text-gray-900 mb-4">Change Password</h4>
 

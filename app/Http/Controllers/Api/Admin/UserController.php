@@ -7,9 +7,14 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\AccountDisabledMail;
 
 class UserController extends Controller
 {
+    // ✅ Protected admin user ID
+    protected $protectedAdminId = 1;
+
     // Get all users with filters
     public function index(Request $request)
     {
@@ -29,17 +34,22 @@ class UserController extends Controller
             $query->where('role', $request->role);
         }
 
+        // Filter by Active/Disabled status based on the tab
+        if ($request->has('status')) {
+            $query->where('is_active', $request->status === 'active');
+        }
+
         $users = $query->latest()->get();
 
         // Calculate stats
         $stats = [
-            'total' => $users->count(),
+            'total' => User::count(),
             'students' => User::where('role', 'student')->count(),
             'faculty' => User::where('role', 'faculty')->count(),
             'outsiders' => User::where('role', 'outsider')->count(),
-            'production_team' => User::where('role', 'production_team')->count(), // ✅ Added
-            'active' => User::where('is_active', true)->count(), // ✅ Added
-            'inactive' => User::where('is_active', false)->count(), // ✅ Added
+            'production_team' => User::where('role', 'production_team')->count(),
+            'active' => User::where('is_active', true)->count(),
+            'inactive' => User::where('is_active', false)->count(),
         ];
 
         return response()->json([
@@ -63,15 +73,23 @@ class UserController extends Controller
     // Update user
     public function update(Request $request, $id)
     {
+        // Prevent admin from being updated
+        if ($id == $this->protectedAdminId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cannot modify the main admin account.'
+            ], 403);
+        }
+
         $user = User::findOrFail($id);
 
         $validated = $request->validate([
             'name' => 'sometimes|required|string|max:255',
             'email' => ['sometimes', 'required', 'email', Rule::unique('users')->ignore($id)],
             'gender' => 'sometimes|in:male,female,other',
-            'role' => 'sometimes|in:student,faculty,outsider,production_team', // ✅ Added production_team
+            'role' => 'sometimes|in:student,faculty,outsider,production_team',
             'phone' => 'sometimes|string|max:20',
-            'is_active' => 'sometimes|boolean', // ✅ Added
+            'is_active' => 'sometimes|boolean',
         ]);
 
         $user->update($validated);
@@ -82,10 +100,18 @@ class UserController extends Controller
             'data' => $user
         ]);
     }
-
-    // ✅ Toggle user status (enable/disable)
+    
+    // Toggle user status (enable/disable) with email notification
     public function toggleStatus($id)
     {
+        // Prevent admin from being disabled
+        if ($id == $this->protectedAdminId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cannot disable the main admin account.'
+            ], 403);
+        }
+
         $user = User::findOrFail($id);
         
         // Toggle the is_active status
@@ -94,6 +120,15 @@ class UserController extends Controller
 
         $status = $user->is_active ? 'enabled' : 'disabled';
 
+        // Send email notification when user is disabled
+        if (!$user->is_active) {
+            try {
+                Mail::to($user->email)->send(new AccountDisabledMail($user));
+            } catch (\Exception $e) {
+                \Log::error('Failed to send account disabled email: ' . $e->getMessage());
+            }
+        }
+
         return response()->json([
             'success' => true,
             'message' => "User {$status} successfully",
@@ -101,10 +136,20 @@ class UserController extends Controller
         ]);
     }
 
-    // Delete user (permanent delete - kept for backup)
+    // Delete user (permanent delete)
     public function destroy($id)
     {
+        // Prevent admin from being deleted
+        if ($id == $this->protectedAdminId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cannot delete the main admin account.'
+            ], 403);
+        }
+
         $user = User::findOrFail($id);
+        
+        // This will now be a hard delete since SoftDeletes is removed from the model
         $user->delete();
 
         return response()->json([

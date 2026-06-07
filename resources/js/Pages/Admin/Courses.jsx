@@ -8,27 +8,45 @@ export default function Courses() {
     const [showViewModal, setShowViewModal] = useState(false);
     const [showEditModal, setShowEditModal] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [showAbsentConfirm, setShowAbsentConfirm] = useState(false);
+    const [pendingAbsentId, setPendingAbsentId] = useState(null);
+
+    // Custom Alert/Confirm Modal States
+    const [showCustomAlert, setShowCustomAlert] = useState(false);
+    const [customAlertData, setCustomAlertData] = useState({
+        type: 'success',
+        title: '',
+        message: '',
+        onConfirm: null,
+    });
 
     const [selectedCourse, setSelectedCourse] = useState(null);
     const [registrationClosed, setRegistrationClosed] = useState(false);
 
-    // ✅ Enrolled Users States
+    // Enrolled Users States
     const [enrollments, setEnrollments] = useState([]);
     const [enrollmentFilter, setEnrollmentFilter] = useState('all');
+    const [enrollmentSearch, setEnrollmentSearch] = useState('');
     const [enrollmentsLoading, setEnrollmentsLoading] = useState(false);
     const [enrollmentError, setEnrollmentError] = useState(null);
 
-    // Create/Edit Form State
+    // Completion tracking state
+    const [completionStatus, setCompletionStatus] = useState({});
+    const [savingCompletion, setSavingCompletion] = useState(false);
+
+    // ✅ NEW: Production Team State (for dynamic instructor dropdown)
+    const [productionTeam, setProductionTeam] = useState([]);
+    const [loadingProductionTeam, setLoadingProductionTeam] = useState(false);
+
+    // Create/Edit Form State - ✅ REMOVED status and registrationStatus
     const [formState, setFormState] = useState({
         title: '',
-        instructor: '',  // ✅ Now will be selected from dropdown
+        instructor: '',
         start_date: '',
         end_date: '',
         seatLimit: '',
         description: '',
         image: null,
-        status: 'upcoming',
-        registrationStatus: 'open',
     });
 
     // Backend State
@@ -36,14 +54,29 @@ export default function Courses() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    // ✅ Static Instructor Options (will be dynamic later)
-    const instructorOptions = [
-        { value: '', label: 'Select Instructor...' },
-        { value: 'Admin', label: 'Admin' },
-        { value: 'Dorji Gyeltshen', label: 'Dorji Gyeltshen' },
-        { value: 'Cimi Dem', label: 'Cimi Dem' },
-        { value: 'Other', label: 'Other (specify in description)' },
-    ];
+    // ✅ NEW: Fetch production team from API
+    const fetchProductionTeam = async () => {
+        try {
+            setLoadingProductionTeam(true);
+            const token = localStorage.getItem('admin_token');
+
+            const response = await axios.get('http://127.0.0.1:8000/api/admin/courses/production-team', {
+                headers: {
+                    'Accept': 'application/json',
+                    'Authorization': `Bearer ${token}`,
+                }
+            });
+
+            if (response.data.success) {
+                setProductionTeam(response.data.data);
+            }
+        } catch (err) {
+            console.error('Fetch production team error:', err);
+            showCustomModal('error', 'Error', 'Failed to load production team members.');
+        } finally {
+            setLoadingProductionTeam(false);
+        }
+    };
 
     // Fetch courses from API
     const fetchCourses = async () => {
@@ -70,7 +103,7 @@ export default function Courses() {
         }
     };
 
-    // ✅ Fetch enrolled users for a course
+    // Fetch enrolled users for a course
     const fetchEnrollments = async (courseId) => {
         try {
             setEnrollmentsLoading(true);
@@ -86,6 +119,11 @@ export default function Courses() {
 
             if (response.data.success) {
                 setEnrollments(response.data.data);
+                const initialStatus = {};
+                response.data.data.forEach(user => {
+                    initialStatus[user.enrollment_id] = user.status === 'completed' ? 'completed' : null;
+                });
+                setCompletionStatus(initialStatus);
             }
         } catch (err) {
             console.error('Fetch enrollments error:', err);
@@ -95,36 +133,126 @@ export default function Courses() {
         }
     };
 
-    // ✅ Remove user from course
-    const handleRemoveUser = async (courseId, userId, userName, enrollmentId) => {
-        if (!window.confirm(`Are you sure you want to remove "${userName}" from this course?`)) {
-            return;
-        }
+    // Show custom alert/confirm
+    const showCustomModal = (type, title, message, onConfirm = null) => {
+        setCustomAlertData({ type, title, message, onConfirm });
+        setShowCustomAlert(true);
+    };
 
-        try {
-            const token = localStorage.getItem('admin_token');
+    // Mark all as completed
+    const handleMarkAllCompleted = () => {
+        const newStatus = {};
+        filteredEnrollments.forEach(user => {
+            newStatus[user.enrollment_id] = 'completed';
+        });
+        setCompletionStatus({ ...completionStatus, ...newStatus });
+    };
 
-            await axios.delete(`http://127.0.0.1:8000/api/admin/courses/${courseId}/enrollments/${enrollmentId}`, {
-                headers: {
-                    'Accept': 'application/json',
-                    'Authorization': `Bearer ${token}`,
-                }
-            });
-
-            setEnrollments(prev => prev.filter(u => u.enrollment_id !== enrollmentId));
-            alert(`✅ "${userName}" has been removed from the course.`);
-            fetchCourses();
-        } catch (err) {
-            console.error('Remove user error:', err);
-            if (err.response?.data?.message) {
-                alert('❌ ' + err.response.data.message);
-            } else {
-                alert('❌ Failed to remove user. Please try again.');
-            }
+    // Toggle individual completion status
+    const handleToggleStatus = (enrollmentId, status) => {
+        if (status === 'absent') {
+            setPendingAbsentId(enrollmentId);
+            setShowAbsentConfirm(true);
+        } else {
+            setCompletionStatus(prev => ({
+                ...prev,
+                [enrollmentId]: status
+            }));
         }
     };
 
-    // ✅ Download enrollments as CSV
+    // Confirm absent marking
+    const confirmMarkAbsent = () => {
+        if (pendingAbsentId) {
+            setCompletionStatus(prev => ({
+                ...prev,
+                [pendingAbsentId]: 'absent'
+            }));
+            setPendingAbsentId(null);
+            setShowAbsentConfirm(false);
+        }
+    };
+
+    // Save completion changes
+    const handleSaveCompletion = async () => {
+        try {
+            setSavingCompletion(true);
+            const token = localStorage.getItem('admin_token');
+
+            const updates = Object.entries(completionStatus)
+                .filter(([_, status]) => status === 'completed' || status === 'absent')
+                .map(([enrollment_id, status]) => ({
+                    enrollment_id: parseInt(enrollment_id),
+                    status: status
+                }));
+
+            if (updates.length === 0) {
+                showCustomModal('info', 'No Changes', 'No changes to save.');
+                setSavingCompletion(false);
+                return;
+            }
+
+            const response = await axios.put(
+                `http://127.0.0.1:8000/api/admin/courses/${selectedCourse.id}/enrollments/bulk-update`,
+                { updates },
+                {
+                    headers: {
+                        'Accept': 'application/json',
+                        'Authorization': `Bearer ${token}`,
+                    }
+                }
+            );
+
+            if (response.data.success) {
+                showCustomModal('success', 'Success', response.data.message);
+                await fetchEnrollments(selectedCourse.id);
+                fetchCourses();
+            }
+        } catch (err) {
+            console.error('Save completion error:', err);
+            if (err.response?.data?.message) {
+                showCustomModal('error', 'Error', err.response.data.message);
+            } else {
+                showCustomModal('error', 'Error', 'Failed to save completion status. Please try again.');
+            }
+        } finally {
+            setSavingCompletion(false);
+        }
+    };
+
+    // Remove user from course
+    const handleRemoveUser = (courseId, userId, userName, enrollmentId) => {
+        showCustomModal(
+            'confirm',
+            'Remove User',
+            `Are you sure you want to remove "${userName}" from this course?`,
+            async () => {
+                try {
+                    const token = localStorage.getItem('admin_token');
+
+                    await axios.delete(`http://127.0.0.1:8000/api/admin/courses/${courseId}/enrollments/${enrollmentId}`, {
+                        headers: {
+                            'Accept': 'application/json',
+                            'Authorization': `Bearer ${token}`,
+                        }
+                    });
+
+                    setEnrollments(prev => prev.filter(u => u.enrollment_id !== enrollmentId));
+                    showCustomModal('success', 'Success', `"${userName}" has been removed from the course.`);
+                    fetchCourses();
+                } catch (err) {
+                    console.error('Remove user error:', err);
+                    if (err.response?.data?.message) {
+                        showCustomModal('error', 'Error', err.response.data.message);
+                    } else {
+                        showCustomModal('error', 'Error', 'Failed to remove user. Please try again.');
+                    }
+                }
+            }
+        );
+    };
+
+    // Download enrollments as CSV
     const handleDownloadEnrollments = async (courseId, courseTitle) => {
         try {
             const token = localStorage.getItem('admin_token');
@@ -152,43 +280,46 @@ export default function Courses() {
 
         } catch (err) {
             console.error('Download error:', err);
-            alert('❌ Failed to download enrollments. Please try again.');
+            showCustomModal('error', 'Error', 'Failed to download enrollments. Please try again.');
         }
     };
 
-    // ✅ Clear active enrollments
-    const handleClearEnrollments = async (courseId, courseTitle) => {
-        if (!window.confirm(`⚠️ Are you sure you want to CLEAR all active enrollments for "${courseTitle}"?\n\n✅ Completion records will be PRESERVED for machine booking.\n✅ Only active (enrolled) users will be cleared.\n\nThis action cannot be undone.`)) {
-            return;
-        }
+    // Clear active enrollments
+    const handleClearEnrollments = (courseId, courseTitle) => {
+        showCustomModal(
+            'confirm',
+            'Clear Enrollments',
+            `Are you sure you want to CLEAR all active enrollments for "${courseTitle}"?\n\n✅ Completion records will be PRESERVED for machine booking.\n✅ Only active (enrolled) users will be cleared.\n\nThis action cannot be undone.`,
+            async () => {
+                try {
+                    const token = localStorage.getItem('admin_token');
 
-        try {
-            const token = localStorage.getItem('admin_token');
+                    const response = await axios.post(
+                        `http://127.0.0.1:8000/api/admin/courses/${courseId}/enrollments/clear`,
+                        {},
+                        {
+                            headers: {
+                                'Accept': 'application/json',
+                                'Authorization': `Bearer ${token}`,
+                            },
+                        }
+                    );
 
-            const response = await axios.post(
-                `http://127.0.0.1:8000/api/admin/courses/${courseId}/enrollments/clear`,
-                {},
-                {
-                    headers: {
-                        'Accept': 'application/json',
-                        'Authorization': `Bearer ${token}`,
-                    },
+                    if (response.data.success) {
+                        showCustomModal('success', 'Success', response.data.message);
+                        await fetchEnrollments(courseId);
+                        fetchCourses();
+                    }
+                } catch (err) {
+                    console.error('Clear error:', err);
+                    if (err.response?.data?.message) {
+                        showCustomModal('error', 'Error', err.response.data.message);
+                    } else {
+                        showCustomModal('error', 'Error', 'Failed to clear enrollments. Please try again.');
+                    }
                 }
-            );
-
-            if (response.data.success) {
-                alert(`✅ ${response.data.message}`);
-                await fetchEnrollments(courseId);
-                fetchCourses();
             }
-        } catch (err) {
-            console.error('Clear error:', err);
-            if (err.response?.data?.message) {
-                alert('❌ ' + err.response.data.message);
-            } else {
-                alert('❌ Failed to clear enrollments. Please try again.');
-            }
-        }
+        );
     };
 
     // Fetch on mount
@@ -227,13 +358,24 @@ export default function Courses() {
     // Capitalize first letter
     const capitalize = (str) => str.charAt(0).toUpperCase() + str.slice(1);
 
-    // ✅ Filter enrollments by role
+    // Filter enrollments by role AND search query
     const filteredEnrollments = enrollments.filter(user => {
-        if (enrollmentFilter === 'all') return true;
-        return user.role === enrollmentFilter;
+        if (enrollmentFilter !== 'all' && user.role !== enrollmentFilter) return false;
+
+        if (enrollmentSearch) {
+            const query = enrollmentSearch.toLowerCase();
+            return (
+                user.name?.toLowerCase().includes(query) ||
+                user.email?.toLowerCase().includes(query) ||
+                user.role?.toLowerCase().includes(query) ||
+                user.department?.toLowerCase().includes(query)
+            );
+        }
+
+        return true;
     });
 
-    // ✅ Check if course is ending soon
+    // Check if course is ending soon
     const isCourseEndingSoon = (endDate) => {
         if (!endDate) return false;
         const end = new Date(endDate);
@@ -242,7 +384,7 @@ export default function Courses() {
         return end <= sevenDaysFromNow && end >= today;
     };
 
-    // Open Create Modal
+    // Open Create Modal - ✅ UPDATED: Fetch production team
     const handleCreateCourse = () => {
         setFormState({
             title: '',
@@ -252,10 +394,9 @@ export default function Courses() {
             seatLimit: '',
             description: '',
             image: null,
-            status: 'upcoming',
-            registrationStatus: 'open',
         });
         setShowCreateModal(true);
+        fetchProductionTeam(); // ✅ Fetch production team when opening create modal
     };
 
     // Open View Modal
@@ -266,7 +407,7 @@ export default function Courses() {
         await fetchEnrollments(course.id);
     };
 
-    // Open Edit Modal
+    // Open Edit Modal - ✅ UPDATED: Fetch production team
     const handleEditCourse = (course) => {
         setSelectedCourse(course);
         setFormState({
@@ -277,11 +418,10 @@ export default function Courses() {
             seatLimit: course.seat_limit,
             description: course.description || '',
             image: null,
-            status: course.status,
-            registrationStatus: course.registration_status,
         });
         setShowViewModal(false);
         setShowEditModal(true);
+        fetchProductionTeam(); // ✅ Fetch production team when opening edit modal
     };
 
     // Open Delete Modal
@@ -304,10 +444,10 @@ export default function Courses() {
 
             setRegistrationClosed(!registrationClosed);
             fetchCourses();
-            alert(`✅ Registration for "${selectedCourse.title}" has been ${!registrationClosed ? 'closed' : 'opened'}.`);
+            showCustomModal('success', 'Success', `Registration for "${selectedCourse.title}" has been ${!registrationClosed ? 'closed' : 'opened'}.`);
         } catch (err) {
             console.error('Toggle registration error:', err);
-            alert('❌ Failed to update registration status');
+            showCustomModal('error', 'Error', 'Failed to update registration status');
         }
     };
 
@@ -325,26 +465,26 @@ export default function Courses() {
             setShowDeleteModal(false);
             setSelectedCourse(null);
             fetchCourses();
-            alert(`✅ Course "${selectedCourse.title}" deleted successfully!`);
+            showCustomModal('success', 'Success', `Course "${selectedCourse.title}" deleted successfully!`);
         } catch (err) {
             console.error('Delete error:', err);
-            alert('❌ Failed to delete course');
+            showCustomModal('error', 'Error', 'Failed to delete course');
         }
     };
 
-    // Save Create
+    // Save Create - ✅ UPDATED: Hardcode status and registration_status
     const handleSaveCreate = async () => {
         try {
             const token = localStorage.getItem('admin_token');
             const formData = new FormData();
             formData.append('title', formState.title);
             formData.append('instructor', formState.instructor);
-            // ❌ REMOVED: duration, schedule
             formData.append('start_date', formState.start_date);
             formData.append('end_date', formState.end_date);
             formData.append('seat_limit', formState.seatLimit);
-            formData.append('status', formState.status);
-            formData.append('registration_status', formState.registrationStatus);
+            // ✅ Hardcode these values
+            formData.append('status', 'active');
+            formData.append('registration_status', 'open');
             formData.append('description', formState.description);
             if (formState.image) {
                 formData.append('image', formState.image);
@@ -360,26 +500,33 @@ export default function Courses() {
 
             setShowCreateModal(false);
             fetchCourses();
-            alert(`✅ Course "${formState.title}" created successfully!`);
+            showCustomModal('success', 'Success', `Course "${formState.title}" created successfully!`);
         } catch (err) {
             console.error('Create error:', err);
-            alert('❌ Failed to create course');
+            if (err.response?.data?.errors) {
+                const errors = Object.values(err.response.data.errors).flat().join('\n');
+                showCustomModal('error', 'Validation Error', errors);
+            } else if (err.response?.data?.message) {
+                showCustomModal('error', 'Error', err.response.data.message);
+            } else {
+                showCustomModal('error', 'Error', 'Failed to create course');
+            }
         }
     };
 
-    // Save Edit
+    // Save Edit - ✅ UPDATED: Hardcode status and registration_status
     const handleSaveEdit = async () => {
         try {
             const token = localStorage.getItem('admin_token');
             const formData = new FormData();
             formData.append('title', formState.title);
             formData.append('instructor', formState.instructor);
-            // ❌ REMOVED: duration, schedule
             formData.append('start_date', formState.start_date);
             formData.append('end_date', formState.end_date);
             formData.append('seat_limit', formState.seatLimit);
-            formData.append('status', formState.status);
-            formData.append('registration_status', formState.registrationStatus);
+            // ✅ Hardcode these values
+            formData.append('status', 'active');
+            formData.append('registration_status', 'open');
             formData.append('description', formState.description);
             if (formState.image) {
                 formData.append('image', formState.image);
@@ -396,10 +543,17 @@ export default function Courses() {
             setShowEditModal(false);
             setSelectedCourse(null);
             fetchCourses();
-            alert(`✅ Course "${formState.title}" updated successfully!`);
+            showCustomModal('success', 'Success', `Course "${formState.title}" updated successfully!`);
         } catch (err) {
             console.error('Update error:', err);
-            alert('❌ Failed to update course');
+            if (err.response?.data?.errors) {
+                const errors = Object.values(err.response.data.errors).flat().join('\n');
+                showCustomModal('error', 'Validation Error', errors);
+            } else if (err.response?.data?.message) {
+                showCustomModal('error', 'Error', err.response.data.message);
+            } else {
+                showCustomModal('error', 'Error', 'Failed to update course');
+            }
         }
     };
 
@@ -409,13 +563,50 @@ export default function Courses() {
         setShowViewModal(false);
         setShowEditModal(false);
         setShowDeleteModal(false);
+        setShowAbsentConfirm(false);
+        setShowCustomAlert(false);
         setSelectedCourse(null);
         setEnrollments([]);
         setEnrollmentFilter('all');
+        setEnrollmentSearch('');
+        setCompletionStatus({});
+        setPendingAbsentId(null);
+        setCustomAlertData({ type: 'success', title: '', message: '', onConfirm: null });
+    };
+
+    // Get alert icon based on type
+    const getAlertIcon = (type) => {
+        const icons = {
+            success: (
+                <svg className="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+            ),
+            error: (
+                <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+            ),
+            warning: (
+                <svg className="w-6 h-6 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+            ),
+            info: (
+                <svg className="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+            ),
+            confirm: (
+                <svg className="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+            ),
+        };
+        return icons[type] || icons.info;
     };
 
     return (
-        // ✅ JUST the main content - sidebar is in AdminLayout now
         <div className="flex-1">
             {/* Top Header */}
             <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
@@ -595,14 +786,13 @@ export default function Courses() {
                                 </div>
                             </div>
 
-                            {/* ✅ ENROLLED USERS SECTION */}
+                            {/* ENROLLED USERS SECTION */}
                             <div className="mb-6">
-                                {/* ✅ No-Show Warning */}
+                                {/* No-Show Warning */}
                                 {isCourseEndingSoon(selectedCourse.end_date) && filteredEnrollments.length > 0 && (
                                     <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                                         <p className="text-xs text-yellow-800">
-                                            ⚠️ <strong>Course ends soon!</strong> Remove any no-show users before {new Date(selectedCourse.end_date).toLocaleDateString()}
-                                            to prevent them from being auto-marked as completed and gaining machine booking privileges.
+                                            ⚠️ <strong>Course ends soon!</strong> Mark attendance for all users before {new Date(selectedCourse.end_date).toLocaleDateString()}
                                         </p>
                                     </div>
                                 )}
@@ -625,7 +815,7 @@ export default function Courses() {
                                             <option value="outsider">Outsiders</option>
                                         </select>
 
-                                        {/* ✅ Download Button */}
+                                        {/* Download Button */}
                                         <button
                                             onClick={() => handleDownloadEnrollments(selectedCourse.id, selectedCourse.title)}
                                             className="flex items-center gap-1 px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors"
@@ -637,7 +827,7 @@ export default function Courses() {
                                             Download
                                         </button>
 
-                                        {/* ✅ Clear Button */}
+                                        {/* Clear Button */}
                                         {filteredEnrollments.length > 0 && (
                                             <button
                                                 onClick={() => handleClearEnrollments(selectedCourse.id, selectedCourse.title)}
@@ -652,6 +842,50 @@ export default function Courses() {
                                         )}
                                     </div>
                                 </div>
+
+                                {/* Search Bar */}
+                                <div className="mb-4">
+                                    <div className="relative max-w-md">
+                                        <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                        </svg>
+                                        <input
+                                            type="text"
+                                            placeholder="Search by name, email, role, or department..."
+                                            value={enrollmentSearch}
+                                            onChange={(e) => setEnrollmentSearch(e.target.value)}
+                                            className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                                        />
+                                        {enrollmentSearch && (
+                                            <button
+                                                onClick={() => setEnrollmentSearch('')}
+                                                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                            >
+                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                                </svg>
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Mark All Button */}
+                                {filteredEnrollments.length > 0 && (
+                                    <div className="mb-4 flex items-center justify-between bg-blue-50 border border-blue-200 rounded-lg p-3">
+                                        <div className="text-sm text-blue-800">
+                                            <strong>Quick Action:</strong> Mark attendance for all filtered users
+                                        </div>
+                                        <button
+                                            onClick={handleMarkAllCompleted}
+                                            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                                        >
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                            Mark All as Completed
+                                        </button>
+                                    </div>
+                                )}
 
                                 {/* Loading/Error States */}
                                 {enrollmentsLoading && (
@@ -678,56 +912,73 @@ export default function Courses() {
                                                     <th className="px-4 py-3 text-left font-medium text-gray-600">Role</th>
                                                     <th className="px-4 py-3 text-left font-medium text-gray-600 hidden md:table-cell">Department</th>
                                                     <th className="px-4 py-3 text-left font-medium text-gray-600 hidden lg:table-cell">Phone</th>
-                                                    <th className="px-4 py-3 text-left font-medium text-gray-600">Status</th>
-                                                    <th className="px-4 py-3 text-right font-medium text-gray-600">Actions</th>
+                                                    <th className="px-4 py-3 text-center font-medium text-gray-600">Attendance</th>
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-gray-100">
                                                 {filteredEnrollments.length === 0 ? (
                                                     <tr>
-                                                        <td colSpan="7" className="px-4 py-8 text-center text-gray-500">
-                                                            {enrollmentFilter === 'all'
+                                                        <td colSpan="6" className="px-4 py-8 text-center text-gray-500">
+                                                            {enrollmentFilter === 'all' && !enrollmentSearch
                                                                 ? 'No active users enrolled in this course yet.'
-                                                                : `No ${enrollmentFilter}s found.`}
+                                                                : enrollmentSearch
+                                                                    ? 'No users match your search.'
+                                                                    : `No ${enrollmentFilter}s found.`}
                                                         </td>
                                                     </tr>
                                                 ) : (
-                                                    filteredEnrollments.map((user) => (
-                                                        <tr key={user.enrollment_id} className="hover:bg-gray-50">
-                                                            <td className="px-4 py-3">
-                                                                <div className="font-medium text-gray-900">{user.name}</div>
-                                                                <div className="text-xs text-gray-400 md:hidden">{user.email}</div>
-                                                            </td>
-                                                            <td className="px-4 py-3 text-gray-600 hidden md:table-cell">{user.email}</td>
-                                                            <td className="px-4 py-3">
-                                                                <span className={`inline-flex px-2 py-1 rounded text-xs font-medium ${user.role === 'student' ? 'bg-blue-100 text-blue-700' :
-                                                                    user.role === 'faculty' ? 'bg-purple-100 text-purple-700' :
-                                                                        'bg-orange-100 text-orange-700'
-                                                                    }`}>
-                                                                    {capitalize(user.role)}
-                                                                </span>
-                                                            </td>
-                                                            <td className="px-4 py-3 text-gray-600 hidden lg:table-cell">{user.department || '-'}</td>
-                                                            <td className="px-4 py-3 text-gray-600 hidden lg:table-cell">{user.phone}</td>
-                                                            <td className="px-4 py-3">
-                                                                <span className={`inline-flex px-2 py-1 rounded text-xs font-medium ${getEnrollmentStatusClass(user.status)}`}>
-                                                                    {capitalize(user.status)}
-                                                                </span>
-                                                            </td>
-                                                            <td className="px-4 py-3 text-right">
-                                                                <div className="flex items-center justify-end gap-2">
-                                                                    {/* Remove Button */}
-                                                                    <button
-                                                                        onClick={() => handleRemoveUser(selectedCourse.id, user.user_id, user.name, user.enrollment_id)}
-                                                                        className="text-red-600 hover:text-red-800 text-xs font-medium hover:underline"
-                                                                        title="Remove user from course"
-                                                                    >
-                                                                        Remove
-                                                                    </button>
-                                                                </div>
-                                                            </td>
-                                                        </tr>
-                                                    ))
+                                                    filteredEnrollments.map((user) => {
+                                                        const status = completionStatus[user.enrollment_id];
+                                                        return (
+                                                            <tr key={user.enrollment_id} className="hover:bg-gray-50">
+                                                                <td className="px-4 py-3">
+                                                                    <div className="font-medium text-gray-900">{user.name}</div>
+                                                                    <div className="text-xs text-gray-400 md:hidden">{user.email}</div>
+                                                                </td>
+                                                                <td className="px-4 py-3 text-gray-600 hidden md:table-cell">{user.email}</td>
+                                                                <td className="px-4 py-3">
+                                                                    <span className={`inline-flex px-2 py-1 rounded text-xs font-medium ${user.role === 'student' ? 'bg-blue-100 text-blue-700' :
+                                                                        user.role === 'faculty' ? 'bg-purple-100 text-purple-700' :
+                                                                            'bg-orange-100 text-orange-700'
+                                                                        }`}>
+                                                                        {capitalize(user.role)}
+                                                                    </span>
+                                                                </td>
+                                                                <td className="px-4 py-3 text-gray-600 hidden lg:table-cell">{user.department || '-'}</td>
+                                                                <td className="px-4 py-3 text-gray-600 hidden lg:table-cell">{user.phone}</td>
+                                                                <td className="px-4 py-3">
+                                                                    <div className="flex items-center justify-center gap-2">
+                                                                        {/* Completed Button */}
+                                                                        <button
+                                                                            onClick={() => handleToggleStatus(user.enrollment_id, 'completed')}
+                                                                            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${status === 'completed'
+                                                                                ? 'bg-green-500 text-white shadow-md'
+                                                                                : 'bg-gray-100 text-gray-400 hover:bg-green-100 hover:text-green-600'
+                                                                                }`}
+                                                                            title="Mark as Completed"
+                                                                        >
+                                                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                                                                            </svg>
+                                                                        </button>
+                                                                        {/* Absent Button */}
+                                                                        <button
+                                                                            onClick={() => handleToggleStatus(user.enrollment_id, 'absent')}
+                                                                            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${status === 'absent'
+                                                                                ? 'bg-red-500 text-white shadow-md'
+                                                                                : 'bg-gray-100 text-gray-400 hover:bg-red-100 hover:text-red-600'
+                                                                                }`}
+                                                                            title="Mark as Absent"
+                                                                        >
+                                                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                                                            </svg>
+                                                                        </button>
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })
                                                 )}
                                             </tbody>
                                         </table>
@@ -757,26 +1008,142 @@ export default function Courses() {
                             </div>
                         </div>
 
-                        {/* Modal Footer - Sticky */}
-                        <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-100 sticky bottom-0 bg-white rounded-b-2xl">
+                        {/* Modal Footer - Sticky with Save Changes Button */}
+                        <div className="flex items-center justify-between gap-3 p-6 border-t border-gray-100 sticky bottom-0 bg-white rounded-b-2xl">
+                            <div className="flex items-center gap-3">
+                                <button
+                                    onClick={() => handleEditCourse(selectedCourse)}
+                                    className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                                >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                    </svg>
+                                    Edit Course
+                                </button>
+                                <button
+                                    onClick={() => handleDeleteCourse(selectedCourse)}
+                                    className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                                >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                    Delete
+                                </button>
+                            </div>
                             <button
-                                onClick={() => handleEditCourse(selectedCourse)}
-                                className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                                onClick={handleSaveCompletion}
+                                disabled={savingCompletion}
+                                className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                {savingCompletion ? (
+                                    <>
+                                        <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                        </svg>
+                                        Saving...
+                                    </>
+                                ) : (
+                                    <>
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                                        </svg>
+                                        Save Attendance
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ===== ABSENT CONFIRMATION MODAL ===== */}
+            {showAbsentConfirm && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center">
+                                <svg className="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                                 </svg>
-                                Edit Course
+                            </div>
+                            <h3 className="text-lg font-semibold text-gray-900">Mark as Absent?</h3>
+                        </div>
+                        <p className="text-gray-600 mb-6">
+                            Are you sure you want to mark this user as absent? They will be removed from the course.
+                        </p>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => {
+                                    setShowAbsentConfirm(false);
+                                    setPendingAbsentId(null);
+                                }}
+                                className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                            >
+                                Cancel
                             </button>
                             <button
-                                onClick={() => handleDeleteCourse(selectedCourse)}
-                                className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                                onClick={confirmMarkAbsent}
+                                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
                             >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                </svg>
-                                Delete
+                                Confirm
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ===== CUSTOM ALERT/CONFIRM MODAL ===== */}
+            {showCustomAlert && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[70] p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 animate-slide-up">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${customAlertData.type === 'success' ? 'bg-green-100' :
+                                customAlertData.type === 'error' ? 'bg-red-100' :
+                                    customAlertData.type === 'warning' ? 'bg-yellow-100' :
+                                        'bg-blue-100'
+                                }`}>
+                                {getAlertIcon(customAlertData.type)}
+                            </div>
+                            <h3 className="text-lg font-semibold text-gray-900">{customAlertData.title}</h3>
+                        </div>
+                        <p className="text-gray-600 mb-6 whitespace-pre-line">{customAlertData.message}</p>
+                        <div className="flex gap-3">
+                            {customAlertData.type === 'confirm' ? (
+                                <>
+                                    <button
+                                        onClick={() => {
+                                            setShowCustomAlert(false);
+                                            setCustomAlertData({ type: 'success', title: '', message: '', onConfirm: null });
+                                        }}
+                                        className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setShowCustomAlert(false);
+                                            if (customAlertData.onConfirm) {
+                                                customAlertData.onConfirm();
+                                            }
+                                            setCustomAlertData({ type: 'success', title: '', message: '', onConfirm: null });
+                                        }}
+                                        className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                                    >
+                                        Confirm
+                                    </button>
+                                </>
+                            ) : (
+                                <button
+                                    onClick={() => {
+                                        setShowCustomAlert(false);
+                                        setCustomAlertData({ type: 'success', title: '', message: '', onConfirm: null });
+                                    }}
+                                    className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                                >
+                                    OK
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -826,7 +1193,7 @@ export default function Courses() {
                                 />
                             </div>
 
-                            {/* ✅ Instructor Dropdown (Static Options) */}
+                            {/* ✅ UPDATED: Dynamic Instructor Dropdown */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">Instructor *</label>
                                 <select
@@ -834,14 +1201,24 @@ export default function Courses() {
                                     onChange={(e) => setFormState({ ...formState, instructor: e.target.value })}
                                     className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                                     required
+                                    disabled={loadingProductionTeam}
                                 >
-                                    {instructorOptions.map(option => (
-                                        <option key={option.value} value={option.value}>
-                                            {option.label}
+                                    <option value="">
+                                        {loadingProductionTeam ? 'Loading instructors...' : 'Select Instructor...'}
+                                    </option>
+                                    {productionTeam.map(member => (
+                                        <option key={member.id} value={member.name}>
+                                            {member.name}
                                         </option>
                                     ))}
                                 </select>
-                                <p className="text-xs text-gray-400 mt-1">Select from available instructors. More will be added later.</p>
+                                <p className="text-xs text-gray-400 mt-1">
+                                    {loadingProductionTeam
+                                        ? 'Loading production team members...'
+                                        : productionTeam.length === 0
+                                            ? 'No production team members found. Please add team members first.'
+                                            : 'Select from active production team members.'}
+                                </p>
                             </div>
 
                             {/* Course Dates - Required */}
@@ -868,6 +1245,7 @@ export default function Courses() {
                                         className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                                         required
                                     />
+                                    <p className="text-xs text-gray-400 mt-1">Can be the same as start date for single-day courses</p>
                                 </div>
                             </div>
 
@@ -875,43 +1253,22 @@ export default function Courses() {
                             <div className="mt-4">
                                 <label className="block text-sm font-medium text-gray-700 mb-2">Seat Limit *</label>
                                 <input
-                                    type="number"
+                                    type="text"
+                                    inputMode="numeric"
+                                    pattern="[0-9]*"
                                     placeholder="30"
                                     value={formState.seatLimit}
-                                    onChange={(e) => setFormState({ ...formState, seatLimit: e.target.value })}
-                                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    onChange={(e) => {
+                                        const value = e.target.value;
+                                        // Only allow numbers
+                                        if (value === '' || /^\d+$/.test(value)) {
+                                            setFormState({ ...formState, seatLimit: value });
+                                        }
+                                    }}
+                                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                     required
-                                    min="1"
                                 />
-                            </div>
-
-                            {/* Status & Registration */}
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
-                                    <select
-                                        value={formState.status}
-                                        onChange={(e) => setFormState({ ...formState, status: e.target.value })}
-                                        className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                                        required
-                                    >
-                                        <option value="upcoming">Upcoming</option>
-                                        <option value="active">Active</option>
-                                        <option value="completed">Completed</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Registration</label>
-                                    <select
-                                        value={formState.registrationStatus}
-                                        onChange={(e) => setFormState({ ...formState, registrationStatus: e.target.value })}
-                                        className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                                        required
-                                    >
-                                        <option value="open">Open</option>
-                                        <option value="closed">Closed</option>
-                                    </select>
-                                </div>
+                                <p className="text-xs text-gray-400 mt-1">Enter the maximum number of seats available</p>
                             </div>
 
                             {/* Description */}
@@ -977,7 +1334,7 @@ export default function Courses() {
                                 />
                             </div>
 
-                            {/* ✅ Instructor Dropdown (Static Options) */}
+                            {/* ✅ UPDATED: Dynamic Instructor Dropdown */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">Instructor *</label>
                                 <select
@@ -985,13 +1342,24 @@ export default function Courses() {
                                     onChange={(e) => setFormState({ ...formState, instructor: e.target.value })}
                                     className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                                     required
+                                    disabled={loadingProductionTeam}
                                 >
-                                    {instructorOptions.map(option => (
-                                        <option key={option.value} value={option.value}>
-                                            {option.label}
+                                    <option value="">
+                                        {loadingProductionTeam ? 'Loading instructors...' : 'Select Instructor...'}
+                                    </option>
+                                    {productionTeam.map(member => (
+                                        <option key={member.id} value={member.name}>
+                                            {member.name}
                                         </option>
                                     ))}
                                 </select>
+                                <p className="text-xs text-gray-400 mt-1">
+                                    {loadingProductionTeam
+                                        ? 'Loading production team members...'
+                                        : productionTeam.length === 0
+                                            ? 'No production team members found.'
+                                            : 'Select from active production team members.'}
+                                </p>
                             </div>
 
                             {/* Course Dates - Required */}
@@ -1018,6 +1386,7 @@ export default function Courses() {
                                         className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                                         required
                                     />
+                                    <p className="text-xs text-gray-400 mt-1">Can be the same as start date for single-day courses</p>
                                 </div>
                             </div>
 
@@ -1032,35 +1401,6 @@ export default function Courses() {
                                     required
                                     min="1"
                                 />
-                            </div>
-
-                            {/* Status & Registration */}
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
-                                    <select
-                                        value={formState.status}
-                                        onChange={(e) => setFormState({ ...formState, status: e.target.value })}
-                                        className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                                        required
-                                    >
-                                        <option value="upcoming">Upcoming</option>
-                                        <option value="active">Active</option>
-                                        <option value="completed">Completed</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Registration</label>
-                                    <select
-                                        value={formState.registrationStatus}
-                                        onChange={(e) => setFormState({ ...formState, registrationStatus: e.target.value })}
-                                        className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                                        required
-                                    >
-                                        <option value="open">Open</option>
-                                        <option value="closed">Closed</option>
-                                    </select>
-                                </div>
                             </div>
 
                             {/* Description */}

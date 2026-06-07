@@ -63,6 +63,9 @@ import MyBookings from './Pages/User/MyBookings';
 import MyEnrollments from './Pages/User/MyEnrollments';
 import UserMachines from './Pages/User/Machines';
 
+// ✅ NEW: User Profile
+import UserProfile from './Pages/User/Profile';
+
 // ✅ Tabbed Pages
 import ShopOrders from './Pages/User/ShopOrders';
 import Learning from './Pages/User/Learning';
@@ -135,6 +138,9 @@ root.render(
                 {/* ✅ UPDATED: User Pages - Now wrapped in UserLayout */}
                 <Route path="/user" element={<UserLayout />}>
                     <Route path="dashboard" element={<UserDashboard />} />
+
+                    {/* ✅ NEW: User Profile Route */}
+                    <Route path="profile" element={<UserProfile />} />
 
                     {/* Tabbed Routes */}
                     <Route path="shop-orders" element={<ShopOrders />} />

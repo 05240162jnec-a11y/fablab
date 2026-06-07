@@ -190,11 +190,16 @@ export default function ShopProducts({
     // Fetch products on mount
     useEffect(() => {
         fetchProducts();
-        const savedCart = localStorage.getItem('cart');
-        if (savedCart) {
-            const parsedCart = JSON.parse(savedCart);
-            setCart(parsedCart);
-            setCartProductIds(parsedCart.map(item => item.id));
+
+        // ✅ Load user-specific cart
+        const user = JSON.parse(localStorage.getItem('user'));
+        if (user?.id) {
+            const savedCart = localStorage.getItem(`cart_${user.id}`);
+            if (savedCart) {
+                const parsedCart = JSON.parse(savedCart);
+                setCart(parsedCart);
+                setCartProductIds(parsedCart.map(item => item.id));
+            }
         }
     }, []);
 
@@ -311,11 +316,13 @@ export default function ShopProducts({
                     : item
             );
             setCart(newCart);
-            localStorage.setItem('cart', JSON.stringify(newCart));
+            localStorage.setItem(`cart_${JSON.parse(localStorage.getItem('user'))?.id}`, JSON.stringify(newCart));
+
         } else {
             const newCart = [...cart, { ...product, quantity: qty }];
             setCart(newCart);
-            localStorage.setItem('cart', JSON.stringify(newCart));
+            localStorage.setItem(`cart_${JSON.parse(localStorage.getItem('user'))?.id}`, JSON.stringify(newCart));
+
             setCartProductIds(prev => [...prev, product.id]);
         }
 

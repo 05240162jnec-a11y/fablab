@@ -31,6 +31,9 @@ export default function Products() {
     const [filterStatus, setFilterStatus] = useState('all');
     const [stockAlertThreshold, setStockAlertThreshold] = useState(5);
 
+    // ✅ NEW: State for the input field (allows empty string while typing)
+    const [thresholdInput, setThresholdInput] = useState('');
+
     // ✅ NEW: Payment Deadline States
     const [paymentDeadlineHours, setPaymentDeadlineHours] = useState(24);
     const [deadlineLoading, setDeadlineLoading] = useState(false);
@@ -79,7 +82,7 @@ export default function Products() {
     // ✅ NEW: Fetch Payment Deadline Setting
     const fetchSettings = async () => {
         try {
-            const adminToken = localStorage.getItem('admin_token');
+            const adminToken = sessionStorage.getItem('auth_token');
             const response = await axios.get('http://127.0.0.1:8000/api/admin/settings/payment-deadline/hours', {
                 headers: { 'Accept': 'application/json', 'Authorization': `Bearer ${adminToken}` }
             });
@@ -119,7 +122,7 @@ export default function Products() {
 
         try {
             setDeadlineLoading(true);
-            const adminToken = localStorage.getItem('admin_token');
+            const adminToken = sessionStorage.getItem('auth_token');
             await axios.put(`http://127.0.0.1:8000/api/admin/settings/payment_upload_deadline_hours`, {
                 value: hours,
                 description: 'Hours allowed for user to re-upload payment after rejection'
@@ -139,7 +142,29 @@ export default function Products() {
     useEffect(() => {
         fetchProducts();
         fetchSettings();
+        fetchStockThreshold();
     }, []);
+
+    // ✅ NEW: Fetch Stock Alert Threshold from backend
+    const fetchStockThreshold = async () => {
+        try {
+            const token = sessionStorage.getItem('auth_token');
+            const response = await axios.get('http://127.0.0.1:8000/api/admin/settings/stock-alert/threshold', {
+                headers: {
+                    'Accept': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            if (response.data.success) {
+                const val = response.data.threshold;
+                setStockAlertThreshold(val);
+                setThresholdInput(val.toString()); // ✅ Set the input field value
+            }
+        } catch (err) {
+            console.error('Error fetching stock threshold:', err);
+        }
+    };
 
     // ✅ NEW: Keyboard navigation for carousel
     useEffect(() => {
@@ -318,7 +343,7 @@ export default function Products() {
     // Toggle product status via API
     const toggleStatus = async (productId) => {
         try {
-            const adminToken = localStorage.getItem('admin_token');
+            const adminToken = sessionStorage.getItem('auth_token');
             const product = products.find(p => p.id === productId);
             const newStatus = product.status === 'active' ? 'inactive' : 'active';
 
@@ -355,7 +380,7 @@ export default function Products() {
             message: 'Are you sure you want to delete this product? This action cannot be undone.',
             onConfirm: async () => {
                 try {
-                    const adminToken = localStorage.getItem('admin_token');
+                    const adminToken = sessionStorage.getItem('auth_token');
 
                     const response = await axios.delete(
                         `http://127.0.0.1:8000/api/admin/products/${productId}`,
@@ -389,7 +414,7 @@ export default function Products() {
         setFormLoading(true);
 
         try {
-            const adminToken = localStorage.getItem('admin_token');
+            const adminToken = sessionStorage.getItem('auth_token');
             const data = new FormData();
 
             data.append('name', formData.name);
@@ -438,7 +463,7 @@ export default function Products() {
         setFormLoading(true);
 
         try {
-            const adminToken = localStorage.getItem('admin_token');
+            const adminToken = sessionStorage.getItem('auth_token');
             const data = new FormData();
 
             data.append('name', formData.name);
@@ -651,14 +676,35 @@ export default function Products() {
                                     <div className="flex items-center gap-2">
                                         <input
                                             type="text"
-                                            value={stockAlertThreshold === 0 ? '' : stockAlertThreshold}
+                                            value={thresholdInput}
                                             onChange={(e) => {
-                                                const value = e.target.value;
-                                                if (value === '') {
-                                                    setStockAlertThreshold(0);
-                                                } else if (/^\d+$/.test(value)) {
-                                                    const num = parseInt(value) || 0;
-                                                    setStockAlertThreshold(num);
+                                                const val = e.target.value;
+                                                // Allow empty string or only numbers
+                                                if (val === '' || /^\d+$/.test(val)) {
+                                                    setThresholdInput(val);
+                                                }
+                                            }}
+                                            onBlur={() => {
+                                                // ✅ Save when user clicks away
+                                                const newValue = parseInt(thresholdInput) || 0;
+                                                setThresholdInput(newValue.toString());
+                                                setStockAlertThreshold(newValue);
+
+                                                const token = sessionStorage.getItem('auth_token');
+                                                axios.put('http://127.0.0.1:8000/api/admin/settings/stock-alert/threshold', {
+                                                    value: newValue
+                                                }, {
+                                                    headers: {
+                                                        'Accept': 'application/json',
+                                                        'Content-Type': 'application/json',
+                                                        'Authorization': `Bearer ${token}`
+                                                    }
+                                                }).catch(err => console.error('Error saving threshold:', err));
+                                            }}
+                                            onKeyDown={(e) => {
+                                                // ✅ Save when user presses Enter
+                                                if (e.key === 'Enter') {
+                                                    e.target.blur();
                                                 }
                                             }}
                                             className="w-20 px-3 py-2 border border-gray-300 rounded-lg text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"

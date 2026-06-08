@@ -15,10 +15,31 @@ export default function Products() {
     // ✅ NEW: Carousel State
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
+    // ✅ NEW: Confirmation Modal State
+    const [showConfirmModal, setShowConfirmModal] = useState(false);
+    const [confirmConfig, setConfirmConfig] = useState({
+        title: '',
+        message: '',
+        onConfirm: null,
+        confirmText: 'Confirm',
+        cancelText: 'Cancel',
+        type: 'danger' // 'danger' | 'warning' | 'info'
+    });
+
     // Filter & Search States
     const [searchQuery, setSearchQuery] = useState('');
     const [filterStatus, setFilterStatus] = useState('all');
     const [stockAlertThreshold, setStockAlertThreshold] = useState(5);
+
+    // ✅ NEW: State for the input field (allows empty string while typing)
+    const [thresholdInput, setThresholdInput] = useState('');
+
+    // ✅ NEW: Payment Deadline States
+    const [paymentDeadlineHours, setPaymentDeadlineHours] = useState(24);
+    const [deadlineLoading, setDeadlineLoading] = useState(false);
+
+    // ✅ NEW: Toast State
+    const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
 
     // Form States
     const [formData, setFormData] = useState({
@@ -38,7 +59,7 @@ export default function Products() {
         try {
             setLoading(true);
             setError(null);
-            const adminToken = localStorage.getItem('admin_token');
+            const adminToken = sessionStorage.getItem('auth_token');
 
             const response = await axios.get('http://127.0.0.1:8000/api/admin/products', {
                 headers: {
@@ -58,10 +79,92 @@ export default function Products() {
         }
     };
 
+    // ✅ NEW: Fetch Payment Deadline Setting
+    const fetchSettings = async () => {
+        try {
+            const adminToken = sessionStorage.getItem('auth_token');
+            const response = await axios.get('http://127.0.0.1:8000/api/admin/settings/payment-deadline/hours', {
+                headers: { 'Accept': 'application/json', 'Authorization': `Bearer ${adminToken}` }
+            });
+            if (response.data.success) {
+                setPaymentDeadlineHours(response.data.hours);
+            }
+        } catch (err) {
+            console.error('Error fetching settings:', err);
+        }
+    };
+
+    // ✅ NEW: Show toast notification
+    const showToast = (message, type = 'success') => {
+        setToast({ show: true, message, type });
+        setTimeout(() => {
+            setToast({ show: false, message: '', type: 'success' });
+        }, 3000);
+    };
+
+    // ✅ NEW: Custom confirmation modal
+    const showCustomConfirm = (config) => {
+        setConfirmConfig({
+            title: config.title || 'Confirm Action',
+            message: config.message || 'Are you sure?',
+            onConfirm: config.onConfirm,
+            confirmText: config.confirmText || 'Confirm',
+            cancelText: config.cancelText || 'Cancel',
+            type: config.type || 'danger'
+        });
+        setShowConfirmModal(true);
+    };
+
+    // ✅ UPDATED: Update Payment Deadline Setting
+    const updateDeadlineHours = async (hours) => {
+        // Prevent duplicate calls
+        if (deadlineLoading) return;
+
+        try {
+            setDeadlineLoading(true);
+            const adminToken = sessionStorage.getItem('auth_token');
+            await axios.put(`http://127.0.0.1:8000/api/admin/settings/payment_upload_deadline_hours`, {
+                value: hours,
+                description: 'Hours allowed for user to re-upload payment after rejection'
+            }, {
+                headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` }
+            });
+            showToast('✅ Payment deadline updated successfully!');
+        } catch (err) {
+            console.error('Error updating settings:', err);
+            showToast('❌ Failed to update deadline.', 'error');
+        } finally {
+            setDeadlineLoading(false);
+        }
+    };
+
     // Fetch on mount
     useEffect(() => {
         fetchProducts();
+        fetchSettings();
+        fetchStockThreshold();
     }, []);
+
+    // ✅ NEW: Fetch Stock Alert Threshold from backend
+    const fetchStockThreshold = async () => {
+        try {
+            const token = sessionStorage.getItem('auth_token');
+            const response = await axios.get('http://127.0.0.1:8000/api/admin/settings/stock-alert/threshold', {
+                headers: {
+                    'Accept': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            if (response.data.success) {
+                const val = response.data.threshold;
+                setStockAlertThreshold(val);
+                setThresholdInput(val.toString()); // ✅ Set the input field value
+            }
+        } catch (err) {
+            console.error('Error fetching stock threshold:', err);
+        }
+    };
 
     // ✅ NEW: Keyboard navigation for carousel
     useEffect(() => {
@@ -152,7 +255,7 @@ export default function Products() {
         setPreviewImages([]);
         setOtherImages([]);
         setHasUnsavedChanges(false);
-        setCurrentImageIndex(0); // ✅ Reset carousel
+        setCurrentImageIndex(0);
     };
 
     // Open product details modal
@@ -168,7 +271,7 @@ export default function Products() {
         };
 
         setSelectedProduct(productWithFullUrls);
-        setCurrentImageIndex(0); // ✅ Reset to first image
+        setCurrentImageIndex(0);
         setShowDetailsModal(true);
     };
 
@@ -221,11 +324,17 @@ export default function Products() {
     // Check for unsaved changes before closing modal
     const checkUnsavedChanges = (callback) => {
         if (hasUnsavedChanges) {
-            const confirmed = window.confirm('You have unsaved changes. Are you sure you want to discard them and close?');
-            if (confirmed) {
-                resetForm();
-                callback();
-            }
+            showCustomConfirm({
+                title: 'Unsaved Changes',
+                message: 'You have unsaved changes. Are you sure you want to discard them and close?',
+                onConfirm: () => {
+                    resetForm();
+                    callback();
+                },
+                confirmText: 'Discard Changes',
+                cancelText: 'Keep Editing',
+                type: 'warning'
+            });
         } else {
             callback();
         }
@@ -234,7 +343,7 @@ export default function Products() {
     // Toggle product status via API
     const toggleStatus = async (productId) => {
         try {
-            const adminToken = localStorage.getItem('admin_token');
+            const adminToken = sessionStorage.getItem('auth_token');
             const product = products.find(p => p.id === productId);
             const newStatus = product.status === 'active' ? 'inactive' : 'active';
 
@@ -260,38 +369,43 @@ export default function Products() {
             }
         } catch (err) {
             console.error('Error toggling status:', err);
-            alert('❌ Failed to update status');
+            showToast('❌ Failed to update status', 'error');
         }
     };
 
     // Delete product via API
     const handleDelete = async (productId) => {
-        if (!confirm('Are you sure you want to delete this product? This action cannot be undone.')) {
-            return;
-        }
+        showCustomConfirm({
+            title: 'Delete Product',
+            message: 'Are you sure you want to delete this product? This action cannot be undone.',
+            onConfirm: async () => {
+                try {
+                    const adminToken = sessionStorage.getItem('auth_token');
 
-        try {
-            const adminToken = localStorage.getItem('admin_token');
+                    const response = await axios.delete(
+                        `http://127.0.0.1:8000/api/admin/products/${productId}`,
+                        {
+                            headers: {
+                                'Accept': 'application/json',
+                                'Authorization': `Bearer ${adminToken}`
+                            }
+                        }
+                    );
 
-            const response = await axios.delete(
-                `http://127.0.0.1:8000/api/admin/products/${productId}`,
-                {
-                    headers: {
-                        'Accept': 'application/json',
-                        'Authorization': `Bearer ${adminToken}`
+                    if (response.data.success) {
+                        setProducts(products.filter(p => p.id !== productId));
+                        setShowDetailsModal(false);
+                        showToast('✅ Product deleted successfully!');
                     }
+                } catch (err) {
+                    console.error('Error deleting product:', err);
+                    showToast('❌ Failed to delete product', 'error');
                 }
-            );
-
-            if (response.data.success) {
-                setProducts(products.filter(p => p.id !== productId));
-                setShowDetailsModal(false);
-                alert('✅ Product deleted successfully!');
-            }
-        } catch (err) {
-            console.error('Error deleting product:', err);
-            alert('❌ Failed to delete product');
-        }
+            },
+            confirmText: 'Delete Product',
+            cancelText: 'Cancel',
+            type: 'danger'
+        });
     };
 
     // Add new product via API
@@ -300,7 +414,7 @@ export default function Products() {
         setFormLoading(true);
 
         try {
-            const adminToken = localStorage.getItem('admin_token');
+            const adminToken = sessionStorage.getItem('auth_token');
             const data = new FormData();
 
             data.append('name', formData.name);
@@ -333,11 +447,11 @@ export default function Products() {
                 setShowAddModal(false);
                 resetForm();
                 fetchProducts();
-                alert('✅ Product added successfully!');
+                showToast('✅ Product added successfully!');
             }
         } catch (err) {
             console.error('Error adding product:', err);
-            alert('❌ Failed to add product');
+            showToast('❌ Failed to add product', 'error');
         } finally {
             setFormLoading(false);
         }
@@ -349,7 +463,7 @@ export default function Products() {
         setFormLoading(true);
 
         try {
-            const adminToken = localStorage.getItem('admin_token');
+            const adminToken = sessionStorage.getItem('auth_token');
             const data = new FormData();
 
             data.append('name', formData.name);
@@ -380,11 +494,11 @@ export default function Products() {
                 resetForm();
                 setSelectedProduct(null);
                 fetchProducts();
-                alert('✅ Product updated successfully!');
+                showToast('✅ Product updated successfully!');
             }
         } catch (err) {
             console.error('Error updating product:', err);
-            alert('❌ Failed to update product');
+            showToast('❌ Failed to update product', 'error');
         } finally {
             setFormLoading(false);
         }
@@ -439,8 +553,17 @@ export default function Products() {
         lowStock: products.filter(p => p.stock > 0 && p.stock <= stockAlertThreshold).length,
     };
 
+    // ✅ NEW: Handle numeric input (prevent non-numeric characters)
+    const handleNumericInput = (e, fieldName) => {
+        const value = e.target.value;
+        // Allow empty string or positive numbers
+        if (value === '' || /^\d*\.?\d*$/.test(value)) {
+            setFormData(prev => ({ ...prev, [fieldName]: value }));
+            setHasUnsavedChanges(true);
+        }
+    };
+
     return (
-        // ✅ JUST the main content - sidebar is in AdminLayout now
         <div className="flex-1">
             <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
                 <div className="flex items-center justify-between px-6 py-4">
@@ -536,26 +659,106 @@ export default function Products() {
                             </div>
                         </div>
 
-                        <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 mb-6">
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                    <svg className="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                                    </svg>
-                                    <div>
-                                        <p className="font-semibold text-gray-900">Stock Alert Threshold</p>
-                                        <p className="text-sm text-gray-600">Products with stock below this value will be highlighted</p>
+                        {/* ✅ UPDATED: Settings Grid (Stock Alert + Payment Deadline) */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                            {/* Stock Alert Threshold */}
+                            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <svg className="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                        </svg>
+                                        <div>
+                                            <p className="font-semibold text-gray-900 text-sm">Stock Alert Threshold</p>
+                                            <p className="text-xs text-gray-600">Highlight low stock items</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            type="text"
+                                            value={thresholdInput}
+                                            onChange={(e) => {
+                                                const val = e.target.value;
+                                                // Allow empty string or only numbers
+                                                if (val === '' || /^\d+$/.test(val)) {
+                                                    setThresholdInput(val);
+                                                }
+                                            }}
+                                            onBlur={() => {
+                                                // ✅ Save when user clicks away
+                                                const newValue = parseInt(thresholdInput) || 0;
+                                                setThresholdInput(newValue.toString());
+                                                setStockAlertThreshold(newValue);
+
+                                                const token = sessionStorage.getItem('auth_token');
+                                                axios.put('http://127.0.0.1:8000/api/admin/settings/stock-alert/threshold', {
+                                                    value: newValue
+                                                }, {
+                                                    headers: {
+                                                        'Accept': 'application/json',
+                                                        'Content-Type': 'application/json',
+                                                        'Authorization': `Bearer ${token}`
+                                                    }
+                                                }).catch(err => console.error('Error saving threshold:', err));
+                                            }}
+                                            onKeyDown={(e) => {
+                                                // ✅ Save when user presses Enter
+                                                if (e.key === 'Enter') {
+                                                    e.target.blur();
+                                                }
+                                            }}
+                                            className="w-20 px-3 py-2 border border-gray-300 rounded-lg text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                            placeholder="0"
+                                        />
+                                        <span className="text-xs text-gray-600">units</span>
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-3">
-                                    <input
-                                        type="number"
-                                        value={stockAlertThreshold}
-                                        onChange={(e) => setStockAlertThreshold(parseInt(e.target.value) || 0)}
-                                        className="w-20 px-3 py-2 border border-gray-300 rounded-lg text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                        min="0"
-                                    />
-                                    <span className="text-sm text-gray-600">units</span>
+                            </div>
+
+                            {/* ✅ NEW: Payment Upload Deadline */}
+                            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        <div>
+                                            <p className="font-semibold text-gray-900 text-sm">Payment Re-upload Deadline</p>
+                                            <p className="text-xs text-gray-600">Hours allowed after rejection</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            type="text"
+                                            value={paymentDeadlineHours === 0 ? '' : paymentDeadlineHours}
+                                            onChange={(e) => {
+                                                const value = e.target.value;
+                                                if (value === '') {
+                                                    setPaymentDeadlineHours(0);
+                                                } else if (/^\d+$/.test(value)) {
+                                                    const num = parseInt(value) || 0;
+                                                    setPaymentDeadlineHours(num);
+                                                }
+                                            }}
+                                            onBlur={() => updateDeadlineHours(paymentDeadlineHours)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') {
+                                                    updateDeadlineHours(paymentDeadlineHours);
+                                                    e.target.blur();
+                                                }
+                                            }}
+                                            disabled={deadlineLoading}
+                                            className="w-20 px-3 py-2 border border-gray-300 rounded-lg text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                            placeholder="0"
+                                        />
+                                        <span className="text-xs text-gray-600">hours</span>
+                                        {deadlineLoading && (
+                                            <svg className="animate-spin h-4 w-4 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -940,15 +1143,13 @@ export default function Products() {
                                             <div>
                                                 <label className="block text-sm font-semibold text-gray-700 mb-2">Price (Nu.) *</label>
                                                 <input
-                                                    type="number"
+                                                    type="text"
                                                     name="price"
                                                     value={formData.price}
-                                                    onChange={handleInputChange}
+                                                    onChange={(e) => handleNumericInput(e, 'price')}
                                                     required
                                                     placeholder="Enter price"
-                                                    min="0"
-                                                    step="0.01"
-                                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                                 />
                                             </div>
                                         </div>
@@ -956,14 +1157,13 @@ export default function Products() {
                                         <div>
                                             <label className="block text-sm font-semibold text-gray-700 mb-2">Stock Quantity *</label>
                                             <input
-                                                type="number"
+                                                type="text"
                                                 name="stock"
                                                 value={formData.stock}
-                                                onChange={handleInputChange}
+                                                onChange={(e) => handleNumericInput(e, 'stock')}
                                                 required
                                                 placeholder="Enter stock quantity"
-                                                min="0"
-                                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                             />
                                         </div>
                                     </div>
@@ -1170,15 +1370,13 @@ export default function Products() {
                                         <div>
                                             <label className="block text-sm font-semibold text-gray-700 mb-2">Price (Nu.) *</label>
                                             <input
-                                                type="number"
+                                                type="text"
                                                 name="price"
                                                 value={formData.price}
-                                                onChange={handleInputChange}
+                                                onChange={(e) => handleNumericInput(e, 'price')}
                                                 required
                                                 placeholder="Enter price"
-                                                min="0"
-                                                step="0.01"
-                                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                             />
                                         </div>
                                     </div>
@@ -1186,14 +1384,13 @@ export default function Products() {
                                     <div>
                                         <label className="block text-sm font-semibold text-gray-700 mb-2">Stock Quantity *</label>
                                         <input
-                                            type="number"
+                                            type="text"
                                             name="stock"
                                             value={formData.stock}
-                                            onChange={handleInputChange}
+                                            onChange={(e) => handleNumericInput(e, 'stock')}
                                             required
                                             placeholder="Enter stock quantity"
-                                            min="0"
-                                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                         />
                                     </div>
                                 </div>
@@ -1281,6 +1478,92 @@ export default function Products() {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* ✅ NEW: Custom Confirmation Modal */}
+            {showConfirmModal && (
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-fade-in">
+                        {/* Modal Header */}
+                        <div className={`px-6 py-4 ${confirmConfig.type === 'danger' ? 'bg-red-50' : confirmConfig.type === 'warning' ? 'bg-yellow-50' : 'bg-blue-50'}`}>
+                            <div className="flex items-center gap-3">
+                                <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${confirmConfig.type === 'danger' ? 'bg-red-100' : confirmConfig.type === 'warning' ? 'bg-yellow-100' : 'bg-blue-100'}`}>
+                                    {confirmConfig.type === 'danger' ? (
+                                        <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                        </svg>
+                                    ) : confirmConfig.type === 'warning' ? (
+                                        <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                    ) : (
+                                        <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                    )}
+                                </div>
+                                <h3 className="text-lg font-bold text-gray-900">{confirmConfig.title}</h3>
+                            </div>
+                        </div>
+
+                        {/* Modal Body */}
+                        <div className="p-6">
+                            <p className="text-gray-600 mb-6">{confirmConfig.message}</p>
+
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => setShowConfirmModal(false)}
+                                    className="flex-1 px-4 py-2 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-semibold"
+                                >
+                                    {confirmConfig.cancelText}
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setShowConfirmModal(false);
+                                        if (confirmConfig.onConfirm) {
+                                            confirmConfig.onConfirm();
+                                        }
+                                    }}
+                                    className={`flex-1 px-4 py-2 text-white rounded-lg transition-colors font-semibold shadow-lg ${confirmConfig.type === 'danger' ? 'bg-red-600 hover:bg-red-700' : confirmConfig.type === 'warning' ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-blue-600 hover:bg-blue-700'
+                                        }`}
+                                >
+                                    {confirmConfig.confirmText}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ✅ Toast Notification */}
+            {toast.show && (
+                <div className="fixed top-6 right-6 z-[9999] animate-fade-in">
+                    <div className={`px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 min-w-[350px] ${toast.type === 'success'
+                        ? 'bg-gradient-to-r from-green-500 to-emerald-600'
+                        : 'bg-gradient-to-r from-red-500 to-rose-600'
+                        } text-white`}>
+                        {toast.type === 'success' ? (
+                            <svg className="w-6 h-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        ) : (
+                            <svg className="w-6 h-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        )}
+                        <div className="flex-1">
+                            <p className="font-semibold text-sm">{toast.message}</p>
+                        </div>
+                        <button
+                            onClick={() => setToast({ show: false, message: '', type: 'success' })}
+                            className="flex-shrink-0 text-white/80 hover:text-white transition-colors"
+                        >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
                     </div>
                 </div>
             )}

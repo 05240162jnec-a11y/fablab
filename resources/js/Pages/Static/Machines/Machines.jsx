@@ -1,49 +1,167 @@
-import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 
-export default function Machines() {
-    const [scrolled, setScrolled] = useState(false);
-    const [search, setSearch] = useState('');
-    const [filter, setFilter] = useState('All');
+const API_BASE = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api';
 
+function getImageUrl(path) {
+    if (!path) return null;
+    if (path.startsWith('http')) return path;
+    return `http://127.0.0.1:8000/storage/${path}`;
+}
+
+const FALLBACK = 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&w=800&q=80';
+
+/* ── Scroll-reveal (same as Home) ──────────────────────────────────────── */
+function useReveal() {
+    const ref = useRef(null);
+    const [visible, setVisible] = useState(false);
     useEffect(() => {
-        const onScroll = () => setScrolled(window.scrollY > 20);
-        window.addEventListener('scroll', onScroll);
-        return () => window.removeEventListener('scroll', onScroll);
+        const el = ref.current; if (!el) return;
+        const obs = new IntersectionObserver(
+            ([entry]) => { if (entry.isIntersecting) { setVisible(true); obs.disconnect(); } },
+            { threshold: 0.1 }
+        );
+        obs.observe(el);
+        return () => obs.disconnect();
     }, []);
+    return [ref, visible];
+}
+function Reveal({ children, delay = 0, style = {} }) {
+    const [ref, visible] = useReveal();
+    return (
+        <div ref={ref} style={{
+            opacity: visible ? 1 : 0,
+            transform: visible ? 'translateY(0)' : 'translateY(40px)',
+            transition: `opacity 0.7s ease ${delay}s, transform 0.7s ease ${delay}s`,
+            ...style
+        }}>{children}</div>
+    );
+}
 
-    const machines = [
-        { id: 1, name: 'Prusa FDM 3D Printer', category: '3D Printing', tag: 'Additive', img: '../images/Persua FDM 3D Printer.webp', fb: 'https://images.unsplash.com/photo-1612815154858-60aa4c59eaa6?auto=format&fit=crop&w=800&q=80', desc: 'Builds objects layer by layer by extruding melted thermoplastic filament through a heated nozzle. Ideal for rapid prototyping and functional parts.' },
-        { id: 2, name: 'Zund G3 Cutting Machine', category: 'Cutting', tag: 'Precision', img: '../images/3D-Printer.avif', fb: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&w=800&q=80', desc: 'A precision machine meticulously engineered with perfectly coordinated components from the innovative drive system for clean, accurate cuts.' },
-        { id: 3, name: 'Trotec Speedy 100', category: 'Laser', tag: 'Laser', img: '../images/Trotec Speedy 100.png', fb: 'https://images.unsplash.com/photo-1565043589221-1a6fd9ae45c7?auto=format&fit=crop&w=800&q=80', desc: 'A versatile and powerful laser engraving and cutting machine designed for a wide range of applications with exceptional precision.' },
-        { id: 4, name: 'Trotec Speedy 400', category: 'Laser', tag: 'Laser', img: '../images/Trotec Speedy 400.png', fb: 'https://images.unsplash.com/photo-1565043589221-1a6fd9ae45c7?auto=format&fit=crop&w=800&q=80', desc: 'A cutting-edge laser engraving and cutting machine that offers unparalleled precision, versatility, and high-throughput performance.' },
-        { id: 5, name: 'Omax Water Jet Cutter', category: 'Cutting', tag: 'WaterJet', img: '../images/Prusa FDM 3D Printer.webp', fb: 'https://images.unsplash.com/photo-1581092160562-40aa08e78837?auto=format&fit=crop&w=800&q=80', desc: 'A state-of-the-art cutting solution renowned for its precision, versatility, and efficiency — cuts virtually any material without heat distortion.' },
-        { id: 6, name: 'Mechatronika Pick & Place', category: 'Electronics', tag: 'Assembly', img: '../images/Zund g3 cutting machine.jpg', fb: 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=800&q=80', desc: 'A cutting-edge solution designed for high-speed, high-precision electronic component assembly on PCB boards.' },
-        { id: 7, name: 'V-Scope 3D Scanner', category: '3D Printing', tag: 'Scanning', img: '../images/Prusa FDM 3D Printer.webp', fb: 'https://images.unsplash.com/photo-1617791160505-6f00504e3519?auto=format&fit=crop&w=800&q=80', desc: 'High-precision 3D scanning system for reverse engineering and quality inspection. Captures complex geometries with sub-millimetre accuracy.' },
-        { id: 8, name: 'Tai Lathe Machine', category: 'CNC', tag: 'CNC', img: '../images/Trotec Speedy 400.png', fb: 'https://images.unsplash.com/photo-1504328345606-18bbc8c9d7d1?auto=format&fit=crop&w=800&q=80', desc: 'A high-precision CNC lathe, perfect for model construction, training, and small-batch productions with excellent surface finish quality.' },
-        { id: 9, name: 'Formlabs Resin Printer', category: '3D Printing', tag: 'Resin', img: '../images/Zund g3 cutting machine.jpg', fb: 'https://images.unsplash.com/photo-1631549916768-4119b2e5f926?auto=format&fit=crop&w=800&q=80', desc: 'Industry-leading SLA resin 3D printer renowned for precision, reliability, and ease of use. Produces parts with exceptional surface quality.' },
-        { id: 10, name: 'ShopBot CNC Machine', category: 'CNC', tag: 'CNC', img: '../images/Prusa FDM 3D Printer.webp', fb: 'https://images.unsplash.com/photo-1565043589221-1a6fd9ae45c7?auto=format&fit=crop&w=800&q=80', desc: 'A versatile and powerful CNC router designed to meet the diverse fabrication needs of makers, designers, and professionals alike.' },
+/* ── Machine Detail Modal ───────────────────────────────────────────────── */
+function MachineModal({ machine, onClose, isLoggedIn }) {
+    const navigate = useNavigate();
+    if (!machine) return null;
+    const imgSrc = getImageUrl(machine.image) || FALLBACK;
+    const isAvail = machine.status === 'available';
+    const handleBook = () => { onClose(); navigate(isLoggedIn ? '/dashboard/bookings' : '/login'); };
+
+    return (
+        <div className="modal-backdrop" onClick={onClose}>
+            <div className="modal-box" onClick={e => e.stopPropagation()}>
+                <button className="modal-close" onClick={onClose} aria-label="Close">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+                <div className="modal-inner">
+                    <div className="modal-img-side">
+                        <img src={imgSrc} alt={machine.name}
+                            onError={e => { e.currentTarget.src = FALLBACK; }} />
+                    </div>
+                    <div className="modal-info-side">
+                        <h2 className="modal-title">{machine.name}</h2>
+                        <div className="modal-status-row">
+                            <span className={`modal-status-dot ${isAvail ? 'green' : 'red'}`} />
+                            <span className="modal-status-text">
+                                {isAvail ? 'Operational' : machine.status === 'maintenance' ? 'Under Maintenance' : 'Offline'}
+                            </span>
+                        </div>
+                        {machine.type && (
+                            <span className="modal-type-badge">{machine.type}</span>
+                        )}
+                        <p className="modal-desc">{machine.description || 'High-precision fabrication machine available for booking.'}</p>
+                        <div className="modal-meta-grid">
+                            {machine.runtime_hours != null && (
+                                <div className="modal-meta-item">
+                                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    <span>{machine.runtime_hours} hrs runtime</span>
+                                </div>
+                            )}
+                            {machine.last_used_at && (
+                                <div className="modal-meta-item">
+                                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                    </svg>
+                                    <span>Last used: {new Date(machine.last_used_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                                </div>
+                            )}
+
+                        </div>
+                        {isAvail
+                            ? <button className="btn-modal-book" onClick={handleBook}>Book Machine</button>
+                            : <button className="btn-modal-disabled" disabled>
+                                {machine.status === 'maintenance' ? 'Under Maintenance' : 'Unavailable'}
+                            </button>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+/* ── Main ───────────────────────────────────────────────────────────────── */
+export default function Machines() {
+    const navigate = useNavigate();
+    const [scrolled, setScrolled] = useState(false);
+    const [machines, setMachines] = useState([]);
+    const [stats, setStats] = useState({ total: 0, available: 0, in_use: 0, maintenance: 0 });
+    const [loading, setLoading] = useState(true);
+    const [search, setSearch] = useState('');
+    const [selectedMachine, setSelectedMachine] = useState(null);
+    const [heroSlideIdx, setHeroSlideIdx] = useState(0);
+
+    const heroSlides = [
+        '../images/b1.jpg',
+        '../images/b2.jpg',
+        '../images/b3.webp',
     ];
 
-    const categories = ['All', ...Array.from(new Set(machines.map(m => m.category)))];
+    const isLoggedIn = !!localStorage.getItem('token');
 
-    const filtered = machines.filter(m => {
-        const matchCat = filter === 'All' || m.category === filter;
-        const matchSearch = m.name.toLowerCase().includes(search.toLowerCase()) ||
-            m.desc.toLowerCase().includes(search.toLowerCase());
-        return matchCat && matchSearch;
-    });
+    useEffect(() => {
+        const fn = () => setScrolled(window.scrollY > 20);
+        window.addEventListener('scroll', fn);
+        return () => window.removeEventListener('scroll', fn);
+    }, []);
 
-    const tagColors = {
-        'Additive': { bg: '#e0f2fe', color: '#0369a1' },
-        'Precision': { bg: '#fce7f3', color: '#9d174d' },
-        'Laser': { bg: '#fef3c7', color: '#92400e' },
-        'WaterJet': { bg: '#d1fae5', color: '#065f46' },
-        'Assembly': { bg: '#ede9fe', color: '#5b21b6' },
-        'Scanning': { bg: '#e0f2fe', color: '#0369a1' },
-        'CNC': { bg: '#ffedd5', color: '#9a3412' },
-        'Resin': { bg: '#fce7f3', color: '#9d174d' },
-    };
+    /* Hero background slideshow */
+    useEffect(() => {
+        const t = setInterval(() => setHeroSlideIdx(p => (p + 1) % heroSlides.length), 5000);
+        return () => clearInterval(t);
+    }, []);
+
+    useEffect(() => {
+        const fn = e => { if (e.key === 'Escape') setSelectedMachine(null); };
+        window.addEventListener('keydown', fn);
+        return () => window.removeEventListener('keydown', fn);
+    }, []);
+
+    useEffect(() => {
+        (async () => {
+            try {
+                const params = search ? `?search=${encodeURIComponent(search)}` : '';
+                const res = await fetch(`${API_BASE}/home/machines${params}`);
+                if (res.ok) {
+                    const d = await res.json();
+                    setMachines(d.data || d);
+                    if (d.stats) setStats(d.stats);
+                }
+            } catch (e) { console.error(e); }
+            finally { setLoading(false); }
+        })();
+    }, [search]);
+
+    const handleBookClick = useCallback(() => {
+        navigate(isLoggedIn ? '/dashboard/bookings' : '/login');
+    }, [isLoggedIn, navigate]);
+
+    /* Status helpers */
+    const statusLabel = (s) => s === 'available' ? 'Available' : s === 'maintenance' ? 'Maintenance' : s === 'in_use' ? 'In Use' : 'Offline';
+    const statusClass = (s) => s === 'available' ? 'tag-available' : s === 'maintenance' ? 'tag-maintenance' : s === 'in_use' ? 'tag-in-use' : 'tag-offline';
 
     return (
         <div style={{ fontFamily: "'DM Sans', sans-serif", background: '#f9fafb', color: '#0d1117', overflowX: 'hidden' }}>
@@ -51,287 +169,283 @@ export default function Machines() {
                 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Playfair+Display:wght@700;800;900&display=swap');
 
                 :root {
-                    --blue:    #0066FF;
-                    --blue-dk: #0051cc;
-                    --blue-lt: #e8f0fe;
-                    --ink:     #0d1117;
-                    --ink-2:   #1e2a3a;
-                    --muted:   #64748b;
-                    --border:  rgba(0,0,0,0.07);
-                    --card-bg: #ffffff;
-                    --offwhite:#f9fafb;
-                    --radius:  1rem;
-                    --radius-lg: 1.5rem;
+                    --blue:       #1a56db;
+                    --blue-dk:    #1446b8;
+                    --blue-lt:    #e8f0fe;
+                    --red:        #e02020;
+                    --red-dk:     #c01a1a;
+                    --red-lt:     #fdecea;
+                    --green:      #16a34a;
+                    --green-dk:   #0f7a38;
+                    --green-lt:   #dcfce7;
+                    --ink:        #0d1117;
+                    --ink-2:      #1e2a3a;
+                    --muted:      #64748b;
+                    --border:     rgba(0,0,0,0.07);
+                    --offwhite:   #f9fafb;
+                    --card-bg:    #ffffff;
+                    --radius:     1rem;
+                    --radius-lg:  1.5rem;
                 }
-                * { box-sizing: border-box; margin: 0; padding: 0; }
+                * { box-sizing:border-box; margin:0; padding:0; }
 
-                /* ── Nav ── */
-                .nav-root {
-                    position: fixed; top: 0; left: 0; width: 100%; z-index: 100;
-                    transition: all .35s ease;
-                }
-                .nav-root.scrolled {
-                    background: rgba(255,255,255,0.92);
-                    backdrop-filter: blur(20px);
-                    -webkit-backdrop-filter: blur(20px);
-                    box-shadow: 0 1px 0 rgba(0,0,0,0.06), 0 8px 32px rgba(0,0,0,0.06);
-                }
-                .nav-root.top {
-                    background: rgba(255,255,255,0.92);
-                    backdrop-filter: blur(20px);
-                    box-shadow: 0 1px 0 rgba(0,0,0,0.06);
-                }
-                .nav-inner {
-                    max-width: 82rem; margin: 0 auto; padding: 0 2rem;
-                    display: flex; align-items: center; justify-content: space-between;
-                    height: 76px;
-                }
-                .nav-logo-wrap { display: flex; align-items: center; gap: .875rem; text-decoration: none; }
-                .nav-logo-circle {
-                    width: 52px; height: 52px; border-radius: 50%;
-                    background: var(--blue);
-                    display: flex; align-items: center; justify-content: center;
-                    box-shadow: 0 4px 18px rgba(0,102,255,0.35);
-                    overflow: hidden; flex-shrink: 0;
-                    transition: transform .3s ease, box-shadow .3s ease;
-                }
-                .nav-logo-circle:hover { transform: scale(1.06); box-shadow: 0 6px 24px rgba(0,102,255,0.45); }
-                .nav-logo-circle img { width: 100%; height: 100%; object-fit: cover; }
-                .nav-logo-circle .logo-letter {
-                    font-family: 'Playfair Display', serif;
-                    font-weight: 900; font-size: 1.5rem; color: white; letter-spacing: -1px;
-                }
-                .nav-brand-text .name { font-size: 1rem; font-weight: 700; color: var(--ink); letter-spacing: -.01em; display: block; line-height: 1.2; }
-                .nav-brand-text .sub  { font-size: .65rem; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: .1em; display: block; }
-                .nav-links { display: flex; gap: 1.75rem; align-items: center; }
-                .nav-link {
-                    font-size: .875rem; font-weight: 500; color: var(--ink-2);
-                    text-decoration: none; position: relative; padding-bottom: 2px; transition: color .2s;
-                }
-                .nav-link::after {
-                    content: ''; position: absolute; bottom: -2px; left: 0;
-                    width: 0; height: 2px; background: var(--blue);
-                    border-radius: 2px; transition: width .25s ease;
-                }
-                .nav-link:hover { color: var(--blue); }
-                .nav-link:hover::after { width: 100%; }
-                .nav-link.active { color: var(--blue); font-weight: 600; }
-                .nav-link.active::after { width: 100%; }
-                .nav-login {
-                    padding: .5rem 1.4rem; font-size: .875rem; font-weight: 600;
-                    color: var(--blue); background: var(--blue-lt);
-                    border: 1.5px solid rgba(0,102,255,.2); border-radius: 9999px;
-                    text-decoration: none; transition: all .25s;
-                }
-                .nav-login:hover { background: var(--blue); color: white; border-color: var(--blue); box-shadow: 0 4px 16px rgba(0,102,255,.3); }
+                /* ── NAV ── */
+                .nav-root { position:fixed; top:0; left:0; width:100%; z-index:100; transition:all .35s ease; background:rgba(255,255,255,0.93); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); box-shadow:0 1px 0 rgba(0,0,0,.06),0 8px 32px rgba(0,0,0,.06); }
+                .nav-inner { max-width:82rem; margin:0 auto; padding:0 2rem; display:flex; align-items:center; justify-content:space-between; height:76px; }
+                .nav-logo-wrap { display:flex; align-items:center; gap:.875rem; text-decoration:none; }
+                .nav-logo-circle { width:52px; height:52px; border-radius:50%; background:var(--blue); display:flex; align-items:center; justify-content:center; box-shadow:0 4px 18px rgba(26,86,219,.35); overflow:hidden; flex-shrink:0; transition:transform .3s,box-shadow .3s; }
+                .nav-logo-circle:hover { transform:scale(1.06); box-shadow:0 6px 24px rgba(26,86,219,.45); }
+                .nav-logo-circle img { width:100%; height:100%; object-fit:cover; }
+                .nav-logo-circle .logo-letter { font-family:'Playfair Display',serif; font-weight:900; font-size:1.5rem; color:white; }
+                .nav-brand-text .name { font-size:1rem; font-weight:700; color:var(--ink); letter-spacing:-.01em; display:block; line-height:1.2; }
+                .nav-brand-text .sub  { font-size:.65rem; font-weight:500; color:var(--muted); text-transform:uppercase; letter-spacing:.1em; display:block; }
+                .nav-links { display:flex; gap:1.75rem; align-items:center; }
+                .nav-link { font-size:.875rem; font-weight:500; color:var(--ink-2); text-decoration:none; position:relative; padding-bottom:2px; transition:color .2s; }
+                .nav-link::after { content:''; position:absolute; bottom:-2px; left:0; width:0; height:2px; background:var(--blue); border-radius:2px; transition:width .25s; }
+                .nav-link:hover { color:var(--blue); }
+                .nav-link:hover::after { width:100%; }
+                .nav-link.active { color:var(--blue); font-weight:600; }
+                .nav-link.active::after { width:100%; }
+                .nav-login { padding:.5rem 1.4rem; font-size:.875rem; font-weight:600; color:var(--blue); background:var(--blue-lt); border:1.5px solid rgba(26,86,219,.2); border-radius:9999px; text-decoration:none; transition:all .25s; }
+                .nav-login:hover { background:var(--blue); color:white; border-color:var(--blue); box-shadow:0 4px 16px rgba(26,86,219,.3); }
 
-                /* ── Page Hero Banner ── */
+                /* ── PAGE HERO ── */
                 .page-hero {
                     padding-top: 76px;
                     background: var(--ink);
                     position: relative; overflow: hidden;
                 }
-                .page-hero-inner {
-                    max-width: 82rem; margin: 0 auto; padding: 5rem 2rem 4rem;
-                    position: relative; z-index: 2;
+                /* background slideshow layers */
+                .hero-bg-slide {
+                    position: absolute; inset: 0;
+                    background-size: cover; background-position: center;
+                    opacity: 0;
+                    transition: opacity 1.4s ease;
+                    z-index: 0;
                 }
-                .page-hero-glow {
-                    position: absolute; width: 700px; height: 700px; border-radius: 50%;
-                    background: radial-gradient(circle, rgba(0,102,255,.2) 0%, transparent 70%);
-                    top: -200px; right: -100px; pointer-events: none; z-index: 1;
+                .hero-bg-slide.active { opacity: 1; }
+                /* dark overlay so text stays readable over any photo */
+                .hero-bg-overlay {
+                    position: absolute; inset: 0; z-index: 1;
+                    background: linear-gradient(165deg, rgba(5,10,25,.82) 0%, rgba(5,10,25,.68) 55%, rgba(10,30,90,.5) 100%);
                 }
-                .page-hero-glow2 {
-                    position: absolute; width: 400px; height: 400px; border-radius: 50%;
-                    background: radial-gradient(circle, rgba(90,172,255,.1) 0%, transparent 70%);
-                    bottom: -100px; left: 5%; pointer-events: none; z-index: 1;
-                }
-                /* Grid pattern overlay */
                 .page-hero-grid {
-                    position: absolute; inset: 0; z-index: 0; opacity: .04;
-                    background-image:
-                        linear-gradient(rgba(255,255,255,.6) 1px, transparent 1px),
-                        linear-gradient(90deg, rgba(255,255,255,.6) 1px, transparent 1px);
+                    position:absolute; inset:0; z-index:2; opacity:.04;
+                    background-image: linear-gradient(rgba(255,255,255,.6) 1px,transparent 1px), linear-gradient(90deg,rgba(255,255,255,.6) 1px,transparent 1px);
                     background-size: 48px 48px;
                 }
+                .page-hero-glow {
+                    position:absolute; width:700px; height:700px; border-radius:50%;
+                    background:radial-gradient(circle,rgba(26,86,219,.22) 0%,transparent 70%);
+                    top:-200px; right:-100px; pointer-events:none; z-index:2;
+                }
+                .page-hero-glow2 {
+                    position:absolute; width:400px; height:400px; border-radius:50%;
+                    background:radial-gradient(circle,rgba(22,163,74,.1) 0%,transparent 70%);
+                    bottom:-100px; left:5%; pointer-events:none; z-index:2;
+                }
+                .page-hero-inner {
+                    max-width:82rem; margin:0 auto; padding:5rem 2rem 4rem;
+                    position:relative; z-index:3;
+                }
+                /* bouncing eyebrow — same pattern as Home */
                 .page-eyebrow {
-                    display: inline-flex; align-items: center; gap: .5rem;
-                    padding: .3rem .9rem; border-radius: 9999px;
-                    background: rgba(0,102,255,.15); border: 1px solid rgba(0,102,255,.3);
-                    color: #5aacff; font-size: .7rem; font-weight: 700;
-                    letter-spacing: .12em; text-transform: uppercase; margin-bottom: 1.25rem;
+                    display:inline-flex; align-items:center; gap:.5rem;
+                    padding:.3rem .9rem; border-radius:9999px;
+                    background:rgba(26,86,219,.18); border:1px solid rgba(26,86,219,.35);
+                    color:#7abaff; font-size:.7rem; font-weight:700;
+                    letter-spacing:.12em; text-transform:uppercase; margin-bottom:1.25rem;
+                    animation: eyebrowIn .8s ease both, gentleBounce 3s ease-in-out 1s infinite;
                 }
-                .page-eyebrow-dot {
-                    width: 6px; height: 6px; border-radius: 50%; background: #5aacff;
-                    animation: pulse 2s ease-in-out infinite;
+                @keyframes eyebrowIn { from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)} }
+                @keyframes gentleBounce {
+                    0%,100% { transform: translateY(0); }
+                    40%     { transform: translateY(-8px); }
+                    60%     { transform: translateY(-4px); }
                 }
-                @keyframes pulse { 0%,100%{ opacity:1; transform:scale(1); } 50%{ opacity:.4; transform:scale(1.5); } }
+                .page-eyebrow-dot { width:6px; height:6px; border-radius:50%; background:#7abaff; animation:pulse 2s ease-in-out infinite; }
+                @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(1.5)} }
                 .page-title {
-                    font-family: 'Playfair Display', serif;
-                    font-size: clamp(2.5rem, 5vw, 4rem);
-                    font-weight: 900; color: white;
-                    letter-spacing: -.03em; line-height: 1.05; margin-bottom: 1rem;
+                    font-family:'Playfair Display',serif;
+                    font-size:clamp(2.5rem,5vw,4rem); font-weight:900; color:white;
+                    letter-spacing:-.03em; line-height:1.05; margin-bottom:1rem;
+                    animation: eyebrowIn .9s .15s ease both;
                 }
-                .page-title .accent { color: #5aacff; font-style: italic; }
-                .page-subtitle { font-size: 1rem; color: rgba(255,255,255,.6); max-width: 480px; line-height: 1.75; }
-                .page-hero-stats {
-                    display: flex; gap: 2.5rem; margin-top: 3rem;
-                }
-                .phero-stat-num {
-                    font-family: 'Playfair Display', serif;
-                    font-size: 2rem; font-weight: 900; color: white; display: block; line-height: 1;
-                }
-                .phero-stat-label { font-size: .72rem; font-weight: 600; color: rgba(255,255,255,.45); letter-spacing: .1em; text-transform: uppercase; margin-top: .25rem; display: block; }
+                .page-title .accent { color:#7abaff; font-style:italic; }
+                .page-subtitle { font-size:1rem; color:rgba(255,255,255,.6); max-width:480px; line-height:1.75; animation: eyebrowIn 1s .3s ease both; }
+                .page-hero-stats { display:flex; gap:2.5rem; margin-top:3rem; flex-wrap:wrap; animation: eyebrowIn 1s .45s ease both; }
+                .phero-stat-num { font-family:'Playfair Display',serif; font-size:2rem; font-weight:900; color:white; display:block; line-height:1; }
+                .phero-stat-label { font-size:.72rem; font-weight:600; color:rgba(255,255,255,.45); letter-spacing:.1em; text-transform:uppercase; margin-top:.25rem; display:block; }
 
-                /* ── Controls bar ── */
-                .controls-bar {
-                    background: var(--card-bg);
-                    border-bottom: 1px solid var(--border);
-                    position: sticky; top: 76px; z-index: 50;
-                    box-shadow: 0 4px 24px rgba(0,0,0,.05);
-                }
-                .controls-inner {
-                    max-width: 82rem; margin: 0 auto; padding: 1.1rem 2rem;
-                    display: flex; align-items: center; justify-content: space-between; gap: 1.5rem;
-                    flex-wrap: wrap;
-                }
-                .filter-pills { display: flex; gap: .5rem; flex-wrap: wrap; }
-                .pill {
-                    padding: .4rem 1rem; border-radius: 9999px;
-                    font-size: .8rem; font-weight: 600; cursor: pointer;
-                    border: 1.5px solid var(--border);
-                    background: var(--offwhite); color: var(--muted);
-                    transition: all .2s;
-                }
-                .pill:hover { border-color: var(--blue); color: var(--blue); }
-                .pill.active { background: var(--blue); color: white; border-color: var(--blue); box-shadow: 0 4px 12px rgba(0,102,255,.25); }
-                .search-wrap {
-                    display: flex; align-items: center; gap: .6rem;
-                    background: var(--offwhite); border: 1.5px solid var(--border);
-                    border-radius: 9999px; padding: .45rem 1rem; min-width: 220px;
-                    transition: border-color .2s;
-                }
-                .search-wrap:focus-within { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(0,102,255,.1); }
-                .search-wrap input {
-                    border: none; background: transparent; outline: none;
-                    font-size: .875rem; color: var(--ink); font-family: inherit; width: 100%;
-                }
-                .search-wrap input::placeholder { color: #a0aec0; }
-                .search-wrap svg { flex-shrink: 0; color: #a0aec0; }
-                .results-count { font-size: .8rem; color: var(--muted); font-weight: 500; white-space: nowrap; }
+                /* ── CONTROLS BAR ── */
+                .controls-bar { background:var(--card-bg); border-bottom:1px solid var(--border); position:sticky; top:76px; z-index:50; box-shadow:0 4px 24px rgba(0,0,0,.05); }
+                .controls-inner { max-width:82rem; margin:0 auto; padding:1.1rem 2rem; display:flex; align-items:center; justify-content:flex-end; gap:1.5rem; flex-wrap:wrap; }
+                .results-count { font-size:.8rem; color:var(--muted); font-weight:500; white-space:nowrap; }
+                .search-wrap { display:flex; align-items:center; gap:.6rem; background:var(--offwhite); border:1.5px solid var(--border); border-radius:9999px; padding:.45rem 1rem; min-width:240px; transition:border-color .2s; }
+                .search-wrap:focus-within { border-color:var(--blue); box-shadow:0 0 0 3px rgba(26,86,219,.1); }
+                .search-wrap input { border:none; background:transparent; outline:none; font-size:.875rem; color:var(--ink); font-family:inherit; width:100%; }
+                .search-wrap input::placeholder { color:#a0aec0; }
 
-                /* ── Machines grid ── */
-                .machines-section { padding: 4rem 0 6rem; }
-                .machines-container { max-width: 82rem; margin: 0 auto; padding: 0 2rem; }
-                .machines-grid {
-                    display: grid;
-                    grid-template-columns: repeat(3, 1fr);
-                    gap: 1.75rem;
-                }
+                /* ── MACHINES SECTION ── */
+                .machines-section { padding:4rem 0 6rem; }
+                .machines-container { max-width:82rem; margin:0 auto; padding:0 2rem; }
+                .machines-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:1.75rem; }
 
-                /* ── Machine card ── */
+                /* ── MACHINE CARD (inner-box image layout matching Machines.jsx style) ── */
                 .machine-card {
-                    background: var(--card-bg);
-                    border-radius: var(--radius-lg);
-                    overflow: hidden;
-                    border: 1px solid var(--border);
-                    box-shadow: 0 2px 8px rgba(0,0,0,.04);
-                    display: flex; flex-direction: column;
-                    transition: transform .35s cubic-bezier(.4,0,.2,1), box-shadow .35s;
+                    background: #fff;
+                    border-radius: 1.25rem;
+                    border: 1px solid rgba(0,0,0,.08);
+                    box-shadow: 0 2px 16px rgba(0,0,0,.06);
+                    display: flex;
+                    flex-direction: column;
+                    padding: 1rem;
+                    gap: .85rem;
+                    transition: box-shadow .35s cubic-bezier(.4,0,.2,1), transform .35s;
                 }
-                .machine-card:hover {
-                    transform: translateY(-6px);
-                    box-shadow: 0 24px 48px rgba(0,0,0,.1);
-                }
-                .machine-img-wrap {
-                    background: #f0f4f8;
+                .machine-card:hover { transform:translateY(-6px); box-shadow:0 24px 52px rgba(0,0,0,.12); }
+
+                /* inner bordered image box */
+                .machine-img-box {
+                    width: 100%;
                     height: 220px;
-                    display: flex; align-items: center; justify-content: center;
-                    overflow: hidden; position: relative; flex-shrink: 0;
+                    background: #f0f4f8;
+                    border: 1px solid rgba(0,0,0,.07);
+                    border-radius: .85rem;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    position: relative;
+                    overflow: hidden;
+                    flex-shrink: 0;
                 }
-                .machine-img-wrap img {
-                    max-height: 180px; max-width: 85%;
+                .machine-img-box img {
+                    width: 88%; height: 88%;
                     object-fit: contain;
-                    transition: transform .6s ease;
+                    transition: transform .55s ease;
                 }
-                .machine-card:hover .machine-img-wrap img { transform: scale(1.06); }
-                .machine-tag {
-                    position: absolute; top: 1rem; left: 1rem;
-                    font-size: .65rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
-                    padding: .25rem .65rem; border-radius: 9999px;
-                }
-                .machine-id-badge {
-                    position: absolute; top: 1rem; right: 1rem;
-                    width: 28px; height: 28px; border-radius: 50%;
-                    background: rgba(255,255,255,.9);
-                    display: flex; align-items: center; justify-content: center;
-                    font-size: .7rem; font-weight: 800; color: var(--muted);
-                    border: 1px solid var(--border);
-                }
-                .machine-body { padding: 1.6rem; flex: 1; display: flex; flex-direction: column; }
-                .machine-cat  { font-size: .68rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--blue); margin-bottom: .4rem; }
-                .machine-name { font-family: 'Playfair Display', serif; font-size: 1.15rem; font-weight: 800; color: var(--ink); margin-bottom: .6rem; letter-spacing: -.02em; line-height: 1.3; }
-                .machine-desc { font-size: .85rem; color: var(--muted); line-height: 1.7; flex: 1; margin-bottom: 1.25rem;
-                    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
-                }
-                .machine-actions { display: flex; gap: .75rem; }
-                .btn-readmore {
-                    flex: 1; padding: .65rem; text-align: center;
-                    background: var(--offwhite); color: var(--ink-2);
-                    font-size: .82rem; font-weight: 600;
-                    border-radius: .65rem; border: 1.5px solid var(--border);
-                    text-decoration: none; cursor: pointer;
-                    transition: all .25s;
-                }
-                .btn-readmore:hover { border-color: var(--blue); color: var(--blue); background: var(--blue-lt); }
-                .btn-book {
-                    flex: 1; padding: .65rem; text-align: center;
-                    background: var(--blue); color: white;
-                    font-size: .82rem; font-weight: 700;
-                    border-radius: .65rem; border: none; cursor: pointer;
-                    box-shadow: 0 4px 12px rgba(0,102,255,.25);
-                    transition: all .25s;
-                }
-                .btn-book:hover { background: var(--blue-dk); box-shadow: 0 8px 24px rgba(0,102,255,.4); transform: translateY(-1px); }
+                .machine-card:hover .machine-img-box img { transform:scale(1.05); }
 
-                /* Empty state */
-                .empty-state { text-align: center; padding: 5rem 0; color: var(--muted); }
-                .empty-state svg { color: #cbd5e1; margin: 0 auto 1.25rem; display: block; }
-                .empty-state h3 { font-family: 'Playfair Display', serif; font-size: 1.4rem; color: var(--ink); margin-bottom: .5rem; }
+                .machine-status-tag {
+                    position:absolute; top:.65rem; left:.65rem;
+                    font-size:.6rem; font-weight:700; letter-spacing:.1em; text-transform:uppercase;
+                    padding:.2rem .6rem; border-radius:9999px;
+                }
+                .tag-available   { background:var(--green);  color:white; }
+                .tag-maintenance { background:var(--red);    color:white; }
+                .tag-in-use      { background:var(--blue);   color:white; }
+                .tag-offline     { background:#64748b;       color:white; }
 
-                /* ── Footer (exact match) ── */
-                .footer { background: #080d14; padding: 5rem 0 0; }
-                .footer-grid { display: grid; grid-template-columns: 1.5fr 1fr 1fr 1.4fr; gap: 3rem; padding-bottom: 3.5rem; }
-                .footer-brand-logo {
-                    width: 56px; height: 56px; border-radius: 50%;
-                    background: var(--blue); display: flex; align-items: center; justify-content: center;
-                    overflow: hidden; margin-bottom: 1.25rem;
-                    box-shadow: 0 4px 18px rgba(0,102,255,.35);
+                /* card body */
+                .machine-card-body { display:flex; flex-direction:column; gap:.4rem; flex:1; }
+                .machine-card-type { font-size:.65rem; color:#a0aec0; text-transform:uppercase; letter-spacing:.07em; }
+                .machine-card-name { font-family:'Playfair Display',serif; font-size:1.1rem; font-weight:800; color:var(--ink); line-height:1.3; letter-spacing:-.01em; }
+                .machine-card-desc {
+                    font-size:.83rem; color:var(--muted); line-height:1.7;
+                    display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;
+                    flex:1;
                 }
-                .footer-brand-logo img { width: 100%; height: 100%; object-fit: cover; }
-                .footer-brand-logo .logo-letter { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.6rem; color: white; }
-                .footer-brand-name { font-size: 1.1rem; font-weight: 700; color: white; display: block; margin-bottom: .15rem; }
-                .footer-brand-sub  { font-size: .68rem; font-weight: 500; color: #475569; letter-spacing: .1em; text-transform: uppercase; display: block; margin-bottom: 1rem; }
-                .footer-about { font-size: .85rem; color: #64748b; line-height: 1.75; }
-                .footer-col-title { font-size: .7rem; font-weight: 700; color: #cbd5e1; letter-spacing: .12em; text-transform: uppercase; margin-bottom: 1.25rem; display: block; }
-                .footer-link { display: block; font-size: .875rem; color: #64748b; text-decoration: none; padding: .3rem 0; transition: color .2s; }
-                .footer-link:hover { color: white; }
-                .footer-contact-item { display: flex; align-items: flex-start; gap: .75rem; margin-bottom: 1rem; }
-                .footer-contact-item svg { flex-shrink: 0; margin-top: .15rem; }
-                .footer-contact-text { font-size: .85rem; color: #64748b; line-height: 1.6; }
-                .footer-bottom { border-top: 1px solid #1a2332; padding: 1.5rem 0; display: flex; justify-content: space-between; align-items: center; }
-                .footer-copy { font-size: .78rem; color: #334155; }
-                .footer-socials { display: flex; gap: .875rem; }
-                .social-btn {
-                    width: 38px; height: 38px; border-radius: 50%;
-                    background: #0d1a2e; border: 1px solid #1e2d42;
-                    display: flex; align-items: center; justify-content: center;
-                    color: #64748b; text-decoration: none; transition: all .25s;
+                .machine-card-meta { display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; margin-top:.2rem; }
+                .meta-chip { display:inline-flex; align-items:center; gap:.3rem; font-size:.7rem; color:var(--muted); font-weight:500; background:var(--offwhite); padding:.25rem .6rem; border-radius:.45rem; }
+                .meta-chip svg { color:var(--blue); flex-shrink:0; }
+
+                /* Read More text link */
+                .btn-read-more {
+                    display:inline-block; font-size:.84rem; font-weight:700;
+                    color:var(--green); background:none; border:none;
+                    padding:.1rem 0; cursor:pointer; text-align:left;
+                    transition:color .2s;
                 }
-                .social-btn:hover { background: var(--blue); border-color: var(--blue); color: white; transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,102,255,.35); }
+                .btn-read-more:hover { color:var(--green-dk); text-decoration:underline; }
+
+                /* Book button full width blue */
+                .btn-book-full {
+                    display:block; width:100%; padding:.75rem;
+                    background:var(--blue); color:white;
+                    font-size:.9rem; font-weight:700; border-radius:.75rem;
+                    border:none; cursor:pointer; text-align:center;
+                    box-shadow:0 3px 12px rgba(26,86,219,.25);
+                    transition:all .22s;
+                }
+                .btn-book-full:hover { background:var(--blue-dk); box-shadow:0 6px 20px rgba(26,86,219,.35); transform:translateY(-1px); }
+                .btn-book-disabled {
+                    display:block; width:100%; padding:.75rem;
+                    background:#e2e8f0; color:#94a3b8;
+                    font-size:.9rem; font-weight:700; border-radius:.75rem;
+                    border:none; text-align:center; cursor:not-allowed;
+                }
+
+                /* ── SKELETON ── */
+                .skeleton { background:linear-gradient(90deg,#e2e8f0 25%,#f1f5f9 50%,#e2e8f0 75%); background-size:200% 100%; animation:shimmer 1.5s infinite; border-radius:.5rem; }
+                @keyframes shimmer { 0%{background-position:200% 0}100%{background-position:-200% 0} }
+
+                /* ── EMPTY STATE ── */
+                .empty-state { text-align:center; padding:5rem 0; color:var(--muted); }
+                .empty-state svg { color:#cbd5e1; margin:0 auto 1.25rem; display:block; }
+                .empty-state h3 { font-family:'Playfair Display',serif; font-size:1.4rem; color:var(--ink); margin-bottom:.5rem; }
+                .empty-state p { font-size:.9rem; }
+
+                /* ── MODAL ── */
+                .modal-backdrop { position:fixed; inset:0; z-index:999; background:rgba(5,10,25,.65); backdrop-filter:blur(6px); display:flex; align-items:center; justify-content:center; padding:1.5rem; animation:fadeIn .2s ease; }
+                @keyframes fadeIn { from{opacity:0}to{opacity:1} }
+                .modal-box { background:white; border-radius:1.5rem; width:100%; max-width:840px; position:relative; overflow:hidden; box-shadow:0 32px 80px rgba(0,0,0,.25); animation:slideUp .25s ease; }
+                @keyframes slideUp { from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)} }
+                .modal-close { position:absolute; top:1.25rem; right:1.25rem; z-index:2; width:36px; height:36px; border-radius:50%; background:#f1f5f9; border:1px solid var(--border); display:flex; align-items:center; justify-content:center; cursor:pointer; color:var(--muted); transition:all .2s; }
+                .modal-close:hover { background:#e2e8f0; color:var(--ink); }
+                .modal-inner { display:grid; grid-template-columns:1fr 1.15fr; min-height:400px; }
+                .modal-img-side { background:#f0f4f8; display:flex; align-items:center; justify-content:center; padding:2rem; }
+                .modal-img-side img { width:100%; max-height:320px; object-fit:contain; border-radius:1rem; }
+                .modal-info-side { padding:2.5rem 2rem 2.5rem 1.75rem; display:flex; flex-direction:column; }
+                .modal-title { font-family:'Playfair Display',serif; font-size:1.65rem; font-weight:800; color:var(--ink); letter-spacing:-.02em; margin-bottom:.6rem; line-height:1.2; }
+                .modal-status-row { display:flex; align-items:center; gap:.5rem; margin-bottom:.6rem; }
+                .modal-status-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+                .modal-status-dot.green { background:var(--green); box-shadow:0 0 0 3px rgba(22,163,74,.15); }
+                .modal-status-dot.red   { background:var(--red);   box-shadow:0 0 0 3px rgba(224,32,32,.15); }
+                .modal-status-text { font-size:.875rem; font-weight:600; color:var(--muted); }
+                .modal-type-badge { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:var(--blue); background:var(--blue-lt); display:inline-block; padding:.22rem .7rem; border-radius:9999px; margin-bottom:1rem; }
+                .modal-desc { font-size:.9rem; color:#4a5568; line-height:1.78; flex:1; margin-bottom:1.25rem; }
+                .modal-meta-grid { display:flex; flex-direction:column; gap:.5rem; margin-bottom:1.5rem; }
+                .modal-meta-item { display:flex; align-items:center; gap:.5rem; font-size:.8rem; color:var(--muted); font-weight:500; background:var(--offwhite); padding:.45rem .8rem; border-radius:.55rem; }
+                .modal-meta-item svg { color:var(--blue); flex-shrink:0; }
+                .modal-meta-item.warn { color:#b45309; background:#fef3c7; }
+                .modal-meta-item.warn svg { color:#b45309; }
+                .btn-modal-book { display:block; width:100%; padding:.9rem; background:var(--blue); color:white; font-size:.95rem; font-weight:700; border-radius:.75rem; border:none; cursor:pointer; box-shadow:0 4px 16px rgba(26,86,219,.3); transition:all .25s; }
+                .btn-modal-book:hover { background:var(--blue-dk); box-shadow:0 8px 28px rgba(26,86,219,.4); transform:translateY(-1px); }
+                .btn-modal-disabled { display:block; width:100%; padding:.9rem; background:#e2e8f0; color:#94a3b8; font-size:.95rem; font-weight:700; border-radius:.75rem; border:none; cursor:not-allowed; }
+
+                /* ── FOOTER ── */
+                .footer { background:#080d14; padding:5rem 0 0; }
+                .footer-grid { display:grid; grid-template-columns:1.5fr 1fr 1fr 1.4fr; gap:3rem; padding-bottom:3.5rem; }
+                .footer-brand-logo { width:56px; height:56px; border-radius:50%; background:var(--blue); display:flex; align-items:center; justify-content:center; overflow:hidden; margin-bottom:1.25rem; box-shadow:0 4px 18px rgba(26,86,219,.35); }
+                .footer-brand-logo img { width:100%; height:100%; object-fit:cover; }
+                .footer-brand-logo .logo-letter { font-family:'Playfair Display',serif; font-weight:900; font-size:1.6rem; color:white; }
+                .footer-brand-name { font-size:1.1rem; font-weight:700; color:white; display:block; margin-bottom:.15rem; }
+                .footer-brand-sub  { font-size:.68rem; font-weight:500; color:#475569; letter-spacing:.1em; text-transform:uppercase; display:block; margin-bottom:1rem; }
+                .footer-about { font-size:.85rem; color:#64748b; line-height:1.75; }
+                .footer-col-title { font-size:.7rem; font-weight:700; color:#cbd5e1; letter-spacing:.12em; text-transform:uppercase; margin-bottom:1.25rem; display:block; }
+                .footer-link { display:block; font-size:.875rem; color:#64748b; text-decoration:none; padding:.3rem 0; transition:color .2s; }
+                .footer-link:hover { color:white; }
+                .footer-contact-item { display:flex; align-items:flex-start; gap:.75rem; margin-bottom:1rem; }
+                .footer-contact-item svg { flex-shrink:0; margin-top:.15rem; }
+                .footer-contact-text { font-size:.85rem; color:#64748b; line-height:1.6; }
+                .footer-bottom { border-top:1px solid #1a2332; padding:1.5rem 0; display:flex; justify-content:space-between; align-items:center; }
+                .footer-copy { font-size:.78rem; color:#334155; }
+                .footer-socials { display:flex; gap:.875rem; }
+                .social-btn { width:38px; height:38px; border-radius:50%; background:#0d1a2e; border:1px solid #1e2d42; display:flex; align-items:center; justify-content:center; color:#64748b; text-decoration:none; transition:all .25s; }
+                .social-btn:hover { background:var(--blue); border-color:var(--blue); color:white; transform:translateY(-2px); box-shadow:0 6px 20px rgba(26,86,219,.35); }
             `}</style>
 
-            {/* ════════ NAV ════════ */}
-            <nav className={`nav-root ${scrolled ? 'scrolled' : 'top'}`}>
+            {/* MODAL */}
+            {selectedMachine && (
+                <MachineModal
+                    machine={selectedMachine}
+                    onClose={() => setSelectedMachine(null)}
+                    isLoggedIn={isLoggedIn}
+                />
+            )}
+
+            {/* ═══ NAV ═══ */}
+            <nav className="nav-root">
                 <div className="nav-inner">
                     <a href="/" className="nav-logo-wrap">
                         <div className="nav-logo-circle">
@@ -344,7 +458,6 @@ export default function Machines() {
                             <span className="sub">Fabrication Laboratory</span>
                         </div>
                     </a>
-
                     <div className="nav-links">
                         <a href="/" className="nav-link">Home</a>
                         <a href="/machines" className="nav-link active">Machines</a>
@@ -359,8 +472,17 @@ export default function Machines() {
                 </div>
             </nav>
 
-            {/* ════════ PAGE HERO ════════ */}
+            {/* ═══ PAGE HERO ═══ */}
             <div className="page-hero">
+                {/* Background slideshow */}
+                {heroSlides.map((src, i) => (
+                    <div
+                        key={i}
+                        className={`hero-bg-slide ${i === heroSlideIdx ? 'active' : ''}`}
+                        style={{ backgroundImage: `url(${src})` }}
+                    />
+                ))}
+                <div className="hero-bg-overlay" />
                 <div className="page-hero-grid" />
                 <div className="page-hero-glow" />
                 <div className="page-hero-glow2" />
@@ -376,7 +498,11 @@ export default function Machines() {
                         Industry-grade digital fabrication equipment — from laser cutters and CNC routers to 3D printers and beyond.
                     </p>
                     <div className="page-hero-stats">
-                        {[['10+', 'Machines'], ['5', 'Categories'], ['24/7', 'Bookable'], ['Expert', 'Support']].map(([n, l]) => (
+                        {[
+                            [loading ? '…' : `${stats.total || machines.length}+`, 'Total Machines'],
+                            [loading ? '…' : `${stats.available}`, 'Available Now'],
+                            [loading ? '…' : `${stats.maintenance}`, 'In Maintenance'],
+                        ].map(([n, l]) => (
                             <div key={l}>
                                 <span className="phero-stat-num">{n}</span>
                                 <span className="phero-stat-label">{l}</span>
@@ -386,71 +512,118 @@ export default function Machines() {
                 </div>
             </div>
 
-            {/* ════════ CONTROLS ════════ */}
+            {/* ═══ CONTROLS ═══ */}
             <div className="controls-bar">
                 <div className="controls-inner">
-                    {/* Filter pills */}
-                    <div className="filter-pills">
-                        {categories.map(cat => (
-                            <button key={cat} className={`pill ${filter === cat ? 'active' : ''}`}
-                                onClick={() => setFilter(cat)}>
-                                {cat}
-                            </button>
-                        ))}
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
-                        {/* Result count */}
-                        <span className="results-count">{filtered.length} machine{filtered.length !== 1 ? 's' : ''}</span>
-
-                        {/* Search */}
-                        <div className="search-wrap">
-                            <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                            </svg>
-                            <input placeholder="Search machines…"
-                                value={search} onChange={e => setSearch(e.target.value)} />
-                        </div>
+                    <span className="results-count">
+                        {loading ? 'Loading…' : `${machines.length} machine${machines.length !== 1 ? 's' : ''}`}
+                    </span>
+                    <div className="search-wrap">
+                        <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                        <input
+                            placeholder="Search machines…"
+                            value={search}
+                            onChange={e => setSearch(e.target.value)}
+                        />
                     </div>
                 </div>
             </div>
 
-            {/* ════════ MACHINES GRID ════════ */}
+            {/* ═══ MACHINES GRID ═══ */}
             <section className="machines-section">
                 <div className="machines-container">
-                    {filtered.length === 0 ? (
+                    {loading ? (
+                        <div className="machines-grid">
+                            {[0, 1, 2, 3, 4, 5].map(i => (
+                                <div key={i} style={{ background: '#fff', borderRadius: '1.25rem', border: '1px solid rgba(0,0,0,.08)', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '.85rem' }}>
+                                    <div className="skeleton" style={{ height: 220, borderRadius: '.85rem' }} />
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '.6rem' }}>
+                                        <div className="skeleton" style={{ height: 11, width: '30%' }} />
+                                        <div className="skeleton" style={{ height: 20, width: '65%' }} />
+                                        <div className="skeleton" style={{ height: 12, width: '95%' }} />
+                                        <div className="skeleton" style={{ height: 12, width: '80%' }} />
+                                        <div className="skeleton" style={{ height: 12, width: '50%' }} />
+                                        <div className="skeleton" style={{ height: 14, width: '25%', marginTop: '.15rem' }} />
+                                        <div className="skeleton" style={{ height: 42, borderRadius: '.75rem', marginTop: '.1rem' }} />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : machines.length === 0 ? (
                         <div className="empty-state">
                             <svg width="56" height="56" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                             <h3>No machines found</h3>
-                            <p>Try a different search or filter.</p>
+                            <p>Try a different search term.</p>
                         </div>
                     ) : (
                         <div className="machines-grid">
-                            {filtered.map(m => {
-                                const tc = tagColors[m.tag] || { bg: '#e8f0fe', color: '#0066FF' };
+                            {machines.map((m, idx) => {
+                                const imgSrc = getImageUrl(m.image) || FALLBACK;
+                                const isAvail = m.status === 'available';
                                 return (
-                                    <div key={m.id} className="machine-card">
-                                        {/* Image */}
-                                        <div className="machine-img-wrap">
-                                            <img src={m.img} alt={m.name}
-                                                onError={e => { e.currentTarget.src = m.fb; e.currentTarget.style.objectFit = 'cover'; e.currentTarget.style.maxHeight = '100%'; e.currentTarget.style.maxWidth = '100%'; }} />
-                                            <span className="machine-tag" style={{ background: tc.bg, color: tc.color }}>{m.tag}</span>
-                                            <span className="machine-id-badge">#{String(m.id).padStart(2, '0')}</span>
-                                        </div>
+                                    <Reveal key={m.id} delay={Math.min(idx % 3 * 0.1, 0.3)}>
+                                        <div className="machine-card">
+                                            {/* Inner image box */}
+                                            <div className="machine-img-box">
+                                                <img src={imgSrc} alt={m.name}
+                                                    onError={e => { e.currentTarget.src = FALLBACK; }} />
+                                                <span className={`machine-status-tag ${statusClass(m.status)}`}>
+                                                    {statusLabel(m.status)}
+                                                </span>
+                                            </div>
 
-                                        {/* Body */}
-                                        <div className="machine-body">
-                                            <span className="machine-cat">{m.category}</span>
-                                            <h3 className="machine-name">{m.name}</h3>
-                                            <p className="machine-desc">{m.desc}</p>
-                                            <div className="machine-actions">
-                                                <a href="#" className="btn-readmore">Read More</a>
-                                                <button className="btn-book">Book Now</button>
+                                            {/* Card body */}
+                                            <div className="machine-card-body">
+                                                {m.type && <span className="machine-card-type">{m.type}</span>}
+                                                <h3 className="machine-card-name">{m.name}</h3>
+                                                <p className="machine-card-desc">
+                                                    {m.description || 'High-precision fabrication machine available for booking.'}
+                                                </p>
+
+                                                {/* Meta chips: runtime + last used */}
+                                                {(m.runtime_hours > 0 || m.last_used_at) && (
+                                                    <div className="machine-card-meta">
+                                                        {m.runtime_hours > 0 && (
+                                                            <span className="meta-chip">
+                                                                <svg width="11" height="11" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                                </svg>
+                                                                {m.runtime_hours} hrs
+                                                            </span>
+                                                        )}
+                                                        {m.last_used_at && (
+                                                            <span className="meta-chip">
+                                                                <svg width="11" height="11" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                                </svg>
+                                                                {new Date(m.last_used_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                )}
+
+                                                {/* Read More link */}
+                                                <button
+                                                    className="btn-read-more"
+                                                    onClick={() => setSelectedMachine(m)}
+                                                >
+                                                    Read More
+                                                </button>
+
+                                                {/* Book button */}
+                                                {isAvail
+                                                    ? <button className="btn-book-full" onClick={handleBookClick}>Book Now</button>
+                                                    : <span className="btn-book-disabled">
+                                                        {m.status === 'maintenance' ? 'Under Maintenance' : m.status === 'in_use' ? 'Currently In Use' : 'Unavailable'}
+                                                    </span>
+                                                }
                                             </div>
                                         </div>
-                                    </div>
+                                    </Reveal>
                                 );
                             })}
                         </div>
@@ -458,12 +631,10 @@ export default function Machines() {
                 </div>
             </section>
 
-            {/* ════════ FOOTER ════════ */}
+            {/* ═══ FOOTER ═══ */}
             <footer className="footer">
                 <div style={{ maxWidth: '82rem', margin: '0 auto', padding: '0 2rem' }}>
                     <div className="footer-grid">
-
-                        {/* Brand */}
                         <div>
                             <div className="footer-brand-logo">
                                 <img src="/images/logo.png" alt="JNEC Fab Lab"
@@ -474,24 +645,18 @@ export default function Machines() {
                             <span className="footer-brand-sub">Fabrication Laboratory</span>
                             <p className="footer-about">The JNEC Fabrication Lab provides access to digital fabrication tools and hands-on training for students, faculty, and the wider community.</p>
                         </div>
-
-                        {/* Quick Links */}
                         <div>
                             <span className="footer-col-title">Quick Links</span>
                             {[['Machines', '/machines'], ['Training', '/training'], ['Projects', '/projects'], ['Gallery', '/gallery'], ['About Us', '/about'], ['FAQ', '/faq']].map(([l, h]) => (
                                 <a key={l} href={h} className="footer-link">{l}</a>
                             ))}
                         </div>
-
-                        {/* Support */}
                         <div>
                             <span className="footer-col-title">Support</span>
                             <a href="/faq" className="footer-link">FAQ</a>
                             <a href="/contact" className="footer-link">Contact Us</a>
                             <Link to="/login" className="footer-link">Login / Register</Link>
                         </div>
-
-                        {/* Contact */}
                         <div>
                             <span className="footer-col-title">Contact</span>
                             <div className="footer-contact-item">
@@ -508,8 +673,6 @@ export default function Machines() {
                             </div>
                         </div>
                     </div>
-
-                    {/* Bottom bar */}
                     <div className="footer-bottom">
                         <p className="footer-copy">© 2026 JNEC Fab Lab, Jigme Namgyel Engineering College. All rights reserved.</p>
                         <div className="footer-socials">

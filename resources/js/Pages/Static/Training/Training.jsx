@@ -1,125 +1,207 @@
-import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 
-export default function Training() {
-    const [scrolled, setScrolled] = useState(false);
-    const [filter, setFilter] = useState('All');
-    const [toast, setToast] = useState(null);
+const API_BASE = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api';
 
+function getImageUrl(path) {
+    if (!path) return null;
+    if (path.startsWith('http')) return path;
+    return `http://127.0.0.1:8000/storage/${path}`;
+}
+
+const FALLBACK_IMG = 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=800&q=80';
+
+/* ── Helpers ─────────────────────────────────────────────────────────────── */
+function calcDuration(start, end) {
+    if (!start || !end) return null;
+    const s = new Date(start), e = new Date(end);
+    const days = Math.round((e - s) / (1000 * 60 * 60 * 24));
+    if (days === 0) return '1 Day';
+    if (days < 7) return `${days} Day${days !== 1 ? 's' : ''}`;
+    if (days < 30) { const w = Math.round(days / 7); return `${w} Week${w !== 1 ? 's' : ''}`; }
+    const m = Math.round(days / 30); return `${m} Month${m !== 1 ? 's' : ''}`;
+}
+function formatDate(d) {
+    if (!d) return '';
+    return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+/* ── Scroll-reveal ─────────────────────────────────────────────────────── */
+function useReveal() {
+    const ref = useRef(null);
+    const [visible, setVisible] = useState(false);
     useEffect(() => {
-        const onScroll = () => setScrolled(window.scrollY > 20);
-        window.addEventListener('scroll', onScroll);
-        return () => window.removeEventListener('scroll', onScroll);
+        const el = ref.current; if (!el) return;
+        const obs = new IntersectionObserver(
+            ([entry]) => { if (entry.isIntersecting) { setVisible(true); obs.disconnect(); } },
+            { threshold: 0.08 }
+        );
+        obs.observe(el);
+        return () => obs.disconnect();
     }, []);
+    return [ref, visible];
+}
+function Reveal({ children, delay = 0, style = {} }) {
+    const [ref, visible] = useReveal();
+    return (
+        <div ref={ref} style={{
+            opacity: visible ? 1 : 0,
+            transform: visible ? 'translateY(0)' : 'translateY(36px)',
+            transition: `opacity 0.65s ease ${delay}s, transform 0.65s ease ${delay}s`,
+            ...style
+        }}>{children}</div>
+    );
+}
 
-    const showToast = (msg) => {
-        setToast(msg);
-        setTimeout(() => setToast(null), 2800);
-    };
+/* ── Course Detail Modal ────────────────────────────────────────────────── */
+function CourseModal({ course, onClose, isLoggedIn, onEnroll }) {
+    if (!course) return null;
+    const imgSrc = getImageUrl(course.image) || FALLBACK_IMG;
+    const seatsLeft = Math.max(0, (course.seat_limit || 0) - (course.enrollment || 0));
+    const isFull = seatsLeft === 0;
+    const canEnroll = course.registration_open && !isFull && course.status !== 'completed';
+    const duration = calcDuration(course.start_date, course.end_date);
 
-    const handleEnroll = (course) => {
-        showToast(`Enrollment initiated for "${course.title}" — please login to complete.`);
-    };
+    return (
+        <div className="modal-backdrop" onClick={onClose}>
+            <div className="modal-box" onClick={e => e.stopPropagation()}>
+                <button className="modal-close" onClick={onClose} aria-label="Close">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+                <div className="modal-inner">
+                    {/* Image side */}
+                    <div className="modal-img-side">
+                        <img src={imgSrc} alt={course.title}
+                            onError={e => { e.currentTarget.src = FALLBACK_IMG; }} />
+                        {/* Single status badge on image */}
+                        <span className={`modal-status-badge ${course.registration_open && !isFull ? 'badge-open' : isFull ? 'badge-full' : course.status === 'completed' ? 'badge-completed' : 'badge-closed'}`}>
+                            {course.registration_open && !isFull ? 'Open' : isFull ? 'Full' : course.status === 'completed' ? 'Completed' : 'Closed'}
+                        </span>
+                    </div>
 
-    const courses = [
-        {
-            id: 1,
-            title: 'CNC Machining Fundamentals',
-            instructor: 'Mr. Dorji Gyeltshen',
-            description: 'Comprehensive course on CNC routing, tool paths, G-code basics, and hands-on machining projects with various materials.',
-            duration: '6 weeks',
-            schedule: 'Tue & Thu, 14:00–16:00',
-            seats: 2,
-            status: 'Open',
-            category: 'CNC',
-            level: 'Beginner',
-            icon: '⚙️',
-        },
-        {
-            id: 2,
-            title: '3D Printing Essentials',
-            instructor: 'Ms. Pema Wangmo',
-            description: 'Learn FDM and resin 3D printing from scratch — slicer settings, support structures, material selection, and post-processing techniques.',
-            duration: '4 weeks',
-            schedule: 'Mon & Wed, 10:00–12:00',
-            seats: 5,
-            status: 'Open',
-            category: '3D Printing',
-            level: 'Beginner',
-            icon: '🖨️',
-        },
-        {
-            id: 3,
-            title: 'Laser Cutting & Engraving',
-            instructor: 'Mr. Tshering Dorji',
-            description: 'Hands-on training with the Trotec Speedy 100 and 400 — vector design, material settings, safety protocols, and project creation.',
-            duration: '3 weeks',
-            schedule: 'Fri, 09:00–12:00',
-            seats: 0,
-            status: 'Full',
-            category: 'Laser',
-            level: 'Intermediate',
-            icon: '🔦',
-        },
-        {
-            id: 4,
-            title: 'PCB Design & Electronics',
-            instructor: 'Mr. Kinley Namgyal',
-            description: 'From schematic to physical board — KiCad design, PCB fabrication, component soldering, and programming with the Mechatronika machine.',
-            duration: '5 weeks',
-            schedule: 'Tue & Thu, 10:00–12:00',
-            seats: 4,
-            status: 'Open',
-            category: 'Electronics',
-            level: 'Intermediate',
-            icon: '🔌',
-        },
-        {
-            id: 5,
-            title: 'Advanced CNC Milling',
-            instructor: 'Mr. Dorji Gyeltshen',
-            description: 'In-depth CNC techniques including multi-axis toolpaths, fixture design, surface finishing, and ShopBot CNC router operations.',
-            duration: '8 weeks',
-            schedule: 'Mon & Wed & Fri, 14:00–16:00',
-            seats: 3,
-            status: 'Open',
-            category: 'CNC',
-            level: 'Advanced',
-            icon: '⚙️',
-        },
-        {
-            id: 6,
-            title: '3D Scanning & Reverse Engineering',
-            instructor: 'Ms. Sonam Choki',
-            description: 'Use the V-Scope 3D scanner for capturing real-world objects, cleaning point clouds, and converting scans to editable CAD models.',
-            duration: '4 weeks',
-            schedule: 'Thu, 14:00–17:00',
-            seats: 6,
-            status: 'Open',
-            category: '3D Printing',
-            level: 'Advanced',
-            icon: '📡',
-        },
+                    {/* Info side */}
+                    <div className="modal-info-side">
+                        <h2 className="modal-title">{course.title}</h2>
+                        {course.instructor && (
+                            <p className="modal-instructor">
+                                <span className="modal-instructor-label">Instructor:</span> {course.instructor}
+                            </p>
+                        )}
+                        {course.description && (
+                            <p className="modal-desc">{course.description}</p>
+                        )}
+                        <div className="modal-meta-grid">
+                            {duration && (
+                                <div className="modal-meta-item">
+                                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    <span>Duration: {duration}</span>
+                                </div>
+                            )}
+                            {course.start_date && (
+                                <div className="modal-meta-item">
+                                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                    </svg>
+                                    <span>Starts: {formatDate(course.start_date)}</span>
+                                </div>
+                            )}
+                            {course.end_date && (
+                                <div className="modal-meta-item">
+                                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                    </svg>
+                                    <span>Ends: {formatDate(course.end_date)}</span>
+                                </div>
+                            )}
+                            <div className={`modal-meta-item ${isFull ? 'warn' : seatsLeft <= 3 ? 'low' : ''}`}>
+                                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                                </svg>
+                                <span>{isFull ? 'No seats left' : `${seatsLeft} seat${seatsLeft !== 1 ? 's' : ''} left`}</span>
+                            </div>
+                        </div>
+
+                        {/* Enroll button */}
+                        {course.status === 'completed' ? (
+                            <span className="btn-modal-disabled">Course Completed</span>
+                        ) : !canEnroll ? (
+                            <span className="btn-modal-disabled">{isFull ? 'Course Full' : 'Registration Closed'}</span>
+                        ) : isLoggedIn ? (
+                            <button className="btn-modal-enroll" onClick={() => { onEnroll(course); onClose(); }}>
+                                Enroll Now →
+                            </button>
+                        ) : (
+                            <button className="btn-modal-login" onClick={() => { onEnroll(course); onClose(); }}>
+                                Enroll Now →
+                            </button>
+                        )}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+/* ── Main ───────────────────────────────────────────────────────────────── */
+export default function Training() {
+    const navigate = useNavigate();
+    const [courses, setCourses] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [heroIdx, setHeroIdx] = useState(0);
+    const [toast, setToast] = useState(null);
+    const [selected, setSelected] = useState(null);
+
+    const isLoggedIn = !!localStorage.getItem('token');
+
+    const heroSlides = [
+        '../images/home.jpg',
+        '../images/home2.jpg',
+        '../images/home3.jpg',
     ];
 
-    const categories = ['All', ...Array.from(new Set(courses.map(c => c.category)))];
-    const levels = ['All Levels', 'Beginner', 'Intermediate', 'Advanced'];
-    const [levelFilter, setLevelFilter] = useState('All Levels');
+    useEffect(() => {
+        const t = setInterval(() => setHeroIdx(p => (p + 1) % heroSlides.length), 5000);
+        return () => clearInterval(t);
+    }, []);
 
-    const filtered = courses.filter(c => {
-        const matchCat = filter === 'All' || c.category === filter;
-        const matchLevel = levelFilter === 'All Levels' || c.level === levelFilter;
-        return matchCat && matchLevel;
-    });
+    useEffect(() => {
+        (async () => {
+            try {
+                const res = await fetch(`${API_BASE}/home/courses`);
+                if (res.ok) {
+                    const d = await res.json();
+                    setCourses(d.data || d);
+                }
+            } catch (e) { console.error(e); }
+            finally { setLoading(false); }
+        })();
+    }, []);
 
-    const openCount = courses.filter(c => c.status === 'Open').length;
-    const totalSeats = courses.reduce((s, c) => s + c.seats, 0);
+    useEffect(() => {
+        const fn = e => { if (e.key === 'Escape') setSelected(null); };
+        window.addEventListener('keydown', fn);
+        return () => window.removeEventListener('keydown', fn);
+    }, []);
 
-    const levelColors = {
-        Beginner: { bg: '#e0f2fe', color: '#0369a1' },
-        Intermediate: { bg: '#fef3c7', color: '#92400e' },
-        Advanced: { bg: '#fce7f3', color: '#9d174d' },
-    };
+    const showToast = useCallback((msg, type = 'warn') => {
+        setToast({ msg, type });
+        setTimeout(() => setToast(null), 3000);
+    }, []);
+
+    const handleEnroll = useCallback((course) => {
+        if (!isLoggedIn) {
+            showToast('Please login to enroll in this course', 'warn');
+            return;
+        }
+        navigate(`/dashboard/courses/${course.id}/enroll`);
+    }, [isLoggedIn, navigate, showToast]);
+
+    /* stats — only 3 (removed seats) */
+    const openCount = courses.filter(c => c.registration_open).length;
 
     return (
         <div style={{ fontFamily: "'DM Sans', sans-serif", background: '#f9fafb', color: '#0d1117', overflowX: 'hidden' }}>
@@ -127,220 +209,289 @@ export default function Training() {
                 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Playfair+Display:wght@700;800;900&display=swap');
 
                 :root {
-                    --blue:    #0066FF;
-                    --blue-dk: #0051cc;
-                    --blue-lt: #e8f0fe;
-                    --ink:     #0d1117;
-                    --ink-2:   #1e2a3a;
-                    --muted:   #64748b;
-                    --border:  rgba(0,0,0,0.07);
-                    --card-bg: #ffffff;
-                    --offwhite:#f9fafb;
-                    --radius:  1rem;
-                    --radius-lg: 1.5rem;
+                    --blue:       #1a56db;
+                    --blue-dk:    #1446b8;
+                    --blue-lt:    #e8f0fe;
+                    --red:        #e02020;
+                    --red-dk:     #c01a1a;
+                    --red-lt:     #fdecea;
+                    --green:      #16a34a;
+                    --green-dk:   #0f7a38;
+                    --green-lt:   #dcfce7;
+                    --ink:        #0d1117;
+                    --ink-2:      #1e2a3a;
+                    --muted:      #64748b;
+                    --border:     rgba(0,0,0,0.07);
+                    --offwhite:   #f9fafb;
+                    --card-bg:    #ffffff;
+                    --radius:     1rem;
+                    --radius-lg:  1.5rem;
                 }
-                * { box-sizing: border-box; margin: 0; padding: 0; }
+                * { box-sizing:border-box; margin:0; padding:0; }
 
-                /* ── Nav ── */
-                .nav-root { position: fixed; top: 0; left: 0; width: 100%; z-index: 100; transition: all .35s ease; }
-                .nav-root.scrolled { background: rgba(255,255,255,0.92); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); box-shadow: 0 1px 0 rgba(0,0,0,0.06), 0 8px 32px rgba(0,0,0,0.06); }
-                .nav-root.top      { background: rgba(255,255,255,0.92); backdrop-filter: blur(20px); box-shadow: 0 1px 0 rgba(0,0,0,0.06); }
-                .nav-inner { max-width: 82rem; margin: 0 auto; padding: 0 2rem; display: flex; align-items: center; justify-content: space-between; height: 76px; }
-                .nav-logo-wrap { display: flex; align-items: center; gap: .875rem; text-decoration: none; }
-                .nav-logo-circle { width: 52px; height: 52px; border-radius: 50%; background: var(--blue); display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 18px rgba(0,102,255,0.35); overflow: hidden; flex-shrink: 0; transition: transform .3s, box-shadow .3s; }
-                .nav-logo-circle:hover { transform: scale(1.06); box-shadow: 0 6px 24px rgba(0,102,255,0.45); }
-                .nav-logo-circle img { width: 100%; height: 100%; object-fit: cover; }
-                .nav-logo-circle .logo-letter { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.5rem; color: white; }
-                .nav-brand-text .name { font-size: 1rem; font-weight: 700; color: var(--ink); display: block; line-height: 1.2; }
-                .nav-brand-text .sub  { font-size: .65rem; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: .1em; display: block; }
-                .nav-links { display: flex; gap: 1.75rem; align-items: center; }
-                .nav-link { font-size: .875rem; font-weight: 500; color: var(--ink-2); text-decoration: none; position: relative; padding-bottom: 2px; transition: color .2s; }
-                .nav-link::after { content: ''; position: absolute; bottom: -2px; left: 0; width: 0; height: 2px; background: var(--blue); border-radius: 2px; transition: width .25s; }
-                .nav-link:hover { color: var(--blue); }
-                .nav-link:hover::after { width: 100%; }
-                .nav-link.active { color: var(--blue); font-weight: 600; }
-                .nav-link.active::after { width: 100%; }
-                .nav-login { padding: .5rem 1.4rem; font-size: .875rem; font-weight: 600; color: var(--blue); background: var(--blue-lt); border: 1.5px solid rgba(0,102,255,.2); border-radius: 9999px; text-decoration: none; transition: all .25s; }
-                .nav-login:hover { background: var(--blue); color: white; border-color: var(--blue); box-shadow: 0 4px 16px rgba(0,102,255,.3); }
+                /* ── NAV ── */
+                .nav-root { position:fixed; top:0; left:0; width:100%; z-index:100; background:rgba(255,255,255,0.93); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); box-shadow:0 1px 0 rgba(0,0,0,.06),0 8px 32px rgba(0,0,0,.06); }
+                .nav-inner { max-width:82rem; margin:0 auto; padding:0 2rem; display:flex; align-items:center; justify-content:space-between; height:76px; }
+                .nav-logo-wrap { display:flex; align-items:center; gap:.875rem; text-decoration:none; }
+                .nav-logo-circle { width:52px; height:52px; border-radius:50%; background:var(--blue); display:flex; align-items:center; justify-content:center; box-shadow:0 4px 18px rgba(26,86,219,.35); overflow:hidden; flex-shrink:0; transition:transform .3s,box-shadow .3s; }
+                .nav-logo-circle:hover { transform:scale(1.06); }
+                .nav-logo-circle img { width:100%; height:100%; object-fit:cover; }
+                .nav-logo-circle .logo-letter { font-family:'Playfair Display',serif; font-weight:900; font-size:1.5rem; color:white; }
+                .nav-brand-text .name { font-size:1rem; font-weight:700; color:var(--ink); letter-spacing:-.01em; display:block; line-height:1.2; }
+                .nav-brand-text .sub  { font-size:.65rem; font-weight:500; color:var(--muted); text-transform:uppercase; letter-spacing:.1em; display:block; }
+                .nav-links { display:flex; gap:1.75rem; align-items:center; }
+                .nav-link { font-size:.875rem; font-weight:500; color:var(--ink-2); text-decoration:none; position:relative; padding-bottom:2px; transition:color .2s; }
+                .nav-link::after { content:''; position:absolute; bottom:-2px; left:0; width:0; height:2px; background:var(--blue); border-radius:2px; transition:width .25s; }
+                .nav-link:hover { color:var(--blue); }
+                .nav-link:hover::after { width:100%; }
+                .nav-link.active { color:var(--blue); font-weight:600; }
+                .nav-link.active::after { width:100%; }
+                .nav-login { padding:.5rem 1.4rem; font-size:.875rem; font-weight:600; color:var(--blue); background:var(--blue-lt); border:1.5px solid rgba(26,86,219,.2); border-radius:9999px; text-decoration:none; transition:all .25s; }
+                .nav-login:hover { background:var(--blue); color:white; border-color:var(--blue); }
 
-                /* ── Page Hero ── */
-                .page-hero { padding-top: 76px; background: var(--ink); position: relative; overflow: hidden; }
-                .page-hero-grid { position: absolute; inset: 0; z-index: 0; opacity: .04; background-image: linear-gradient(rgba(255,255,255,.6) 1px,transparent 1px), linear-gradient(90deg,rgba(255,255,255,.6) 1px,transparent 1px); background-size: 48px 48px; }
-                .page-hero-glow  { position: absolute; width: 700px; height: 700px; border-radius: 50%; background: radial-gradient(circle,rgba(0,102,255,.2) 0%,transparent 70%); top: -200px; right: -100px; pointer-events: none; z-index: 1; }
-                .page-hero-glow2 { position: absolute; width: 400px; height: 400px; border-radius: 50%; background: radial-gradient(circle,rgba(90,172,255,.1) 0%,transparent 70%); bottom: -100px; left: 5%; pointer-events: none; z-index: 1; }
-                .page-hero-inner { max-width: 82rem; margin: 0 auto; padding: 5rem 2rem 4rem; position: relative; z-index: 2; display: grid; grid-template-columns: 1fr auto; gap: 4rem; align-items: center; }
-                .page-eyebrow { display: inline-flex; align-items: center; gap: .5rem; padding: .3rem .9rem; border-radius: 9999px; background: rgba(0,102,255,.15); border: 1px solid rgba(0,102,255,.3); color: #5aacff; font-size: .7rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; margin-bottom: 1.25rem; }
-                .page-eyebrow-dot { width: 6px; height: 6px; border-radius: 50%; background: #5aacff; animation: pulse 2s ease-in-out infinite; }
-                @keyframes pulse { 0%,100%{ opacity:1; transform:scale(1); } 50%{ opacity:.4; transform:scale(1.5); } }
-                .page-title { font-family: 'Playfair Display', serif; font-size: clamp(2.5rem,5vw,4rem); font-weight: 900; color: white; letter-spacing: -.03em; line-height: 1.05; margin-bottom: 1rem; }
-                .page-title .accent { color: #5aacff; font-style: italic; }
-                .page-subtitle { font-size: 1rem; color: rgba(255,255,255,.6); max-width: 480px; line-height: 1.75; margin-bottom: 2rem; }
-                .page-hero-stats { display: flex; gap: 2.5rem; }
-                .phero-stat-num   { font-family: 'Playfair Display', serif; font-size: 2rem; font-weight: 900; color: white; display: block; line-height: 1; }
-                .phero-stat-label { font-size: .72rem; font-weight: 600; color: rgba(255,255,255,.45); letter-spacing: .1em; text-transform: uppercase; margin-top: .25rem; display: block; }
+                /* ── PAGE HERO with slideshow ── */
+                .page-hero { padding-top:76px; background:var(--ink); position:relative; overflow:hidden; }
+                .hero-bg-slide { position:absolute; inset:0; background-size:cover; background-position:center; opacity:0; transition:opacity 1.4s ease; z-index:0; }
+                .hero-bg-slide.active { opacity:1; }
+                .hero-bg-overlay { position:absolute; inset:0; z-index:1; background:linear-gradient(165deg,rgba(5,10,25,.82) 0%,rgba(5,10,25,.68) 55%,rgba(10,30,90,.5) 100%); }
+                .page-hero-grid { position:absolute; inset:0; z-index:2; opacity:.04; background-image:linear-gradient(rgba(255,255,255,.6) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.6) 1px,transparent 1px); background-size:48px 48px; }
+                .page-hero-glow  { position:absolute; width:700px; height:700px; border-radius:50%; background:radial-gradient(circle,rgba(26,86,219,.22) 0%,transparent 70%); top:-200px; right:-100px; pointer-events:none; z-index:2; }
+                .page-hero-glow2 { position:absolute; width:400px; height:400px; border-radius:50%; background:radial-gradient(circle,rgba(22,163,74,.1) 0%,transparent 70%); bottom:-100px; left:5%; pointer-events:none; z-index:2; }
+                .page-hero-inner { max-width:82rem; margin:0 auto; padding:5rem 2rem 4rem; position:relative; z-index:3; display:grid; grid-template-columns:1fr auto; gap:4rem; align-items:center; }
 
-                /* Hero right card */
-                .hero-info-card {
-                    background: rgba(255,255,255,.06);
-                    border: 1px solid rgba(255,255,255,.1);
-                    border-radius: var(--radius-lg);
-                    padding: 2rem 2.25rem;
-                    backdrop-filter: blur(12px);
-                    min-width: 300px;
-                }
-                .hero-info-card h3 { font-family: 'Playfair Display', serif; font-size: 1.1rem; font-weight: 800; color: white; margin-bottom: .5rem; }
-                .hero-info-card p  { font-size: .85rem; color: rgba(255,255,255,.6); line-height: 1.7; margin-bottom: 1.25rem; }
-                .btn-learn-more {
-                    display: inline-block; padding: .65rem 1.5rem;
-                    background: white; color: var(--ink);
-                    font-weight: 700; font-size: .85rem;
-                    border-radius: 9999px; text-decoration: none;
-                    border: none; cursor: pointer; transition: all .25s;
-                }
-                .btn-learn-more:hover { background: var(--blue-lt); color: var(--blue); }
+                /* bouncing eyebrow */
+                .page-eyebrow { display:inline-flex; align-items:center; gap:.5rem; padding:.3rem .9rem; border-radius:9999px; background:rgba(26,86,219,.18); border:1px solid rgba(26,86,219,.35); color:#7abaff; font-size:.7rem; font-weight:700; letter-spacing:.12em; text-transform:uppercase; margin-bottom:1.25rem; animation:eyebrowIn .8s ease both, gentleBounce 3s ease-in-out 1s infinite; }
+                @keyframes eyebrowIn { from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)} }
+                @keyframes gentleBounce { 0%,100%{transform:translateY(0)}40%{transform:translateY(-8px)}60%{transform:translateY(-4px)} }
+                .page-eyebrow-dot { width:6px; height:6px; border-radius:50%; background:#7abaff; animation:pulse 2s ease-in-out infinite; }
+                @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(1.5)} }
 
-                /* ── Controls bar ── */
-                .controls-bar { background: var(--card-bg); border-bottom: 1px solid var(--border); position: sticky; top: 76px; z-index: 50; box-shadow: 0 4px 24px rgba(0,0,0,.05); }
-                .controls-inner { max-width: 82rem; margin: 0 auto; padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; flex-wrap: wrap; }
-                .filter-pills { display: flex; gap: .5rem; flex-wrap: wrap; }
-                .pill { padding: .4rem 1rem; border-radius: 9999px; font-size: .8rem; font-weight: 600; cursor: pointer; border: 1.5px solid var(--border); background: var(--offwhite); color: var(--muted); transition: all .2s; }
-                .pill:hover { border-color: var(--blue); color: var(--blue); }
-                .pill.active { background: var(--blue); color: white; border-color: var(--blue); box-shadow: 0 4px 12px rgba(0,102,255,.25); }
-                .controls-right { display: flex; align-items: center; gap: 1rem; }
-                .sort-select { padding: .45rem .9rem; border-radius: 9999px; border: 1.5px solid var(--border); background: var(--offwhite); font-size: .8rem; font-weight: 600; color: var(--muted); outline: none; cursor: pointer; font-family: inherit; transition: border-color .2s; }
-                .sort-select:focus { border-color: var(--blue); }
-                .results-count { font-size: .8rem; color: var(--muted); font-weight: 500; white-space: nowrap; }
+                .page-title { font-family:'Playfair Display',serif; font-size:clamp(2.5rem,5vw,4rem); font-weight:900; color:white; letter-spacing:-.03em; line-height:1.05; margin-bottom:1rem; animation:eyebrowIn .9s .15s ease both; }
+                .page-title .accent { color:#7abaff; font-style:italic; }
+                .page-subtitle { font-size:1rem; color:rgba(255,255,255,.6); max-width:480px; line-height:1.75; margin-bottom:2rem; animation:eyebrowIn 1s .3s ease both; }
+                .page-hero-stats { display:flex; gap:2.5rem; flex-wrap:wrap; animation:eyebrowIn 1s .45s ease both; }
+                .phero-stat-num   { font-family:'Playfair Display',serif; font-size:2rem; font-weight:900; color:white; display:block; line-height:1; }
+                .phero-stat-label { font-size:.72rem; font-weight:600; color:rgba(255,255,255,.45); letter-spacing:.1em; text-transform:uppercase; margin-top:.25rem; display:block; }
 
-                /* ── Courses section ── */
-                .courses-section { padding: 4.5rem 0 6rem; }
-                .courses-container { max-width: 82rem; margin: 0 auto; padding: 0 2rem; }
-                .section-label { display: inline-block; font-size: .68rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--blue); background: var(--blue-lt); padding: .25rem .75rem; border-radius: 9999px; margin-bottom: .65rem; }
-                .section-title { font-family: 'Playfair Display', serif; font-size: clamp(1.5rem,2.5vw,2rem); font-weight: 800; color: var(--ink); letter-spacing: -.02em; }
-                .section-sub { font-size: .925rem; color: var(--muted); margin-top: .4rem; }
-                .divider { width: 3rem; height: 3px; background: var(--blue); border-radius: 9999px; margin-top: .75rem; }
+                /* Hero right info card */
+                .hero-info-card { background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.12); border-radius:var(--radius-lg); padding:2rem 2.25rem; backdrop-filter:blur(12px); min-width:280px; max-width:320px; animation:eyebrowIn 1s .3s ease both; }
+                .hero-info-card-icon { font-size:2rem; margin-bottom:.75rem; }
+                .hero-info-card h3 { font-family:'Playfair Display',serif; font-size:1.1rem; font-weight:800; color:white; margin-bottom:.5rem; }
+                .hero-info-card p  { font-size:.85rem; color:rgba(255,255,255,.6); line-height:1.7; margin-bottom:1.25rem; }
+                .btn-info { display:inline-block; padding:.6rem 1.4rem; background:white; color:var(--ink); font-weight:700; font-size:.82rem; border-radius:9999px; text-decoration:none; border:none; cursor:pointer; transition:all .25s; }
+                .btn-info:hover { background:var(--blue-lt); color:var(--blue); }
 
-                /* ── Course grid ── */
-                .courses-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 1.75rem; margin-top: 3rem; }
+                /* ── COURSES SECTION ── */
+                .courses-section { padding:4.5rem 0 6rem; }
+                .courses-container { max-width:82rem; margin:0 auto; padding:0 2rem; }
+                .section-label { display:inline-block; font-size:.68rem; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--blue); background:var(--blue-lt); padding:.25rem .75rem; border-radius:9999px; margin-bottom:.65rem; }
+                .section-title { font-family:'Playfair Display',serif; font-size:clamp(1.5rem,2.5vw,2rem); font-weight:800; color:var(--ink); letter-spacing:-.02em; }
+                .section-sub { font-size:.925rem; color:var(--muted); margin-top:.4rem; }
+                .divider { width:3rem; height:3px; background:var(--blue); border-radius:9999px; margin-top:.75rem; }
 
-                /* ── Course card ── */
+                /* ── COURSES GRID — 4 columns, all same height ── */
+                .courses-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:1.5rem; margin-top:3rem; align-items:stretch; }
+
+                /* ── COURSE CARD — fixed uniform height ── */
                 .course-card {
                     background: var(--card-bg);
                     border-radius: var(--radius-lg);
                     border: 1px solid var(--border);
                     box-shadow: 0 2px 8px rgba(0,0,0,.04);
-                    overflow: hidden; position: relative;
-                    display: flex; flex-direction: column;
+                    overflow: hidden;
+                    display: flex;
+                    flex-direction: column;
+                    height: 100%;
                     transition: transform .35s cubic-bezier(.4,0,.2,1), box-shadow .35s;
                 }
-                .course-card:hover { transform: translateY(-5px); box-shadow: 0 24px 48px rgba(0,0,0,.1); }
-                .course-card.full { opacity: .7; }
+                .course-card:hover { transform:translateY(-5px); box-shadow:0 20px 40px rgba(0,0,0,.1); }
 
-                /* left colour accent */
-                .course-card::before {
-                    content: ''; position: absolute; top: 0; left: 0;
-                    width: 4px; height: 100%;
-                    background: linear-gradient(180deg, var(--blue), #4f7cff);
-                    border-radius: 1rem 0 0 1rem;
-                }
+                /* course image — fixed height, never grows */
+                .course-img-wrap { height:160px; min-height:160px; max-height:160px; overflow:hidden; position:relative; flex-shrink:0; }
+                .course-img-wrap img { width:100%; height:100%; object-fit:cover; transition:transform .6s ease; }
+                .course-card:hover .course-img-wrap img { transform:scale(1.06); }
+                .course-img-overlay { position:absolute; inset:0; background:linear-gradient(to top,rgba(5,10,25,.55) 0%,transparent 55%); }
 
-                .course-top {
-                    padding: 1.75rem 2rem 0 2rem;
-                    display: flex; justify-content: space-between; align-items: flex-start;
-                    margin-bottom: 1.25rem;
+                /* single status badge on image top-left */
+                .course-status-tag {
+                    position:absolute; top:.65rem; left:.65rem;
+                    font-size:.6rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
+                    padding:.22rem .65rem; border-radius:9999px;
                 }
-                .course-icon {
-                    width: 3rem; height: 3rem; border-radius: .875rem;
-                    background: var(--blue-lt); display: flex; align-items: center; justify-content: center;
-                    font-size: 1.35rem; flex-shrink: 0;
-                }
-                .course-badges { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+                .tag-open      { background:var(--green);  color:white; }
+                .tag-closed    { background:#64748b;       color:white; }
+                .tag-full      { background:var(--red);    color:white; }
+                .tag-completed { background:#1e293b;       color:#94a3b8; }
+                .tag-upcoming  { background:var(--blue);   color:white; }
+                /* pulse dot inside open badge */
+                .tag-open-dot { display:inline-block; width:5px; height:5px; border-radius:50%; background:white; margin-right:.3rem; animation:pulse 2s ease-in-out infinite; vertical-align:middle; }
 
-                .badge-open {
-                    display: inline-flex; align-items: center; gap: .35rem;
-                    padding: .28rem .75rem; background: #dcfce7; color: #15803d;
-                    font-size: .68rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
-                    border-radius: 9999px;
-                }
-                .badge-open::before { content:''; width:6px; height:6px; border-radius:50%; background:#16a34a; animation: pulse 2s ease-in-out infinite; }
-                .badge-full {
-                    display: inline-flex; align-items: center; gap: .35rem;
-                    padding: .28rem .75rem; background: #fee2e2; color: #991b1b;
-                    font-size: .68rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
-                    border-radius: 9999px;
-                }
-                .badge-level {
-                    font-size: .65rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
-                    padding: .25rem .65rem; border-radius: 9999px;
-                }
-                .badge-dur {
-                    font-size: .75rem; font-weight: 600; color: var(--muted);
-                    background: var(--offwhite); padding: .25rem .65rem; border-radius: .5rem;
-                }
+                /* card body — flex:1 so it fills remaining space, buttons pinned to bottom */
+                .course-card-body { padding:1rem 1.1rem 1.2rem; flex:1; display:flex; flex-direction:column; }
+                .course-title { font-family:'Playfair Display',serif; font-size:1rem; font-weight:800; color:var(--ink); line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; margin-bottom:.3rem; }
+                .course-instructor-line { font-size:.775rem; color:var(--muted); margin-bottom:.4rem; }
+                .course-instructor-line strong { font-weight:600; color:var(--ink-2); }
 
-                .course-body { padding: 0 2rem 2rem; flex: 1; display: flex; flex-direction: column; }
-                .course-title { font-family: 'Playfair Display', serif; font-size: 1.35rem; font-weight: 800; color: var(--ink); margin-bottom: .25rem; letter-spacing: -.02em; line-height: 1.25; }
-                .course-instructor { font-size: .85rem; color: var(--muted); margin-bottom: 1rem; font-style: italic; }
-                .course-desc { font-size: .875rem; color: #4a5568; line-height: 1.7; margin-bottom: 1.5rem; flex: 1; }
+                /* meta row */
+                .course-meta-row { display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; margin-bottom:.4rem; }
+                .cmeta { display:inline-flex; align-items:center; gap:.3rem; font-size:.72rem; color:var(--muted); font-weight:500; background:var(--offwhite); padding:.25rem .55rem; border-radius:.45rem; }
+                .cmeta svg { color:var(--blue); flex-shrink:0; }
+                .cmeta.seats-low  { background:#fef3c7; color:#92400e; }
+                .cmeta.seats-low svg { color:#d97706; }
+                .cmeta.seats-none { background:var(--red-lt); color:var(--red-dk); }
+                .cmeta.seats-none svg { color:var(--red); }
 
-                .course-meta { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: .65rem; margin-bottom: 1.75rem; }
-                .meta-chip {
-                    display: flex; align-items: center; gap: .45rem;
-                    background: var(--offwhite); padding: .6rem .85rem;
-                    border-radius: .75rem; font-size: .78rem; color: var(--muted); font-weight: 500;
+                /* spacer pushes Read More + button to bottom of every card */
+                .course-body-spacer { flex:1; min-height:.5rem; }
+
+                /* Read More link — green, always at bottom above button */
+                .btn-read-more {
+                    display:inline-block; font-size:.82rem; font-weight:700;
+                    color:var(--green); background:none; border:none;
+                    padding:.4rem 0 .1rem; cursor:pointer; text-align:left;
+                    transition:color .2s;
                 }
-                .meta-chip svg { flex-shrink: 0; color: var(--blue); }
-                .meta-chip.seats-low { background: #fef3c7; color: #92400e; }
-                .meta-chip.seats-low svg { color: #d97706; }
-                .meta-chip.seats-none { background: #fee2e2; color: #991b1b; }
-                .meta-chip.seats-none svg { color: #ef4444; }
+                .btn-read-more:hover { color:var(--green-dk); text-decoration:underline; }
 
+                /* Enroll button — blue theme, always at very bottom */
                 .btn-enroll {
-                    width: 100%; padding: .875rem;
-                    background: var(--ink); color: white;
-                    font-size: .9rem; font-weight: 700; letter-spacing: .02em;
-                    border-radius: .75rem; border: none; cursor: pointer;
-                    transition: all .25s;
+                    display:block; width:100%; padding:.7rem;
+                    background:var(--blue); color:white;
+                    font-size:.845rem; font-weight:700;
+                    border-radius:.65rem; border:none; cursor:pointer;
+                    box-shadow:0 3px 12px rgba(26,86,219,.25);
+                    transition:all .22s; text-align:center; margin-top:.4rem;
                 }
-                .btn-enroll:hover:not(:disabled) { background: var(--blue); box-shadow: 0 8px 28px rgba(0,102,255,.4); transform: translateY(-1px); }
-                .btn-enroll:disabled { background: #cbd5e1; color: #94a3b8; cursor: not-allowed; }
+                .btn-enroll:hover { background:var(--blue-dk); box-shadow:0 6px 20px rgba(26,86,219,.35); transform:translateY(-1px); }
+                /* Login to enroll — also blue, consistent */
+                .btn-enroll-login {
+                    display:block; width:100%; padding:.7rem;
+                    background:var(--blue); color:white;
+                    font-size:.845rem; font-weight:700;
+                    border-radius:.65rem; border:none; cursor:pointer;
+                    box-shadow:0 3px 12px rgba(26,86,219,.25);
+                    transition:all .22s; text-align:center; margin-top:.4rem;
+                }
+                .btn-enroll-login:hover { background:var(--blue-dk); box-shadow:0 6px 20px rgba(26,86,219,.35); transform:translateY(-1px); }
+                .btn-enroll-disabled {
+                    display:block; width:100%; padding:.7rem;
+                    background:#e2e8f0; color:#94a3b8;
+                    font-size:.845rem; font-weight:700; border-radius:.65rem;
+                    border:none; text-align:center; cursor:not-allowed; margin-top:.4rem;
+                }
 
-                /* Divider between top and body */
-                .card-divider { height: 1px; background: var(--border); margin: 0 2rem 1.5rem; }
+                /* ── SKELETON ── */
+                .skeleton { background:linear-gradient(90deg,#e2e8f0 25%,#f1f5f9 50%,#e2e8f0 75%); background-size:200% 100%; animation:shimmer 1.5s infinite; border-radius:.5rem; }
+                @keyframes shimmer { 0%{background-position:200% 0}100%{background-position:-200% 0} }
+                .skeleton-card { background:var(--card-bg); border-radius:var(--radius-lg); border:1px solid var(--border); overflow:hidden; }
 
-                /* ── Empty state ── */
-                .empty-state { text-align: center; padding: 5rem 0; color: var(--muted); }
-                .empty-state svg { color: #cbd5e1; margin: 0 auto 1.25rem; display: block; }
-                .empty-state h3 { font-family: 'Playfair Display', serif; font-size: 1.4rem; color: var(--ink); margin-bottom: .5rem; }
+                /* ── EMPTY STATE ── */
+                .empty-state { text-align:center; padding:5rem 0; color:var(--muted); }
+                .empty-state svg { color:#cbd5e1; margin:0 auto 1.25rem; display:block; }
+                .empty-state h3 { font-family:'Playfair Display',serif; font-size:1.4rem; color:var(--ink); margin-bottom:.5rem; }
+                .empty-state p { font-size:.9rem; }
 
-                /* ── Toast ── */
-                .toast { position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%); background: var(--ink); color: white; padding: .75rem 1.75rem; border-radius: 9999px; font-size: .875rem; font-weight: 600; box-shadow: 0 8px 32px rgba(0,0,0,.3); z-index: 9999; display: flex; align-items: center; gap: .6rem; white-space: nowrap; animation: slideUp .3s ease; }
-                @keyframes slideUp { from { opacity:0; transform:translate(-50%,16px); } to { opacity:1; transform:translate(-50%,0); } }
-                .toast-dot { width: 8px; height: 8px; border-radius: 50%; background: #4af; flex-shrink: 0; }
+                /* ── TOAST ── */
+                .toast-wrap { position:fixed; top:1.5rem; left:50%; transform:translateX(-50%); z-index:9999; display:flex; align-items:center; gap:.75rem; padding:.85rem 1.5rem; border-radius:.75rem; font-size:.9rem; font-weight:600; box-shadow:0 8px 32px rgba(0,0,0,.3); white-space:nowrap; animation:toastSlide .3s ease; min-width:240px; }
+                .toast-wrap.warn    { background:#3b1219; color:#f4a4a4; border:1px solid rgba(244,164,164,.2); }
+                .toast-wrap.success { background:var(--ink); color:white; border:1px solid rgba(255,255,255,.08); }
+                .toast-close { margin-left:auto; background:none; border:none; cursor:pointer; color:inherit; opacity:.6; padding:0; display:flex; align-items:center; }
+                .toast-close:hover { opacity:1; }
+                @keyframes toastSlide { from{opacity:0;transform:translate(-50%,-12px)}to{opacity:1;transform:translate(-50%,0)} }
 
-                /* ── Footer ── */
-                .footer { background: #080d14; padding: 5rem 0 0; }
-                .footer-grid { display: grid; grid-template-columns: 1.5fr 1fr 1fr 1.4fr; gap: 3rem; padding-bottom: 3.5rem; }
-                .footer-brand-logo { width: 56px; height: 56px; border-radius: 50%; background: var(--blue); display: flex; align-items: center; justify-content: center; overflow: hidden; margin-bottom: 1.25rem; box-shadow: 0 4px 18px rgba(0,102,255,.35); }
-                .footer-brand-logo img { width: 100%; height: 100%; object-fit: cover; }
-                .footer-brand-logo .logo-letter { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.6rem; color: white; }
-                .footer-brand-name { font-size: 1.1rem; font-weight: 700; color: white; display: block; margin-bottom: .15rem; }
-                .footer-brand-sub  { font-size: .68rem; font-weight: 500; color: #475569; letter-spacing: .1em; text-transform: uppercase; display: block; margin-bottom: 1rem; }
-                .footer-about { font-size: .85rem; color: #64748b; line-height: 1.75; }
-                .footer-col-title { font-size: .7rem; font-weight: 700; color: #cbd5e1; letter-spacing: .12em; text-transform: uppercase; margin-bottom: 1.25rem; display: block; }
-                .footer-link { display: block; font-size: .875rem; color: #64748b; text-decoration: none; padding: .3rem 0; transition: color .2s; }
-                .footer-link:hover { color: white; }
-                .footer-contact-item { display: flex; align-items: flex-start; gap: .75rem; margin-bottom: 1rem; }
-                .footer-contact-item svg { flex-shrink: 0; margin-top: .15rem; }
-                .footer-contact-text { font-size: .85rem; color: #64748b; line-height: 1.6; }
-                .footer-bottom { border-top: 1px solid #1a2332; padding: 1.5rem 0; display: flex; justify-content: space-between; align-items: center; }
-                .footer-copy { font-size: .78rem; color: #334155; }
-                .footer-socials { display: flex; gap: .875rem; }
-                .social-btn { width: 38px; height: 38px; border-radius: 50%; background: #0d1a2e; border: 1px solid #1e2d42; display: flex; align-items: center; justify-content: center; color: #64748b; text-decoration: none; transition: all .25s; }
-                .social-btn:hover { background: var(--blue); border-color: var(--blue); color: white; transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,102,255,.35); }
+                /* ── COURSE DETAIL MODAL ── */
+                .modal-backdrop { position:fixed; inset:0; z-index:999; background:rgba(5,10,25,.65); backdrop-filter:blur(6px); display:flex; align-items:center; justify-content:center; padding:1.5rem; animation:fadeIn .2s ease; }
+                @keyframes fadeIn { from{opacity:0}to{opacity:1} }
+                .modal-box { background:white; border-radius:1.5rem; width:100%; max-width:780px; position:relative; overflow:hidden; box-shadow:0 32px 80px rgba(0,0,0,.25); animation:slideUp .25s ease; }
+                @keyframes slideUp { from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:translateY(0)} }
+                .modal-close { position:absolute; top:1.1rem; right:1.1rem; z-index:10; width:34px; height:34px; border-radius:50%; background:#f1f5f9; border:1px solid var(--border); display:flex; align-items:center; justify-content:center; cursor:pointer; color:var(--muted); transition:all .2s; }
+                .modal-close:hover { background:#e2e8f0; color:var(--ink); }
+                .modal-inner { display:grid; grid-template-columns:1fr 1.1fr; min-height:380px; }
+
+                /* image side */
+                .modal-img-side { position:relative; overflow:hidden; background:#f0f4f8; display:flex; align-items:center; justify-content:center; }
+                .modal-img-side img { width:100%; height:100%; object-fit:cover; display:block; }
+                .modal-status-badge { position:absolute; top:.8rem; left:.8rem; font-size:.65rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; padding:.28rem .75rem; border-radius:9999px; }
+                .badge-open     { background:var(--green);  color:white; }
+                .badge-full     { background:var(--red);    color:white; }
+                .badge-closed   { background:#64748b;       color:white; }
+                .badge-completed{ background:#1e293b;       color:#94a3b8; }
+
+                /* info side */
+                .modal-info-side { padding:2.25rem 2rem 2.25rem 1.75rem; display:flex; flex-direction:column; overflow-y:auto; max-height:520px; }
+                .modal-title { font-family:'Playfair Display',serif; font-size:1.45rem; font-weight:800; color:var(--ink); letter-spacing:-.02em; margin-bottom:.5rem; line-height:1.25; }
+                .modal-instructor { font-size:.875rem; color:var(--muted); margin-bottom:.875rem; }
+                .modal-instructor-label { font-weight:700; color:var(--ink-2); }
+                .modal-desc { font-size:.875rem; color:#4a5568; line-height:1.78; margin-bottom:1.25rem; flex:1; }
+                .modal-meta-grid { display:flex; flex-direction:column; gap:.5rem; margin-bottom:1.5rem; }
+                .modal-meta-item { display:flex; align-items:center; gap:.5rem; font-size:.8rem; color:var(--muted); font-weight:500; background:var(--offwhite); padding:.45rem .85rem; border-radius:.55rem; }
+                .modal-meta-item svg { color:var(--blue); flex-shrink:0; }
+                .modal-meta-item.warn { background:var(--red-lt); color:var(--red-dk); }
+                .modal-meta-item.warn svg { color:var(--red); }
+                .modal-meta-item.low  { background:#fef3c7; color:#92400e; }
+                .modal-meta-item.low svg  { color:#d97706; }
+                .btn-modal-enroll { display:block; width:100%; padding:.875rem; background:var(--blue); color:white; font-size:.95rem; font-weight:700; border-radius:.75rem; border:none; cursor:pointer; box-shadow:0 4px 16px rgba(26,86,219,.3); transition:all .25s; text-align:center; }
+                .btn-modal-enroll:hover { background:var(--blue-dk); box-shadow:0 8px 28px rgba(26,86,219,.4); transform:translateY(-1px); }
+                .btn-modal-login { display:block; width:100%; padding:.875rem; background:var(--blue); color:white; font-size:.95rem; font-weight:700; border-radius:.75rem; border:none; cursor:pointer; box-shadow:0 4px 16px rgba(26,86,219,.3); transition:all .25s; text-align:center; }
+.btn-modal-login:hover { background:var(--blue-dk); box-shadow:0 8px 28px rgba(26,86,219,.4); transform:translateY(-1px); }
+                .btn-modal-login:hover { background:var(--blue); box-shadow:0 8px 28px rgba(26,86,219,.4); transform:translateY(-1px); }
+                .btn-modal-disabled { display:block; width:100%; padding:.875rem; background:#e2e8f0; color:#94a3b8; font-size:.95rem; font-weight:700; border-radius:.75rem; border:none; text-align:center; cursor:not-allowed; }
+
+                /* ── FOOTER ── */
+                .footer { background:#080d14; padding:5rem 0 0; }
+                .footer-grid { display:grid; grid-template-columns:1.5fr 1fr 1fr 1.4fr; gap:3rem; padding-bottom:3.5rem; }
+                .footer-brand-logo { width:56px; height:56px; border-radius:50%; background:var(--blue); display:flex; align-items:center; justify-content:center; overflow:hidden; margin-bottom:1.25rem; box-shadow:0 4px 18px rgba(26,86,219,.35); }
+                .footer-brand-logo img { width:100%; height:100%; object-fit:cover; }
+                .footer-brand-logo .logo-letter { font-family:'Playfair Display',serif; font-weight:900; font-size:1.6rem; color:white; }
+                .footer-brand-name { font-size:1.1rem; font-weight:700; color:white; display:block; margin-bottom:.15rem; }
+                .footer-brand-sub  { font-size:.68rem; font-weight:500; color:#475569; letter-spacing:.1em; text-transform:uppercase; display:block; margin-bottom:1rem; }
+                .footer-about { font-size:.85rem; color:#64748b; line-height:1.75; }
+                .footer-col-title { font-size:.7rem; font-weight:700; color:#cbd5e1; letter-spacing:.12em; text-transform:uppercase; margin-bottom:1.25rem; display:block; }
+                .footer-link { display:block; font-size:.875rem; color:#64748b; text-decoration:none; padding:.3rem 0; transition:color .2s; }
+                .footer-link:hover { color:white; }
+                .footer-contact-item { display:flex; align-items:flex-start; gap:.75rem; margin-bottom:1rem; }
+                .footer-contact-item svg { flex-shrink:0; margin-top:.15rem; }
+                .footer-contact-text { font-size:.85rem; color:#64748b; line-height:1.6; }
+                .footer-bottom { border-top:1px solid #1a2332; padding:1.5rem 0; display:flex; justify-content:space-between; align-items:center; }
+                .footer-copy { font-size:.78rem; color:#334155; }
+                .footer-socials { display:flex; gap:.875rem; }
+                .social-btn { width:38px; height:38px; border-radius:50%; background:#0d1a2e; border:1px solid #1e2d42; display:flex; align-items:center; justify-content:center; color:#64748b; text-decoration:none; transition:all .25s; }
+                .social-btn:hover { background:var(--blue); border-color:var(--blue); color:white; transform:translateY(-2px); box-shadow:0 6px 20px rgba(26,86,219,.35); }
             `}</style>
 
-            {/* ════════ NAV ════════ */}
-            <nav className={`nav-root ${scrolled ? 'scrolled' : 'top'}`}>
+            {/* ── MODAL ── */}
+            {selected && (
+                <CourseModal
+                    course={selected}
+                    onClose={() => setSelected(null)}
+                    isLoggedIn={isLoggedIn}
+                    onEnroll={handleEnroll}
+                />
+            )}
+
+            {/* ── TOAST ── */}
+            {toast && (
+                <div className={`toast-wrap ${toast.type}`}>
+                    {toast.type === 'warn' ? (
+                        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ flexShrink: 0 }}>
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                        </svg>
+                    ) : (
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ flexShrink: 0 }}>
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
+                        </svg>
+                    )}
+                    {toast.msg}
+                    <button className="toast-close" onClick={() => setToast(null)} aria-label="Dismiss">
+                        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+            )}
+
+            {/* ═══ NAV ═══ */}
+            <nav className="nav-root">
                 <div className="nav-inner">
                     <a href="/" className="nav-logo-wrap">
                         <div className="nav-logo-circle">
@@ -367,13 +518,17 @@ export default function Training() {
                 </div>
             </nav>
 
-            {/* ════════ PAGE HERO ════════ */}
+            {/* ═══ PAGE HERO ═══ */}
             <div className="page-hero">
+                {heroSlides.map((src, i) => (
+                    <div key={i} className={`hero-bg-slide ${i === heroIdx ? 'active' : ''}`}
+                        style={{ backgroundImage: `url(${src})` }} />
+                ))}
+                <div className="hero-bg-overlay" />
                 <div className="page-hero-grid" />
                 <div className="page-hero-glow" />
                 <div className="page-hero-glow2" />
                 <div className="page-hero-inner">
-                    {/* Left */}
                     <div>
                         <div className="page-eyebrow">
                             <span className="page-eyebrow-dot" />
@@ -385,11 +540,11 @@ export default function Training() {
                         <p className="page-subtitle">
                             Build essential fabrication skills with hands-on training from experienced instructors — covering everything from 3D printing to electronics and CNC.
                         </p>
+                        {/* Stats — only 3, no Seats Available */}
                         <div className="page-hero-stats">
                             {[
-                                [courses.length, 'Courses'],
-                                [openCount, 'Open Now'],
-                                [totalSeats + '+', 'Seats Available'],
+                                [loading ? '…' : `${courses.length}`, 'Total Courses'],
+                                [loading ? '…' : `${openCount}`, 'Open for Enroll'],
                                 ['Free', 'For Members'],
                             ].map(([n, l]) => (
                                 <div key={l}>
@@ -400,112 +555,151 @@ export default function Training() {
                         </div>
                     </div>
 
-                    {/* Right — info card */}
+                    {/* Right info card */}
                     <div className="hero-info-card">
-                        <div style={{ fontSize: '2rem', marginBottom: '.75rem' }}>📋</div>
+                        <div className="hero-info-card-icon"></div>
                         <h3>New to the Fab Lab?</h3>
-                        <p>All first-time users must complete a mandatory safety orientation before enrolling in any course. Sessions are held every Monday at 9:00 AM in Lab A.</p>
-                        <button className="btn-learn-more">Learn about orientation →</button>
+                        <p>All first-time users must complete a mandatory safety orientation courses before booking any machines.</p>
+                        <a href="/about" className="btn-info">Learn about orientation →</a>
                     </div>
                 </div>
             </div>
 
-            {/* ════════ CONTROLS ════════ */}
-            <div className="controls-bar">
-                <div className="controls-inner">
-                    <div className="filter-pills">
-                        {categories.map(cat => (
-                            <button key={cat} className={`pill ${filter === cat ? 'active' : ''}`}
-                                onClick={() => setFilter(cat)}>
-                                {cat}
-                            </button>
-                        ))}
-                    </div>
-                    <div className="controls-right">
-                        <span className="results-count">{filtered.length} course{filtered.length !== 1 ? 's' : ''}</span>
-                        <select className="sort-select" value={levelFilter} onChange={e => setLevelFilter(e.target.value)}>
-                            {levels.map(l => <option key={l} value={l}>{l}</option>)}
-                        </select>
-                    </div>
-                </div>
-            </div>
-
-            {/* ════════ COURSES ════════ */}
+            {/* ═══ COURSES — no controls bar, no filter pills ═══ */}
             <section className="courses-section">
                 <div className="courses-container">
-                    <div>
-                        <span className="section-label">Upcoming</span>
-                        <h2 className="section-title">Available Courses</h2>
-                        <p className="section-sub">Log in to enroll — seats are limited</p>
-                        <div className="divider" />
-                    </div>
+                    <Reveal>
+                        <div>
+                            <span className="section-label">Courses</span>
+                            <h2 className="section-title">Available Courses</h2>
+                            <p className="section-sub">
+                                {isLoggedIn ? 'Click "Read More" for details, then enroll' : 'Login to enroll — seats are limited'}
+                            </p>
+                            <div className="divider" />
+                        </div>
+                    </Reveal>
 
-                    {filtered.length === 0 ? (
-                        <div className="empty-state">
+                    {loading ? (
+                        <div className="courses-grid">
+                            {[0, 1, 2, 3].map(i => (
+                                <div key={i} className="skeleton-card">
+                                    <div className="skeleton" style={{ height: 160 }} />
+                                    <div style={{ padding: '1rem 1.1rem 1.2rem', display: 'flex', flexDirection: 'column', gap: '.6rem' }}>
+                                        <div className="skeleton" style={{ height: 18, width: '80%' }} />
+                                        <div className="skeleton" style={{ height: 12, width: '55%' }} />
+                                        <div className="skeleton" style={{ height: 12, width: '70%' }} />
+                                        <div className="skeleton" style={{ height: 14, width: '30%', marginTop: '.25rem' }} />
+                                        <div className="skeleton" style={{ height: 38, borderRadius: '.65rem' }} />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : courses.length === 0 ? (
+                        <div className="empty-state" style={{ marginTop: '3rem' }}>
                             <svg width="56" height="56" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                             </svg>
-                            <h3>No courses found</h3>
-                            <p>Try a different category or level filter.</p>
+                            <h3>No courses available</h3>
+                            <p>Check back soon for upcoming training sessions.</p>
                         </div>
                     ) : (
                         <div className="courses-grid">
-                            {filtered.map(course => {
-                                const lc = levelColors[course.level] || { bg: '#e8f0fe', color: '#0066FF' };
-                                const isFull = course.status === 'Full';
-                                const seatsClass = course.seats === 0 ? 'seats-none' : course.seats <= 3 ? 'seats-low' : '';
+                            {courses.map((course, idx) => {
+                                const imgSrc = getImageUrl(course.image) || FALLBACK_IMG;
+                                const seatsLeft = Math.max(0, (course.seat_limit || 0) - (course.enrollment || 0));
+                                const isFull = seatsLeft === 0;
+                                const canEnroll = course.registration_open && !isFull && course.status !== 'completed';
+                                const duration = calcDuration(course.start_date, course.end_date);
+                                const seatsClass = isFull ? 'seats-none' : seatsLeft <= 3 ? 'seats-low' : '';
+
+                                /* single status tag */
+                                let tagLabel = 'Open';
+                                let tagCls = 'tag-open';
+                                if (isFull) { tagLabel = 'Full'; tagCls = 'tag-full'; }
+                                else if (course.status === 'completed') { tagLabel = 'Completed'; tagCls = 'tag-completed'; }
+                                else if (course.status === 'upcoming') { tagLabel = 'Upcoming'; tagCls = 'tag-upcoming'; }
+                                else if (!course.registration_open) { tagLabel = 'Closed'; tagCls = 'tag-closed'; }
+
                                 return (
-                                    <div key={course.id} className={`course-card ${isFull ? 'full' : ''}`}>
-
-                                        {/* Top row */}
-                                        <div className="course-top">
-                                            <div className="course-icon">{course.icon}</div>
-                                            <div className="course-badges">
-                                                {isFull
-                                                    ? <span className="badge-full">Full</span>
-                                                    : <span className="badge-open">Open</span>
-                                                }
-                                                <span className="badge-level" style={{ background: lc.bg, color: lc.color }}>{course.level}</span>
-                                                <span className="badge-dur">{course.duration}</span>
-                                            </div>
-                                        </div>
-
-                                        <div className="card-divider" />
-
-                                        {/* Body */}
-                                        <div className="course-body">
-                                            <h3 className="course-title">{course.title}</h3>
-                                            <p className="course-instructor">— {course.instructor}</p>
-                                            <p className="course-desc">{course.description}</p>
-
-                                            {/* Meta chips */}
-                                            <div className="course-meta">
-                                                {/* Duration */}
-                                                <div className="meta-chip">
-                                                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                                                    {course.duration}
-                                                </div>
-                                                {/* Schedule */}
-                                                <div className="meta-chip">
-                                                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                                                    {course.schedule}
-                                                </div>
-                                                {/* Seats */}
-                                                <div className={`meta-chip ${seatsClass}`}>
-                                                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                                                    {isFull ? 'No seats left' : `${course.seats} seat${course.seats !== 1 ? 's' : ''} left`}
-                                                </div>
+                                    <Reveal key={course.id} delay={(idx % 4) * 0.07}>
+                                        <div className="course-card">
+                                            {/* Image */}
+                                            <div className="course-img-wrap">
+                                                <img src={imgSrc} alt={course.title}
+                                                    onError={e => { e.currentTarget.src = FALLBACK_IMG; }} />
+                                                <div className="course-img-overlay" />
+                                                {/* Single status badge only */}
+                                                <span className={`course-status-tag ${tagCls}`}>
+                                                    {tagCls === 'tag-open' && <span className="tag-open-dot" />}
+                                                    {tagLabel}
+                                                </span>
                                             </div>
 
-                                            <button
-                                                className="btn-enroll"
-                                                onClick={() => !isFull && handleEnroll(course)}
-                                                disabled={isFull}
-                                            >
-                                                {isFull ? 'Course Full' : 'Enroll Now →'}
-                                            </button>
+                                            {/* Body */}
+                                            <div className="course-card-body">
+                                                <h3 className="course-title">{course.title}</h3>
+                                                {course.instructor && (
+                                                    <p className="course-instructor-line">
+                                                        <strong>Instructor:</strong> {course.instructor}
+                                                    </p>
+                                                )}
+
+                                                {/* Meta chips */}
+                                                <div className="course-meta-row">
+                                                    {duration && (
+                                                        <span className="cmeta">
+                                                            <svg width="11" height="11" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                            </svg>
+                                                            {duration}
+                                                        </span>
+                                                    )}
+                                                    {course.start_date && (
+                                                        <span className="cmeta">
+                                                            <svg width="11" height="11" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                            </svg>
+                                                            {formatDate(course.start_date)}
+                                                        </span>
+                                                    )}
+                                                    <span className={`cmeta ${seatsClass}`}>
+                                                        <svg width="11" height="11" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                        </svg>
+                                                        {isFull ? 'Full' : `${seatsLeft} left`}
+                                                    </span>
+                                                </div>
+
+                                                {/* Spacer pushes Read More + button to bottom */}
+                                                <div className="course-body-spacer" />
+
+                                                {/* Read More green text link */}
+                                                <button
+                                                    className="btn-read-more"
+                                                    onClick={() => setSelected(course)}
+                                                >
+                                                    Read More
+                                                </button>
+
+                                                {/* Enroll button — always blue, always "Enroll Now" */}
+                                                {course.status === 'completed' ? (
+                                                    <span className="btn-enroll-disabled">Course Completed</span>
+                                                ) : !canEnroll ? (
+                                                    <span className="btn-enroll-disabled">
+                                                        {isFull ? 'Course Full' : 'Registration Closed'}
+                                                    </span>
+                                                ) : isLoggedIn ? (
+                                                    <button className="btn-enroll" onClick={() => handleEnroll(course)}>
+                                                        Enroll Now
+                                                    </button>
+                                                ) : (
+                                                    <button className="btn-enroll-login" onClick={() => handleEnroll(course)}>
+                                                        Enroll Now
+                                                    </button>
+                                                )}
+                                            </div>
                                         </div>
-                                    </div>
+                                    </Reveal>
                                 );
                             })}
                         </div>
@@ -513,15 +707,7 @@ export default function Training() {
                 </div>
             </section>
 
-            {/* ════════ TOAST ════════ */}
-            {toast && (
-                <div className="toast">
-                    <span className="toast-dot" />
-                    {toast}
-                </div>
-            )}
-
-            {/* ════════ FOOTER ════════ */}
+            {/* ═══ FOOTER ═══ */}
             <footer className="footer">
                 <div style={{ maxWidth: '82rem', margin: '0 auto', padding: '0 2rem' }}>
                     <div className="footer-grid">

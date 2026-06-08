@@ -17,6 +17,9 @@ Route::post('/login', [AuthController::class, 'login']);
 Route::get('/home/machines', [\App\Http\Controllers\Api\Admin\MachineController::class, 'index']);
 Route::get('/home/courses', [\App\Http\Controllers\Api\Admin\CourseController::class, 'index']);
 Route::get('/home/users', [\App\Http\Controllers\Api\Admin\UserController::class, 'index']);
+Route::get('/home/products', [\App\Http\Controllers\Api\Admin\ProductController::class, 'index']); // ✅ Public product listing for Shop page
+Route::get('/home/projects', [\App\Http\Controllers\Api\AdminProjectController::class, 'index']); // ✅ Public approved projects listing
+Route::get('/home/gallery', [\App\Http\Controllers\Api\GalleryController::class, 'index']);       // ✅ Public gallery listing
 
 // ==========================================
 // ADMIN ROUTES (Now uses unified auth)
@@ -65,11 +68,10 @@ Route::prefix('admin')->middleware('auth:sanctum')->group(function () {
     Route::post('/custom-orders/{id}/assign', [\App\Http\Controllers\Api\Admin\CustomOrderController::class, 'assign']);
     Route::post('/custom-orders/{id}/update-status', [\App\Http\Controllers\Api\Admin\CustomOrderController::class, 'updateStatus']);
     Route::delete('/custom-orders/{id}', [\App\Http\Controllers\Api\Admin\CustomOrderController::class, 'destroy']);
-    // Add after existing custom orders routes
     Route::post('/custom-orders/{id}/reject-design', [\App\Http\Controllers\Api\Admin\CustomOrderController::class, 'rejectDesign']);
     Route::post('/custom-orders/bulk-delete', [\App\Http\Controllers\Api\Admin\CustomOrderController::class, 'bulkDelete']);
     
-        // Courses - ✅ Custom routes MUST come BEFORE apiResource
+    // Courses - ✅ Custom routes MUST come BEFORE apiResource
     Route::get('courses/production-team', [\App\Http\Controllers\Api\Admin\CourseController::class, 'getProductionTeam']);
     Route::apiResource('courses', \App\Http\Controllers\Api\Admin\CourseController::class);
     Route::post('courses/{id}/toggle-registration', [\App\Http\Controllers\Api\Admin\CourseController::class, 'toggleRegistration']);
@@ -91,22 +93,20 @@ Route::prefix('admin')->middleware('auth:sanctum')->group(function () {
     Route::get('inventory/threshold', [\App\Http\Controllers\Api\Admin\InventoryController::class, 'getStockAlertThreshold']);
     Route::post('inventory/threshold', [\App\Http\Controllers\Api\Admin\InventoryController::class, 'updateStockAlertThreshold']);
     Route::get('inventory/departments-users', [\App\Http\Controllers\Api\Admin\InventoryController::class, 'getDepartmentsAndUsers']);
-    // Users
+
+    // Users (deduplicated — was defined twice)
     Route::apiResource('users', \App\Http\Controllers\Api\Admin\UserController::class)
-    ->only(['index', 'show', 'update', 'destroy']);
+        ->only(['index', 'show', 'update', 'destroy']);
     Route::post('users/{id}/toggle-status', [\App\Http\Controllers\Api\Admin\UserController::class, 'toggleStatus']);
     
-    
     // ==========================================
-    // ✅ ADMIN PROJECT ROUTES (NEW)
+    // ADMIN PROJECT ROUTES
     // ==========================================
     Route::get('/projects', [App\Http\Controllers\Api\AdminProjectController::class, 'index']);
     Route::post('/projects/{id}/approve', [App\Http\Controllers\Api\AdminProjectController::class, 'approve']);
     Route::post('/projects/{id}/reject', [App\Http\Controllers\Api\AdminProjectController::class, 'reject']);
     Route::delete('/projects/{id}', [App\Http\Controllers\Api\AdminProjectController::class, 'destroy']);
-    // ✅ NEW: Bulk delete (must be BEFORE the {id} routes)
     Route::post('/projects/bulk-delete', [App\Http\Controllers\Api\AdminProjectController::class, 'bulkDelete']);
-    // ✅ NEW: Download document
     Route::get('/projects/{id}/download', [App\Http\Controllers\Api\AdminProjectController::class, 'download']);
 
     // Gallery Management
@@ -131,17 +131,19 @@ Route::prefix('admin')->middleware('auth:sanctum')->group(function () {
     // Admin Dashboard Stats
     Route::get('/dashboard/stats', [App\Http\Controllers\Api\Admin\DashboardController::class, 'index']);
 
-    // ✅ NEW: Chart Data Endpoints
+    // Chart Data Endpoints
     Route::get('/dashboard/user-distribution', [App\Http\Controllers\Api\Admin\DashboardController::class, 'getUserDistribution']);
     Route::get('/dashboard/top-products', [App\Http\Controllers\Api\Admin\DashboardController::class, 'getTopSellingProducts']);
     Route::get('/dashboard/monthly-revenue', [App\Http\Controllers\Api\Admin\DashboardController::class, 'getMonthlyRevenue']);
     Route::get('/dashboard/most-booked-machines', [App\Http\Controllers\Api\Admin\DashboardController::class, 'getMostBookedMachines']);
 
-    // ✅ NEW: Settings Routes
+    // Settings Routes
     Route::get('/settings', [App\Http\Controllers\Api\Admin\SettingController::class, 'index']);
     Route::get('/settings/{key}', [App\Http\Controllers\Api\Admin\SettingController::class, 'show']);
     Route::put('/settings/{key}', [App\Http\Controllers\Api\Admin\SettingController::class, 'update']);
     Route::get('/settings/payment-deadline/hours', [App\Http\Controllers\Api\Admin\SettingController::class, 'getPaymentUploadDeadlineHours']);
+    Route::get('/settings/stock-alert/threshold', [App\Http\Controllers\Api\Admin\SettingController::class, 'getStockAlertThreshold']);
+    Route::put('/settings/stock-alert/threshold', [App\Http\Controllers\Api\Admin\SettingController::class, 'updateStockAlertThreshold']);
     
 }); // ← Close admin prefix with auth:sanctum
 
@@ -149,7 +151,7 @@ Route::prefix('admin')->middleware('auth:sanctum')->group(function () {
 // USER ROUTES (Authenticated)
 // ==========================================
 Route::middleware('auth:sanctum')->group(function () {
-    // ✅ Notification Routes
+    // Notification Routes
     Route::get('/user/notifications', [App\Http\Controllers\Api\NotificationController::class, 'index']);
     Route::get('/user/notifications/unread-count', [App\Http\Controllers\Api\NotificationController::class, 'unreadCount']);
     Route::post('/user/notifications/{id}/read', [App\Http\Controllers\Api\NotificationController::class, 'markAsRead']);
@@ -157,14 +159,12 @@ Route::middleware('auth:sanctum')->group(function () {
     // User Dashboard
     Route::get('/user/dashboard', [App\Http\Controllers\Api\DashboardController::class, 'userDashboard']);
 
-    // User Profile
-    Route::get('/user/profile', [App\Http\Controllers\Api\UserController::class, 'profile']);
     // User Profile Routes
     Route::get('/user/profile', [\App\Http\Controllers\Api\User\ProfileController::class, 'show']);
     Route::post('/user/profile/update', [\App\Http\Controllers\Api\User\ProfileController::class, 'update']);
     Route::post('/user/profile/change-password', [\App\Http\Controllers\Api\User\ProfileController::class, 'changePassword']);
 
-    // User Products (Shop)
+    // User Products (Shop — authenticated actions)
     Route::get('/user/products', [App\Http\Controllers\Api\Admin\ProductController::class, 'index']);
 
     // User Machines
@@ -200,22 +200,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/user/product-orders/{id}/upload-payment', [\App\Http\Controllers\Api\User\ProductOrderController::class, 'uploadPayment']);
     Route::post('/user/product-orders/{id}/cancel', [\App\Http\Controllers\Api\User\ProductOrderController::class, 'cancel']);
     Route::get('/user/product-orders/{id}/screenshot', [\App\Http\Controllers\Api\User\ProductOrderController::class, 'screenshot']);
-    // ✅ NEW: Process expired orders
     Route::post('/user/product-orders/process-expired', [App\Http\Controllers\Api\User\ProductOrderController::class, 'processExpiredOrders']);
     Route::post('/user/product-orders/bulk-delete', [App\Http\Controllers\Api\User\ProductOrderController::class, 'bulkDelete']);
 
-    // ==========================================
-    // ✅ USER PROJECT ROUTES (NEW)
-    // ==========================================
+    // User Project Routes
     Route::get('/user/projects', [App\Http\Controllers\Api\UserProjectController::class, 'index']);
     Route::post('/user/projects', [App\Http\Controllers\Api\UserProjectController::class, 'store']);
     Route::put('/user/projects/{id}', [App\Http\Controllers\Api\UserProjectController::class, 'update']);
-    // Project document download
     Route::get('/user/projects/{id}/download', [App\Http\Controllers\Api\UserProjectController::class, 'download']);
-    // ✅ NEW: Bulk delete
     Route::post('/user/projects/bulk-delete', [App\Http\Controllers\Api\UserProjectController::class, 'bulkDelete']);
-    
-    // ✅ NEW: Cancel project
     Route::post('/user/projects/{id}/cancel', [App\Http\Controllers\Api\UserProjectController::class, 'cancel']);
 });
 
@@ -229,7 +222,7 @@ Route::middleware('auth:sanctum')->prefix('production-team')->group(function () 
     Route::post('/assigned-orders/{id}/update-status', [\App\Http\Controllers\Api\ProductionTeam\AssignedOrdersController::class, 'updateStatus']);
     Route::get('/custom-orders', [\App\Http\Controllers\Api\ProductionTeam\AssignedOrdersController::class, 'getAllCustomOrders']);
 
-    // ✅ NEW: Project Routes
+    // Project Routes
     Route::get('/projects', [App\Http\Controllers\Api\ProductionTeam\ProjectController::class, 'index']);
     Route::post('/projects/{id}/approve', [App\Http\Controllers\Api\ProductionTeam\ProjectController::class, 'approve']);
     Route::post('/projects/{id}/reject', [App\Http\Controllers\Api\ProductionTeam\ProjectController::class, 'reject']);
@@ -241,7 +234,6 @@ Route::middleware('auth:sanctum')->prefix('production-team')->group(function () 
     Route::get('/profile', [\App\Http\Controllers\Api\ProductionTeam\ProfileController::class, 'show']);
     Route::post('/profile/update', [\App\Http\Controllers\Api\ProductionTeam\ProfileController::class, 'update']);
     Route::post('/profile/change-password', [\App\Http\Controllers\Api\ProductionTeam\ProfileController::class, 'changePassword']);
-
 });
 
 // ==========================================

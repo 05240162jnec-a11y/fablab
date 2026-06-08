@@ -322,7 +322,6 @@ export default function ShopProducts({
             const newCart = [...cart, { ...product, quantity: qty }];
             setCart(newCart);
             localStorage.setItem(`cart_${JSON.parse(localStorage.getItem('user'))?.id}`, JSON.stringify(newCart));
-
             setCartProductIds(prev => [...prev, product.id]);
         }
 

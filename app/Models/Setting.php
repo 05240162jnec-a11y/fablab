@@ -45,4 +45,12 @@ class Setting extends Model
     {
         return (int) static::get('payment_upload_deadline_hours', 24);
     }
+
+    /**
+     * ✅ NEW: Get stock alert threshold
+     */
+    public static function getStockAlertThreshold()
+    {
+        return (int) static::get('stock_alert_threshold', 5); // Default to 5 if not set
+    }
 }

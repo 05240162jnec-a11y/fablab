@@ -70,4 +70,34 @@ class SettingController extends Controller
             'hours' => $hours
         ]);
     }
+
+    /**
+     * ✅ NEW: Get stock alert threshold
+     */
+    public function getStockAlertThreshold()
+    {
+        $threshold = Setting::getStockAlertThreshold();
+        
+        return response()->json([
+            'success' => true,
+            'threshold' => $threshold
+        ]);
+    }
+
+    /**
+     * ✅ NEW: Update stock alert threshold
+     */
+    public function updateStockAlertThreshold(Request $request)
+    {
+        $request->validate([
+            'value' => 'required|integer|min:0'
+        ]);
+
+        Setting::set('stock_alert_threshold', $request->value, 'Highlight low stock items');
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Stock alert threshold updated successfully!'
+        ]);
+    }
 }

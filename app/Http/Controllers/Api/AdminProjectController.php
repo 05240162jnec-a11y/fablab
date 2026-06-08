@@ -18,7 +18,6 @@ class AdminProjectController extends Controller
     public function index()
 {
     $projects = Project::with(['user', 'reviewer'])
-        ->where('status', '!=', 'cancelled')
         ->where('status', '!=', 'cancelled') // ✅ EXCLUDE cancelled projects
         ->orderBy('created_at', 'desc')
         ->get()

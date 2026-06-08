@@ -6,19 +6,19 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    public function up()
+    public function up(): void
     {
-        // ✅ Check if table exists before creating
-        if (!Schema::hasTable('materials')) {
-            Schema::create('materials', function (Blueprint $table) {
-                $table->id();
-                $table->string('name')->unique();
-                $table->timestamps();
-            });
-        }
+        Schema::create('materials', function (Blueprint $table) {
+            $table->id();
+            $table->string('name');
+            $table->text('description')->nullable();
+            $table->integer('quantity')->default(0);
+            $table->decimal('rate', 10, 2)->default(0.00);
+            $table->timestamps();
+        });
     }
 
-    public function down()
+    public function down(): void
     {
         Schema::dropIfExists('materials');
     }

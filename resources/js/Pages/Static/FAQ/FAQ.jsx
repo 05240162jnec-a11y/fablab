@@ -1,60 +1,106 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
+
+const API_BASE = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api';
+
+/* ── Scroll-reveal ─────────────────────────────────────────────────────── */
+function useReveal() {
+    const ref = useRef(null);
+    const [visible, setVisible] = useState(false);
+    useEffect(() => {
+        const el = ref.current; if (!el) return;
+        const obs = new IntersectionObserver(
+            ([e]) => { if (e.isIntersecting) { setVisible(true); obs.disconnect(); } },
+            { threshold: 0.08 }
+        );
+        obs.observe(el);
+        return () => obs.disconnect();
+    }, []);
+    return [ref, visible];
+}
+function Reveal({ children, delay = 0, style = {} }) {
+    const [ref, visible] = useReveal();
+    return (
+        <div ref={ref} style={{
+            opacity: visible ? 1 : 0,
+            transform: visible ? 'translateY(0)' : 'translateY(36px)',
+            transition: `opacity 0.65s ease ${delay}s, transform 0.65s ease ${delay}s`,
+            ...style
+        }}>{children}</div>
+    );
+}
+
+/* ── Category colour palette (cycles through for any category name) ─────── */
+const PALETTES = [
+    { color: '#e0f2fe', accent: '#0369a1' },
+    { color: '#fef3c7', accent: '#92400e' },
+    { color: '#dcfce7', accent: '#065f46' },
+    { color: '#fce7f3', accent: '#9d174d' },
+    { color: '#ede9fe', accent: '#5b21b6' },
+    { color: '#fee2e2', accent: '#991b1b' },
+    { color: '#ecfdf5', accent: '#065f46' },
+];
+function catPalette(cat, allCats) {
+    const idx = allCats.indexOf(cat);
+    return PALETTES[idx % PALETTES.length] || PALETTES[0];
+}
 
 export default function FAQ() {
     const [scrolled, setScrolled] = useState(false);
+    const [faqs, setFaqs] = useState([]);
+    const [loading, setLoading] = useState(true);
     const [activeCategory, setCategory] = useState('All');
     const [searchQuery, setSearch] = useState('');
     const [expandedId, setExpanded] = useState(null);
+    const [heroIdx, setHeroIdx] = useState(0);
+
+    const heroSlides = [
+        '../images/home.jpg',
+        '../images/home2.jpg',
+        '../images/home3.jpg',
+    ];
 
     useEffect(() => {
-        const onScroll = () => setScrolled(window.scrollY > 20);
-        window.addEventListener('scroll', onScroll);
-        return () => window.removeEventListener('scroll', onScroll);
+        const fn = () => setScrolled(window.scrollY > 20);
+        window.addEventListener('scroll', fn);
+        return () => window.removeEventListener('scroll', fn);
+    }, []);
+
+    useEffect(() => {
+        const t = setInterval(() => setHeroIdx(p => (p + 1) % heroSlides.length), 5000);
+        return () => clearInterval(t);
+    }, []);
+
+    useEffect(() => {
+        (async () => {
+            try {
+                const res = await fetch(`${API_BASE}/home/faq`);
+                if (res.ok) {
+                    const d = await res.json();
+                    setFaqs(d.faqs || d.data || d);
+                }
+            } catch (e) { console.error(e); }
+            finally { setLoading(false); }
+        })();
     }, []);
 
     const toggle = (id) => setExpanded(expandedId === id ? null : id);
 
-    /* ── FAQ data ── */
-    const faqData = [
-        { id: 1, category: 'General', icon: '🏛️', question: 'What is Fab Lab?', answer: 'The JNEC Fab Lab is a digital fabrication laboratory equipped with advanced machines such as 3D printers, laser cutters, CNC routers, and electronics workstations. It provides students, faculty, and innovators a collaborative space to turn creative ideas into physical prototypes.' },
-        { id: 2, category: 'General', icon: '🏛️', question: 'Who can access the Fab Lab?', answer: 'The Fab Lab is open to JNEC students, faculty, and staff. Community members and external innovators may also access it through special arrangements — contact the lab team for details.' },
-        { id: 3, category: 'General', icon: '🏛️', question: 'What are the Fab Lab opening hours?', answer: 'The Fab Lab is open Monday to Friday, 8:00 AM to 5:00 PM. During project season, extended hours (8:00 AM – 8:00 PM) may be available. Check the announcements on the home page for updates.' },
-        { id: 4, category: 'Machines', icon: '⚙️', question: 'How do I book a machine?', answer: 'Log in to your account, navigate to the Machines page, find the machine you need, and click "Book Now". Select your preferred date and time slot. Bookings must be made at least 24 hours in advance.' },
-        { id: 5, category: 'Machines', icon: '⚙️', question: 'What machines are available?', answer: 'The Fab Lab has Prusa FDM 3D printers, a Formlabs resin printer, Trotec Speedy 100 and 400 laser cutters, a ShopBot CNC router, a Tai lathe, an OMAX water jet cutter, a Mechatronika pick-and-place machine, and a V-Scope 3D scanner.' },
-        { id: 6, category: 'Machines', icon: '⚙️', question: 'Do I need training before using a machine?', answer: 'Yes. All first-time users must complete a mandatory safety orientation (held every Monday at 9:00 AM in Lab A) before accessing any machine. Some advanced machines require additional machine-specific training.' },
-        { id: 7, category: 'Machines', icon: '⚙️', question: 'What if a machine is unavailable?', answer: 'If your preferred slot is fully booked, you can join the waitlist from the booking page. You\'ll receive a notification if a slot opens up. You can also contact the lab team directly for urgent requests.' },
-        { id: 8, category: 'Training', icon: '📚', question: 'How do I enroll in a course?', answer: 'Go to the Training page, browse available courses, and click "Enroll Now". You must be logged in to complete enrollment. Course seats are limited, so early registration is recommended.' },
-        { id: 9, category: 'Training', icon: '📚', question: 'Are training courses free?', answer: 'Most courses are free for registered JNEC students and staff. Some specialised workshops may have a nominal fee. Fee details are displayed on each course card before you enroll.' },
-        { id: 10, category: 'Training', icon: '📚', question: 'What if a course is full?', answer: 'If a course is marked as "Full", it means no seats remain for that batch. New batches are added regularly — check the Training page or enable notifications to be informed when new sessions open.' },
-        { id: 11, category: 'Projects', icon: '🚀', question: 'How do I upload my project?', answer: 'Go to the Projects page and click "Submit Project". Fill in the project title, category, description, and upload your documentation and video links. Projects are reviewed by the lab team before being published.' },
-        { id: 12, category: 'Projects', icon: '🚀', question: 'Can I collaborate with other students?', answer: 'Absolutely! The Fab Lab encourages collaborative projects. You can list multiple contributors when submitting a project. The lab also hosts regular hackathons and open project days for community collaboration.' },
-        { id: 13, category: 'System', icon: '💻', question: 'How do I reset my password?', answer: 'On the Login page, click "Forgot Password" and enter your registered email address. You\'ll receive a reset link within a few minutes. If you don\'t receive the email, check your spam folder or contact the support team.' },
-        { id: 14, category: 'System', icon: '💻', question: 'How do I create an account?', answer: 'Click "Register Now" on the home page or "Login / Register" in the footer. Fill in your name, student/staff ID, email, and set a password. Your account will be activated once verified by the lab admin.' },
-        { id: 15, category: 'System', icon: '💻', question: 'How do I contact the Fab Lab team?', answer: 'You can reach us by email at fablab@jnec.ac.in, by phone at +975 77653429, or visit us at the Fab Lab on JNEC Campus, Dewathang, Samdrupjongkhar. You can also use the Contact page on this website.' },
-    ];
+    /* derive categories from real data */
+    const allCatNames = Array.from(new Set(faqs.map(f => f.category).filter(Boolean)));
+    const categories = ['All', ...allCatNames];
 
-    const categories = ['All', 'General', 'Machines', 'Training', 'Projects', 'System'];
-
-    const catMeta = {
-        General: { icon: '🏛️', color: '#e0f2fe', accent: '#0369a1' },
-        Machines: { icon: '⚙️', color: '#fef3c7', accent: '#92400e' },
-        Training: { icon: '📚', color: '#dcfce7', accent: '#065f46' },
-        Projects: { icon: '🚀', color: '#fce7f3', accent: '#9d174d' },
-        System: { icon: '💻', color: '#ede9fe', accent: '#5b21b6' },
-    };
-
-    const filtered = faqData.filter(f => {
+    const filtered = faqs.filter(f => {
         const matchCat = activeCategory === 'All' || f.category === activeCategory;
-        const matchSearch = f.question.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        const matchSearch = !searchQuery ||
+            f.question.toLowerCase().includes(searchQuery.toLowerCase()) ||
             f.answer.toLowerCase().includes(searchQuery.toLowerCase());
         return matchCat && matchSearch;
     });
 
-    /* counts per category */
     const catCount = (cat) => cat === 'All'
-        ? faqData.length
-        : faqData.filter(f => f.category === cat).length;
+        ? faqs.length
+        : faqs.filter(f => f.category === cat).length;
 
     return (
         <div style={{ fontFamily: "'DM Sans', sans-serif", background: '#f9fafb', color: '#0d1117', overflowX: 'hidden' }}>
@@ -62,180 +108,182 @@ export default function FAQ() {
                 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Playfair+Display:wght@700;800;900&display=swap');
 
                 :root {
-                    --blue:    #0066FF;
-                    --blue-dk: #0051cc;
-                    --blue-lt: #e8f0fe;
-                    --ink:     #0d1117;
-                    --ink-2:   #1e2a3a;
-                    --muted:   #64748b;
-                    --border:  rgba(0,0,0,0.07);
-                    --card-bg: #ffffff;
-                    --offwhite:#f9fafb;
-                    --radius:  1rem;
-                    --radius-lg: 1.5rem;
+                    --blue:       #1a56db;
+                    --blue-dk:    #1446b8;
+                    --blue-lt:    #e8f0fe;
+                    --ink:        #0d1117;
+                    --ink-2:      #1e2a3a;
+                    --muted:      #64748b;
+                    --border:     rgba(0,0,0,0.07);
+                    --offwhite:   #f9fafb;
+                    --card-bg:    #ffffff;
+                    --radius:     1rem;
+                    --radius-lg:  1.5rem;
                 }
-                * { box-sizing: border-box; margin: 0; padding: 0; }
+                * { box-sizing:border-box; margin:0; padding:0; }
 
-                /* ── Nav ── */
-                .nav-root { position: fixed; top: 0; left: 0; width: 100%; z-index: 100; transition: all .35s ease; }
-                .nav-root.scrolled { background: rgba(255,255,255,0.92); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); box-shadow: 0 1px 0 rgba(0,0,0,0.06), 0 8px 32px rgba(0,0,0,0.06); }
-                .nav-root.top      { background: transparent; }
-                .nav-root.top .nav-brand-text .name { color: white; }
-                .nav-root.top .nav-brand-text .sub  { color: rgba(255,255,255,.6); }
-                .nav-root.top .nav-link             { color: rgba(255,255,255,.85); }
-                .nav-root.top .nav-link:hover       { color: white; }
-                .nav-root.top .nav-link.active      { color: white; }
-                .nav-root.top .nav-link.active::after { background: white; }
-                .nav-root.top .nav-login { background: rgba(255,255,255,.15); border-color: rgba(255,255,255,.3); color: white; }
-                .nav-root.top .nav-login:hover { background: rgba(255,255,255,.25); }
-                .nav-inner { max-width: 82rem; margin: 0 auto; padding: 0 2rem; display: flex; align-items: center; justify-content: space-between; height: 76px; }
-                .nav-logo-wrap { display: flex; align-items: center; gap: .875rem; text-decoration: none; }
-                .nav-logo-circle { width: 52px; height: 52px; border-radius: 50%; background: var(--blue); display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 18px rgba(0,102,255,0.35); overflow: hidden; flex-shrink: 0; transition: transform .3s, box-shadow .3s; }
-                .nav-logo-circle:hover { transform: scale(1.06); box-shadow: 0 6px 24px rgba(0,102,255,0.45); }
-                .nav-logo-circle img { width: 100%; height: 100%; object-fit: cover; }
-                .nav-logo-circle .logo-letter { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.5rem; color: white; }
-                .nav-brand-text .name { font-size: 1rem; font-weight: 700; color: var(--ink); display: block; line-height: 1.2; transition: color .3s; }
-                .nav-brand-text .sub  { font-size: .65rem; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: .1em; display: block; transition: color .3s; }
-                .nav-links { display: flex; gap: 1.75rem; align-items: center; }
-                .nav-link { font-size: .875rem; font-weight: 500; color: var(--ink-2); text-decoration: none; position: relative; padding-bottom: 2px; transition: color .2s; }
-                .nav-link::after { content: ''; position: absolute; bottom: -2px; left: 0; width: 0; height: 2px; background: var(--blue); border-radius: 2px; transition: width .25s; }
-                .nav-link:hover { color: var(--blue); }
-                .nav-link:hover::after { width: 100%; }
-                .nav-link.active { color: var(--blue); font-weight: 600; }
-                .nav-link.active::after { width: 100%; }
-                .nav-login { padding: .5rem 1.4rem; font-size: .875rem; font-weight: 600; color: var(--blue); background: var(--blue-lt); border: 1.5px solid rgba(0,102,255,.2); border-radius: 9999px; text-decoration: none; transition: all .25s; }
-                .nav-login:hover { background: var(--blue); color: white; border-color: var(--blue); box-shadow: 0 4px 16px rgba(0,102,255,.3); }
+                /* ── NAV ── */
+                .nav-root { position:fixed; top:0; left:0; width:100%; z-index:100; transition:all .35s ease; }
+                .nav-root.scrolled { background:rgba(255,255,255,0.93); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); box-shadow:0 1px 0 rgba(0,0,0,.06),0 8px 32px rgba(0,0,0,.06); }
+                .nav-root.top { background:transparent; }
+                .nav-root.top .nav-brand-text .name { color:white; }
+                .nav-root.top .nav-brand-text .sub  { color:rgba(255,255,255,.6); }
+                .nav-root.top .nav-link             { color:rgba(255,255,255,.85); }
+                .nav-root.top .nav-link:hover       { color:white; }
+                .nav-root.top .nav-link.active      { color:white; }
+                .nav-root.top .nav-link.active::after { background:white; }
+                .nav-root.top .nav-login { background:rgba(255,255,255,.15); border-color:rgba(255,255,255,.3); color:white; }
+                .nav-root.top .nav-login:hover { background:rgba(255,255,255,.25); }
+                .nav-inner { max-width:82rem; margin:0 auto; padding:0 2rem; display:flex; align-items:center; justify-content:space-between; height:76px; }
+                .nav-logo-wrap { display:flex; align-items:center; gap:.875rem; text-decoration:none; }
+                .nav-logo-circle { width:52px; height:52px; border-radius:50%; background:var(--blue); display:flex; align-items:center; justify-content:center; box-shadow:0 4px 18px rgba(26,86,219,.35); overflow:hidden; flex-shrink:0; transition:transform .3s,box-shadow .3s; }
+                .nav-logo-circle:hover { transform:scale(1.06); }
+                .nav-logo-circle img { width:100%; height:100%; object-fit:cover; }
+                .nav-logo-circle .logo-letter { font-family:'Playfair Display',serif; font-weight:900; font-size:1.5rem; color:white; }
+                .nav-brand-text .name { font-size:1rem; font-weight:700; color:var(--ink); display:block; line-height:1.2; transition:color .3s; }
+                .nav-brand-text .sub  { font-size:.65rem; font-weight:500; color:var(--muted); text-transform:uppercase; letter-spacing:.1em; display:block; transition:color .3s; }
+                .nav-links { display:flex; gap:1.75rem; align-items:center; }
+                .nav-link { font-size:.875rem; font-weight:500; color:var(--ink-2); text-decoration:none; position:relative; padding-bottom:2px; transition:color .2s; }
+                .nav-link::after { content:''; position:absolute; bottom:-2px; left:0; width:0; height:2px; background:var(--blue); border-radius:2px; transition:width .25s; }
+                .nav-link:hover { color:var(--blue); }
+                .nav-link:hover::after { width:100%; }
+                .nav-link.active { color:var(--blue); font-weight:600; }
+                .nav-link.active::after { width:100%; }
+                .nav-login { padding:.5rem 1.4rem; font-size:.875rem; font-weight:600; color:var(--blue); background:var(--blue-lt); border:1.5px solid rgba(26,86,219,.2); border-radius:9999px; text-decoration:none; transition:all .25s; }
+                .nav-login:hover { background:var(--blue); color:white; border-color:var(--blue); }
 
-                /* ── Hero ── */
-                .hero-section { position: relative; padding-top: 76px; background: var(--ink); overflow: hidden; }
-                .hero-grid { position: absolute; inset: 0; opacity: .04; background-image: linear-gradient(rgba(255,255,255,.6) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.6) 1px,transparent 1px); background-size: 48px 48px; }
-                .hero-glow  { position: absolute; width: 700px; height: 700px; border-radius: 50%; background: radial-gradient(circle,rgba(0,102,255,.2) 0%,transparent 70%); top:-200px; right:-100px; pointer-events:none; z-index:1; }
-                .hero-glow2 { position: absolute; width: 400px; height: 400px; border-radius: 50%; background: radial-gradient(circle,rgba(90,172,255,.1) 0%,transparent 70%); bottom:-100px; left:5%; pointer-events:none; z-index:1; }
-                .hero-inner { max-width: 82rem; margin: 0 auto; padding: 5rem 2rem 0; position: relative; z-index: 2; text-align: center; }
-                .hero-eyebrow { display: inline-flex; align-items: center; gap: .5rem; padding: .3rem .9rem; border-radius: 9999px; background: rgba(0,102,255,.15); border: 1px solid rgba(0,102,255,.3); color: #5aacff; font-size: .7rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; margin-bottom: 1.25rem; }
-                .hero-eyebrow-dot { width: 6px; height: 6px; border-radius: 50%; background: #5aacff; animation: pulse 2s ease-in-out infinite; }
-                @keyframes pulse { 0%,100%{opacity:1;transform:scale(1);} 50%{opacity:.4;transform:scale(1.5);} }
-                .hero-title { font-family: 'Playfair Display', serif; font-size: clamp(2.5rem,5vw,4rem); font-weight: 900; color: white; letter-spacing: -.03em; line-height: 1.05; margin-bottom: 1rem; }
-                .hero-title .accent { color: #5aacff; font-style: italic; }
-                .hero-subtitle { font-size: 1rem; color: rgba(255,255,255,.6); max-width: 460px; margin: 0 auto 2.5rem; line-height: 1.75; }
+                /* ── HERO ── */
+                .hero-section { position:relative; padding-top:76px; background:var(--ink); overflow:hidden; }
+                .hero-bg-slide { position:absolute; inset:0; background-size:cover; background-position:center; opacity:0; transition:opacity 1.4s ease; z-index:0; }
+                .hero-bg-slide.active { opacity:1; }
+                .hero-overlay { position:absolute; inset:0; z-index:1; background:linear-gradient(165deg,rgba(5,10,25,.88) 0%,rgba(5,10,25,.75) 55%,rgba(10,30,90,.6) 100%); }
+                .hero-grid { position:absolute; inset:0; z-index:2; opacity:.04; background-image:linear-gradient(rgba(255,255,255,.6) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.6) 1px,transparent 1px); background-size:48px 48px; }
+                .hero-glow  { position:absolute; width:700px; height:700px; border-radius:50%; background:radial-gradient(circle,rgba(26,86,219,.2) 0%,transparent 70%); top:-200px; right:-100px; pointer-events:none; z-index:2; }
+                .hero-glow2 { position:absolute; width:400px; height:400px; border-radius:50%; background:radial-gradient(circle,rgba(90,172,255,.1) 0%,transparent 70%); bottom:-100px; left:5%; pointer-events:none; z-index:2; }
+                .hero-inner { max-width:82rem; margin:0 auto; padding:5rem 2rem 0; position:relative; z-index:3; text-align:center; }
+
+                /* bouncing eyebrow */
+                .hero-eyebrow { display:inline-flex; align-items:center; gap:.5rem; padding:.3rem .9rem; border-radius:9999px; background:rgba(26,86,219,.15); border:1px solid rgba(26,86,219,.3); color:#7abaff; font-size:.7rem; font-weight:700; letter-spacing:.12em; text-transform:uppercase; margin-bottom:1.25rem; animation:eyebrowIn .8s ease both, gentleBounce 3s ease-in-out 1s infinite; }
+                @keyframes eyebrowIn { from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)} }
+                @keyframes gentleBounce { 0%,100%{transform:translateY(0)}40%{transform:translateY(-7px)}60%{transform:translateY(-3px)} }
+                .hero-eyebrow-dot { width:6px; height:6px; border-radius:50%; background:#7abaff; animation:pulse 2s ease-in-out infinite; }
+                @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(1.5)} }
+
+                .hero-title { font-family:'Playfair Display',serif; font-size:clamp(2.5rem,5vw,4rem); font-weight:900; color:white; letter-spacing:-.03em; line-height:1.05; margin-bottom:1rem; animation:eyebrowIn .9s .15s ease both; }
+                .hero-title .accent { color:#7abaff; font-style:italic; }
+                .hero-subtitle { font-size:1rem; color:rgba(255,255,255,.6); max-width:460px; margin:0 auto 2.5rem; line-height:1.75; animation:eyebrowIn 1s .3s ease both; }
 
                 /* Hero search */
-                .hero-search-wrap {
-                    max-width: 520px; margin: 0 auto;
-                    display: flex; align-items: center; gap: .75rem;
-                    background: rgba(255,255,255,.08);
-                    border: 1.5px solid rgba(255,255,255,.15);
-                    border-radius: 9999px;
-                    padding: .6rem .6rem .6rem 1.25rem;
-                    backdrop-filter: blur(12px);
-                    transition: border-color .2s, box-shadow .2s;
-                }
-                .hero-search-wrap:focus-within { border-color: rgba(0,102,255,.6); box-shadow: 0 0 0 4px rgba(0,102,255,.15); }
-                .hero-search-wrap svg { flex-shrink: 0; color: rgba(255,255,255,.4); }
-                .hero-search-wrap input { flex: 1; border: none; background: transparent; outline: none; font-size: .95rem; color: white; font-family: inherit; }
-                .hero-search-wrap input::placeholder { color: rgba(255,255,255,.35); }
-                .hero-search-clear { padding: .5rem 1.1rem; background: var(--blue); color: white; font-size: .8rem; font-weight: 700; border-radius: 9999px; border: none; cursor: pointer; transition: background .2s; white-space: nowrap; flex-shrink: 0; }
-                .hero-search-clear:hover { background: var(--blue-dk); }
+                .hero-search-wrap { max-width:520px; margin:0 auto; display:flex; align-items:center; gap:.75rem; background:rgba(255,255,255,.08); border:1.5px solid rgba(255,255,255,.15); border-radius:9999px; padding:.6rem .6rem .6rem 1.25rem; backdrop-filter:blur(12px); transition:border-color .2s,box-shadow .2s; animation:eyebrowIn 1s .45s ease both; }
+                .hero-search-wrap:focus-within { border-color:rgba(26,86,219,.6); box-shadow:0 0 0 4px rgba(26,86,219,.15); }
+                .hero-search-wrap svg { flex-shrink:0; color:rgba(255,255,255,.4); }
+                .hero-search-wrap input { flex:1; border:none; background:transparent; outline:none; font-size:.95rem; color:white; font-family:inherit; }
+                .hero-search-wrap input::placeholder { color:rgba(255,255,255,.35); }
+                .hero-search-clear { padding:.5rem 1.1rem; background:var(--blue); color:white; font-size:.8rem; font-weight:700; border-radius:9999px; border:none; cursor:pointer; transition:background .2s; white-space:nowrap; flex-shrink:0; }
+                .hero-search-clear:hover { background:var(--blue-dk); }
 
                 /* Hero stats strip */
-                .hero-stats { display: flex; justify-content: center; gap: 3.5rem; padding: 2.75rem 0; border-top: 1px solid rgba(255,255,255,.07); margin-top: 3rem; }
-                .hstat-num   { font-family: 'Playfair Display', serif; font-size: 1.75rem; font-weight: 900; color: white; display: block; line-height: 1; }
-                .hstat-label { font-size: .68rem; font-weight: 600; color: rgba(255,255,255,.4); letter-spacing: .1em; text-transform: uppercase; margin-top: .2rem; display: block; }
+                .hero-stats { display:flex; justify-content:center; gap:3.5rem; padding:2.75rem 0; border-top:1px solid rgba(255,255,255,.07); margin-top:3rem; animation:eyebrowIn 1s .6s ease both; }
+                .hstat-num   { font-family:'Playfair Display',serif; font-size:1.75rem; font-weight:900; color:white; display:block; line-height:1; }
+                .hstat-label { font-size:.68rem; font-weight:600; color:rgba(255,255,255,.4); letter-spacing:.1em; text-transform:uppercase; margin-top:.2rem; display:block; }
 
-                /* ── Layout ── */
-                .faq-section { padding: 4rem 0 6rem; }
-                .faq-container { max-width: 82rem; margin: 0 auto; padding: 0 2rem; }
-                .faq-layout { display: grid; grid-template-columns: 280px 1fr; gap: 3rem; align-items: start; }
+                /* ── LAYOUT ── */
+                .faq-section { padding:4rem 0 6rem; }
+                .faq-container { max-width:82rem; margin:0 auto; padding:0 2rem; }
+                .faq-layout { display:grid; grid-template-columns:280px 1fr; gap:3rem; align-items:start; }
 
-                /* ── Sidebar ── */
-                .sidebar { position: sticky; top: calc(76px + 1.5rem); }
-                .sidebar-card { background: var(--card-bg); border-radius: var(--radius-lg); border: 1px solid var(--border); box-shadow: 0 2px 8px rgba(0,0,0,.04); padding: 1.75rem; }
-                .sidebar-title { font-family: 'Playfair Display', serif; font-size: 1.1rem; font-weight: 800; color: var(--ink); margin-bottom: 1.25rem; letter-spacing: -.01em; }
-                .cat-btn { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: .65rem .9rem; border-radius: .75rem; border: none; cursor: pointer; font-family: inherit; font-size: .875rem; font-weight: 500; color: var(--muted); background: transparent; transition: all .2s; margin-bottom: .35rem; text-align: left; }
-                .cat-btn:hover { background: var(--offwhite); color: var(--ink); }
-                .cat-btn.active { background: var(--blue-lt); color: var(--blue); font-weight: 700; }
-                .cat-btn-left { display: flex; align-items: center; gap: .6rem; }
-                .cat-btn-icon { font-size: 1rem; }
-                .cat-count { font-size: .72rem; font-weight: 700; padding: .15rem .5rem; border-radius: 9999px; background: rgba(0,0,0,.06); color: var(--muted); }
-                .cat-btn.active .cat-count { background: rgba(0,102,255,.15); color: var(--blue); }
+                /* ── SIDEBAR ── */
+                .sidebar { position:sticky; top:calc(76px + 1.5rem); }
+                .sidebar-card { background:var(--card-bg); border-radius:var(--radius-lg); border:1px solid var(--border); box-shadow:0 2px 8px rgba(0,0,0,.04); padding:1.75rem; }
+                .sidebar-title { font-family:'Playfair Display',serif; font-size:1.1rem; font-weight:800; color:var(--ink); margin-bottom:1.25rem; letter-spacing:-.01em; }
+                .cat-btn { display:flex; align-items:center; justify-content:space-between; width:100%; padding:.65rem .9rem; border-radius:.75rem; border:none; cursor:pointer; font-family:inherit; font-size:.875rem; font-weight:500; color:var(--muted); background:transparent; transition:all .2s; margin-bottom:.35rem; text-align:left; }
+                .cat-btn:hover { background:var(--offwhite); color:var(--ink); }
+                .cat-btn.active { background:var(--blue-lt); color:var(--blue); font-weight:700; }
+                .cat-btn-left { display:flex; align-items:center; gap:.6rem; }
+                .cat-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+                .cat-count { font-size:.72rem; font-weight:700; padding:.15rem .5rem; border-radius:9999px; background:rgba(0,0,0,.06); color:var(--muted); }
+                .cat-btn.active .cat-count { background:rgba(26,86,219,.15); color:var(--blue); }
+
+                /* Skeleton sidebar */
+                .skeleton { background:linear-gradient(90deg,#e2e8f0 25%,#f1f5f9 50%,#e2e8f0 75%); background-size:200% 100%; animation:shimmer 1.5s infinite; border-radius:.5rem; }
+                @keyframes shimmer { 0%{background-position:200% 0}100%{background-position:-200% 0} }
 
                 /* Sidebar contact card */
-                .sidebar-contact { background: var(--ink); border-radius: var(--radius-lg); padding: 1.5rem; margin-top: 1.25rem; }
-                .sidebar-contact h4 { font-family: 'Playfair Display', serif; font-size: 1rem; font-weight: 800; color: white; margin-bottom: .5rem; }
-                .sidebar-contact p  { font-size: .8rem; color: rgba(255,255,255,.55); line-height: 1.65; margin-bottom: 1rem; }
-                .btn-contact { display: block; width: 100%; padding: .65rem; background: var(--blue); color: white; font-size: .82rem; font-weight: 700; border-radius: .65rem; border: none; cursor: pointer; text-align: center; text-decoration: none; transition: background .25s; }
-                .btn-contact:hover { background: var(--blue-dk); }
+                .sidebar-contact { background:var(--ink); border-radius:var(--radius-lg); padding:1.5rem; margin-top:1.25rem; }
+                .sidebar-contact h4 { font-family:'Playfair Display',serif; font-size:1rem; font-weight:800; color:white; margin-bottom:.5rem; }
+                .sidebar-contact p  { font-size:.8rem; color:rgba(255,255,255,.55); line-height:1.65; margin-bottom:1rem; }
+                .btn-contact { display:block; width:100%; padding:.65rem; background:var(--blue); color:white; font-size:.82rem; font-weight:700; border-radius:.65rem; border:none; cursor:pointer; text-align:center; text-decoration:none; transition:background .25s; }
+                .btn-contact:hover { background:var(--blue-dk); }
 
-                /* ── Accordion ── */
-                .faq-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 2rem; }
-                .section-label { display: inline-block; font-size: .68rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--blue); background: var(--blue-lt); padding: .25rem .75rem; border-radius: 9999px; margin-bottom: .65rem; }
-                .section-title { font-family: 'Playfair Display', serif; font-size: clamp(1.5rem,2.5vw,2rem); font-weight: 800; color: var(--ink); letter-spacing: -.02em; }
-                .results-label { font-size: .82rem; color: var(--muted); font-weight: 500; }
-                .divider { width: 3rem; height: 3px; background: var(--blue); border-radius: 9999px; margin-top: .75rem; }
+                /* ── ACCORDION ── */
+                .faq-header { display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:2rem; }
+                .section-label { display:inline-block; font-size:.68rem; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--blue); background:var(--blue-lt); padding:.25rem .75rem; border-radius:9999px; margin-bottom:.65rem; }
+                .section-title { font-family:'Playfair Display',serif; font-size:clamp(1.5rem,2.5vw,2rem); font-weight:800; color:var(--ink); letter-spacing:-.02em; }
+                .results-label { font-size:.82rem; color:var(--muted); font-weight:500; }
+                .divider { width:3rem; height:3px; background:var(--blue); border-radius:9999px; margin-top:.75rem; }
 
-                .accordion-list { display: flex; flex-direction: column; gap: 1rem; }
+                .accordion-list { display:flex; flex-direction:column; gap:1rem; }
+                .accordion-item { background:var(--card-bg); border-radius:var(--radius-lg); border:1px solid var(--border); box-shadow:0 1px 4px rgba(0,0,0,.04); overflow:hidden; transition:box-shadow .25s,border-color .25s; }
+                .accordion-item.open { border-color:var(--blue); box-shadow:0 4px 20px rgba(26,86,219,.1); }
+                .accordion-trigger { width:100%; display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1.4rem 1.75rem; background:transparent; border:none; cursor:pointer; text-align:left; transition:background .2s; }
+                .accordion-trigger:hover { background:var(--offwhite); }
+                .trigger-left { display:flex; align-items:center; gap:1rem; flex:1; min-width:0; }
+                .trigger-cat-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+                .trigger-question { font-size:.975rem; font-weight:700; color:var(--ink); letter-spacing:-.01em; }
+                .accordion-item.open .trigger-question { color:var(--blue); }
+                .trigger-badge { font-size:.65rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; padding:.2rem .6rem; border-radius:9999px; flex-shrink:0; }
+                .chevron { flex-shrink:0; color:var(--muted); transition:transform .3s ease; }
+                .accordion-item.open .chevron { transform:rotate(180deg); color:var(--blue); }
+                .accordion-body { max-height:0; overflow:hidden; transition:max-height .4s ease; }
+                .accordion-item.open .accordion-body { max-height:500px; }
+                .accordion-body-inner { padding:0 1.75rem 1.5rem; border-top:1px solid var(--border); padding-top:1.25rem; }
+                .accordion-answer { font-size:.9rem; color:#475569; line-height:1.8; }
 
-                .accordion-item { background: var(--card-bg); border-radius: var(--radius-lg); border: 1px solid var(--border); box-shadow: 0 1px 4px rgba(0,0,0,.04); overflow: hidden; transition: box-shadow .25s, border-color .25s; }
-                .accordion-item.open { border-color: var(--blue); box-shadow: 0 4px 20px rgba(0,102,255,.1); }
+                /* Skeleton accordion */
+                .skeleton-accordion { display:flex; flex-direction:column; gap:1rem; }
+                .skeleton-accordion-item { background:var(--card-bg); border-radius:var(--radius-lg); border:1px solid var(--border); padding:1.4rem 1.75rem; display:flex; align-items:center; gap:1rem; }
 
-                .accordion-trigger { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1.4rem 1.75rem; background: transparent; border: none; cursor: pointer; text-align: left; transition: background .2s; }
-                .accordion-trigger:hover { background: var(--offwhite); }
+                /* ── EMPTY STATE ── */
+                .empty-state { text-align:center; padding:4rem 0; color:var(--muted); }
+                .empty-state svg { color:#cbd5e1; margin:0 auto 1.25rem; display:block; }
+                .empty-state h3 { font-family:'Playfair Display',serif; font-size:1.4rem; color:var(--ink); margin-bottom:.5rem; }
+                .empty-state p { font-size:.9rem; }
 
-                .trigger-left { display: flex; align-items: center; gap: 1rem; flex: 1; min-width: 0; }
-                .trigger-cat-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-                .trigger-question { font-size: .975rem; font-weight: 700; color: var(--ink); letter-spacing: -.01em; }
-                .accordion-item.open .trigger-question { color: var(--blue); }
+                /* ── CTA STRIP ── */
+                .cta-strip { background:var(--ink); padding:4rem 0; position:relative; overflow:hidden; }
+                .cta-glow { position:absolute; width:600px; height:600px; border-radius:50%; background:radial-gradient(circle,rgba(26,86,219,.18) 0%,transparent 70%); top:50%; left:50%; transform:translate(-50%,-50%); pointer-events:none; }
+                .cta-inner { max-width:60rem; margin:0 auto; padding:0 2rem; display:flex; align-items:center; justify-content:space-between; gap:3rem; position:relative; z-index:1; }
+                .cta-text h2 { font-family:'Playfair Display',serif; font-size:clamp(1.5rem,3vw,2.2rem); font-weight:900; color:white; letter-spacing:-.03em; margin-bottom:.5rem; }
+                .cta-text p  { font-size:.9rem; color:rgba(255,255,255,.55); line-height:1.7; }
+                .cta-actions { display:flex; gap:.875rem; flex-shrink:0; }
+                .btn-cta-primary { padding:.8rem 2rem; background:var(--blue); color:white; font-weight:700; font-size:.9rem; border-radius:9999px; text-decoration:none; display:inline-block; box-shadow:0 8px 24px rgba(26,86,219,.4); transition:all .3s; border:none; cursor:pointer; }
+                .btn-cta-primary:hover { background:var(--blue-dk); transform:translateY(-2px); }
+                .btn-cta-outline { padding:.8rem 2rem; background:transparent; color:rgba(255,255,255,.8); font-weight:600; font-size:.9rem; border-radius:9999px; text-decoration:none; display:inline-block; border:1.5px solid rgba(255,255,255,.2); transition:all .3s; }
+                .btn-cta-outline:hover { border-color:rgba(255,255,255,.5); color:white; background:rgba(255,255,255,.05); }
 
-                .trigger-badge { font-size: .65rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; padding: .2rem .6rem; border-radius: 9999px; flex-shrink: 0; }
-
-                .chevron { flex-shrink: 0; color: var(--muted); transition: transform .3s ease; }
-                .accordion-item.open .chevron { transform: rotate(180deg); color: var(--blue); }
-
-                .accordion-body { max-height: 0; overflow: hidden; transition: max-height .4s ease; }
-                .accordion-item.open .accordion-body { max-height: 500px; }
-                .accordion-body-inner { padding: 0 1.75rem 1.5rem; border-top: 1px solid var(--border); padding-top: 1.25rem; }
-                .accordion-answer { font-size: .9rem; color: #475569; line-height: 1.8; }
-
-                /* ── Empty state ── */
-                .empty-state { text-align: center; padding: 4rem 0; color: var(--muted); }
-                .empty-state svg { color: #cbd5e1; margin: 0 auto 1.25rem; display: block; }
-                .empty-state h3 { font-family: 'Playfair Display', serif; font-size: 1.4rem; color: var(--ink); margin-bottom: .5rem; }
-
-                /* ── CTA Strip ── */
-                .cta-strip { background: var(--ink); padding: 4rem 0; position: relative; overflow: hidden; }
-                .cta-glow { position: absolute; width: 600px; height: 600px; border-radius: 50%; background: radial-gradient(circle,rgba(0,102,255,.18) 0%,transparent 70%); top:50%; left:50%; transform:translate(-50%,-50%); pointer-events:none; }
-                .cta-inner { max-width: 60rem; margin: 0 auto; padding: 0 2rem; display: flex; align-items: center; justify-content: space-between; gap: 3rem; position: relative; z-index:1; }
-                .cta-text h2 { font-family: 'Playfair Display', serif; font-size: clamp(1.5rem,3vw,2.2rem); font-weight: 900; color: white; letter-spacing: -.03em; margin-bottom: .5rem; }
-                .cta-text p  { font-size: .9rem; color: rgba(255,255,255,.55); line-height: 1.7; }
-                .cta-actions { display: flex; gap: .875rem; flex-shrink: 0; }
-                .btn-cta-primary { padding: .8rem 2rem; background: var(--blue); color: white; font-weight: 700; font-size: .9rem; border-radius: 9999px; text-decoration: none; display: inline-block; box-shadow: 0 8px 24px rgba(0,102,255,.4); transition: all .3s; border: none; cursor: pointer; }
-                .btn-cta-primary:hover { background: var(--blue-dk); transform: translateY(-2px); }
-                .btn-cta-outline { padding: .8rem 2rem; background: transparent; color: rgba(255,255,255,.8); font-weight: 600; font-size: .9rem; border-radius: 9999px; text-decoration: none; display: inline-block; border: 1.5px solid rgba(255,255,255,.2); transition: all .3s; }
-                .btn-cta-outline:hover { border-color: rgba(255,255,255,.5); color: white; background: rgba(255,255,255,.05); }
-
-                /* ── Footer ── */
-                .footer { background: #080d14; padding: 5rem 0 0; }
-                .footer-grid { display: grid; grid-template-columns: 1.5fr 1fr 1fr 1.4fr; gap: 3rem; padding-bottom: 3.5rem; }
-                .footer-brand-logo { width: 56px; height: 56px; border-radius: 50%; background: var(--blue); display: flex; align-items: center; justify-content: center; overflow: hidden; margin-bottom: 1.25rem; box-shadow: 0 4px 18px rgba(0,102,255,.35); }
-                .footer-brand-logo img { width: 100%; height: 100%; object-fit: cover; }
-                .footer-brand-logo .logo-letter { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.6rem; color: white; }
-                .footer-brand-name { font-size: 1.1rem; font-weight: 700; color: white; display: block; margin-bottom: .15rem; }
-                .footer-brand-sub  { font-size: .68rem; font-weight: 500; color: #475569; letter-spacing: .1em; text-transform: uppercase; display: block; margin-bottom: 1rem; }
-                .footer-about { font-size: .85rem; color: #64748b; line-height: 1.75; }
-                .footer-col-title { font-size: .7rem; font-weight: 700; color: #cbd5e1; letter-spacing: .12em; text-transform: uppercase; margin-bottom: 1.25rem; display: block; }
-                .footer-link { display: block; font-size: .875rem; color: #64748b; text-decoration: none; padding: .3rem 0; transition: color .2s; }
-                .footer-link:hover { color: white; }
-                .footer-contact-item { display: flex; align-items: flex-start; gap: .75rem; margin-bottom: 1rem; }
-                .footer-contact-item svg { flex-shrink: 0; margin-top: .15rem; }
-                .footer-contact-text { font-size: .85rem; color: #64748b; line-height: 1.6; }
-                .footer-bottom { border-top: 1px solid #1a2332; padding: 1.5rem 0; display: flex; justify-content: space-between; align-items: center; }
-                .footer-copy { font-size: .78rem; color: #334155; }
-                .footer-socials { display: flex; gap: .875rem; }
-                .social-btn { width: 38px; height: 38px; border-radius: 50%; background: #0d1a2e; border: 1px solid #1e2d42; display: flex; align-items: center; justify-content: center; color: #64748b; text-decoration: none; transition: all .25s; }
-                .social-btn:hover { background: var(--blue); border-color: var(--blue); color: white; transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,102,255,.35); }
+                /* ── FOOTER ── */
+                .footer { background:#080d14; padding:5rem 0 0; }
+                .footer-grid { display:grid; grid-template-columns:1.5fr 1fr 1fr 1.4fr; gap:3rem; padding-bottom:3.5rem; }
+                .footer-brand-logo { width:56px; height:56px; border-radius:50%; background:var(--blue); display:flex; align-items:center; justify-content:center; overflow:hidden; margin-bottom:1.25rem; box-shadow:0 4px 18px rgba(26,86,219,.35); }
+                .footer-brand-logo img { width:100%; height:100%; object-fit:cover; }
+                .footer-brand-logo .logo-letter { font-family:'Playfair Display',serif; font-weight:900; font-size:1.6rem; color:white; }
+                .footer-brand-name { font-size:1.1rem; font-weight:700; color:white; display:block; margin-bottom:.15rem; }
+                .footer-brand-sub  { font-size:.68rem; font-weight:500; color:#475569; letter-spacing:.1em; text-transform:uppercase; display:block; margin-bottom:1rem; }
+                .footer-about { font-size:.85rem; color:#64748b; line-height:1.75; }
+                .footer-col-title { font-size:.7rem; font-weight:700; color:#cbd5e1; letter-spacing:.12em; text-transform:uppercase; margin-bottom:1.25rem; display:block; }
+                .footer-link { display:block; font-size:.875rem; color:#64748b; text-decoration:none; padding:.3rem 0; transition:color .2s; }
+                .footer-link:hover { color:white; }
+                .footer-contact-item { display:flex; align-items:flex-start; gap:.75rem; margin-bottom:1rem; }
+                .footer-contact-item svg { flex-shrink:0; margin-top:.15rem; }
+                .footer-contact-text { font-size:.85rem; color:#64748b; line-height:1.6; }
+                .footer-bottom { border-top:1px solid #1a2332; padding:1.5rem 0; display:flex; justify-content:space-between; align-items:center; }
+                .footer-copy { font-size:.78rem; color:#334155; }
+                .footer-socials { display:flex; gap:.875rem; }
+                .social-btn { width:38px; height:38px; border-radius:50%; background:#0d1a2e; border:1px solid #1e2d42; display:flex; align-items:center; justify-content:center; color:#64748b; text-decoration:none; transition:all .25s; }
+                .social-btn:hover { background:var(--blue); border-color:var(--blue); color:white; transform:translateY(-2px); box-shadow:0 6px 20px rgba(26,86,219,.35); }
             `}</style>
 
-            {/* ════════ NAV ════════ */}
+            {/* ═══ NAV ═══ */}
             <nav className={`nav-root ${scrolled ? 'scrolled' : 'top'}`}>
                 <div className="nav-inner">
                     <a href="/" className="nav-logo-wrap">
@@ -263,8 +311,13 @@ export default function FAQ() {
                 </div>
             </nav>
 
-            {/* ════════ HERO ════════ */}
+            {/* ═══ HERO ═══ */}
             <div className="hero-section">
+                {heroSlides.map((src, i) => (
+                    <div key={i} className={`hero-bg-slide ${i === heroIdx ? 'active' : ''}`}
+                        style={{ backgroundImage: `url(${src})` }} />
+                ))}
+                <div className="hero-overlay" />
                 <div className="hero-grid" />
                 <div className="hero-glow" />
                 <div className="hero-glow2" />
@@ -279,8 +332,7 @@ export default function FAQ() {
                     <p className="hero-subtitle">
                         Find quick answers about machines, booking, training, projects, and system usage.
                     </p>
-
-                    {/* Search bar */}
+                    {/* Search */}
                     <div className="hero-search-wrap">
                         <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -294,13 +346,11 @@ export default function FAQ() {
                             <button className="hero-search-clear" onClick={() => setSearch('')}>Clear</button>
                         )}
                     </div>
-
-                    {/* Stats strip */}
+                    {/* Stats */}
                     <div className="hero-stats">
                         {[
-                            [faqData.length, 'Questions'],
-                            [categories.length - 1, 'Categories'],
-                            ['Instant', 'Answers'],
+                            [loading ? '…' : faqs.length, 'Questions'],
+                            [loading ? '…' : allCatNames.length, 'Categories'],
                         ].map(([n, l]) => (
                             <div key={l} style={{ textAlign: 'center' }}>
                                 <span className="hstat-num">{n}</span>
@@ -311,7 +361,7 @@ export default function FAQ() {
                 </div>
             </div>
 
-            {/* ════════ FAQ CONTENT ════════ */}
+            {/* ═══ FAQ CONTENT ═══ */}
             <section className="faq-section">
                 <div className="faq-container">
                     <div className="faq-layout">
@@ -320,48 +370,65 @@ export default function FAQ() {
                         <aside className="sidebar">
                             <div className="sidebar-card">
                                 <h3 className="sidebar-title">Categories</h3>
-                                {categories.map(cat => {
-                                    const meta = catMeta[cat] || {};
-                                    return (
-                                        <button key={cat} className={`cat-btn ${activeCategory === cat ? 'active' : ''}`}
-                                            onClick={() => { setCategory(cat); setExpanded(null); }}>
-                                            <span className="cat-btn-left">
-                                                {meta.icon && <span className="cat-btn-icon">{meta.icon}</span>}
-                                                {!meta.icon && <span className="cat-btn-icon">🗂️</span>}
-                                                {cat}
-                                            </span>
-                                            <span className="cat-count">{catCount(cat)}</span>
-                                        </button>
-                                    );
-                                })}
-                            </div>
-
-                            {/* Contact card */}
-                            <div className="sidebar-contact">
-                                <h4>Still have questions?</h4>
-                                <p>Can't find what you're looking for? Our team is happy to help.</p>
-                                <a href="/contact" className="btn-contact">Contact Us →</a>
+                                {loading ? (
+                                    /* skeleton category buttons */
+                                    [80, 100, 90, 110, 85].map((w, i) => (
+                                        <div key={i} className="skeleton" style={{ height: 38, marginBottom: '.35rem', borderRadius: '.75rem', width: `${w}%` }} />
+                                    ))
+                                ) : (
+                                    categories.map(cat => {
+                                        const pal = cat === 'All' ? { accent: '#1a56db' } : catPalette(cat, allCatNames);
+                                        return (
+                                            <button key={cat} className={`cat-btn ${activeCategory === cat ? 'active' : ''}`}
+                                                onClick={() => { setCategory(cat); setExpanded(null); }}>
+                                                <span className="cat-btn-left">
+                                                    {cat === 'All' && (
+                                                        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ flexShrink: 0 }}>
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                                                        </svg>
+                                                    )}
+                                                    {cat}
+                                                </span>
+                                                <span className="cat-count">{catCount(cat)}</span>
+                                            </button>
+                                        );
+                                    })
+                                )}
                             </div>
                         </aside>
 
                         {/* ── Accordion ── */}
                         <div>
-                            <div className="faq-header">
-                                <div>
-                                    <span className="section-label">
-                                        {activeCategory === 'All' ? 'All Questions' : activeCategory}
+                            <Reveal>
+                                <div className="faq-header">
+                                    <div>
+                                        <span className="section-label">
+                                            {activeCategory === 'All' ? 'All Questions' : activeCategory}
+                                        </span>
+                                        <h2 className="section-title">
+                                            {searchQuery ? `Results for "${searchQuery}"` : 'Frequently Asked Questions'}
+                                        </h2>
+                                        <div className="divider" />
+                                    </div>
+                                    <span className="results-label">
+                                        {loading ? '…' : `${filtered.length} question${filtered.length !== 1 ? 's' : ''}`}
                                     </span>
-                                    <h2 className="section-title">
-                                        {searchQuery ? `Results for "${searchQuery}"` : 'Frequently Asked Questions'}
-                                    </h2>
-                                    <div className="divider" />
                                 </div>
-                                <span className="results-label">
-                                    {filtered.length} question{filtered.length !== 1 ? 's' : ''}
-                                </span>
-                            </div>
+                            </Reveal>
 
-                            {filtered.length === 0 ? (
+                            {loading ? (
+                                /* skeleton accordion items */
+                                <div className="skeleton-accordion">
+                                    {[0, 1, 2, 3, 4].map(i => (
+                                        <div key={i} className="skeleton-accordion-item">
+                                            <div className="skeleton" style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0 }} />
+                                            <div className="skeleton" style={{ flex: 1, height: 14 }} />
+                                            <div className="skeleton" style={{ width: 60, height: 20, borderRadius: '9999px' }} />
+                                            <div className="skeleton" style={{ width: 18, height: 18, borderRadius: '.35rem', flexShrink: 0 }} />
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : filtered.length === 0 ? (
                                 <div className="empty-state">
                                     <svg width="56" height="56" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -371,29 +438,33 @@ export default function FAQ() {
                                 </div>
                             ) : (
                                 <div className="accordion-list">
-                                    {filtered.map(faq => {
-                                        const meta = catMeta[faq.category] || { color: '#e8f0fe', accent: '#0066FF' };
+                                    {filtered.map((faq, idx) => {
+                                        const pal = catPalette(faq.category, allCatNames);
                                         const isOpen = expandedId === faq.id;
                                         return (
-                                            <div key={faq.id} className={`accordion-item ${isOpen ? 'open' : ''}`}>
-                                                <button className="accordion-trigger" onClick={() => toggle(faq.id)}>
-                                                    <div className="trigger-left">
-                                                        <span className="trigger-cat-dot" style={{ background: meta.accent }} />
-                                                        <span className="trigger-question">{faq.question}</span>
-                                                    </div>
-                                                    <span className="trigger-badge" style={{ background: meta.color, color: meta.accent }}>
-                                                        {faq.category}
-                                                    </span>
-                                                    <svg className="chevron" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" />
-                                                    </svg>
-                                                </button>
-                                                <div className="accordion-body">
-                                                    <div className="accordion-body-inner">
-                                                        <p className="accordion-answer">{faq.answer}</p>
+                                            <Reveal key={faq.id} delay={Math.min(idx * 0.05, 0.3)}>
+                                                <div className={`accordion-item ${isOpen ? 'open' : ''}`}>
+                                                    <button className="accordion-trigger" onClick={() => toggle(faq.id)}>
+                                                        <div className="trigger-left">
+                                                            <span className="trigger-question">{faq.question}</span>
+                                                        </div>
+                                                        {faq.category && (
+                                                            <span className="trigger-badge"
+                                                                style={{ background: 'var(--offwhite)', color: 'var(--muted)' }}>
+                                                                {faq.category}
+                                                            </span>
+                                                        )}
+                                                        <svg className="chevron" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" />
+                                                        </svg>
+                                                    </button>
+                                                    <div className="accordion-body">
+                                                        <div className="accordion-body-inner">
+                                                            <p className="accordion-answer">{faq.answer}</p>
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            </div>
+                                            </Reveal>
                                         );
                                     })}
                                 </div>
@@ -403,22 +474,24 @@ export default function FAQ() {
                 </div>
             </section>
 
-            {/* ════════ CTA STRIP ════════ */}
-            <div className="cta-strip">
-                <div className="cta-glow" />
-                <div className="cta-inner">
-                    <div className="cta-text">
-                        <h2>Still have a question?</h2>
-                        <p>Our team is ready to help. Reach out or create an account to get started with the Fab Lab.</p>
-                    </div>
-                    <div className="cta-actions">
-                        <Link to="/register" className="btn-cta-primary">Create Account</Link>
-                        <a href="/contact" className="btn-cta-outline">Contact Us</a>
+            {/* ═══ CTA STRIP ═══ */}
+            <Reveal>
+                <div className="cta-strip">
+                    <div className="cta-glow" />
+                    <div className="cta-inner">
+                        <div className="cta-text">
+                            <h2>Still have a question?</h2>
+                            <p>Our team is ready to help. Reach out or create an account to get started with the Fab Lab.</p>
+                        </div>
+                        <div className="cta-actions">
+                            <Link to="/register" className="btn-cta-primary">Create Account</Link>
+                            <a href="/contact" className="btn-cta-outline">Contact Us</a>
+                        </div>
                     </div>
                 </div>
-            </div>
+            </Reveal>
 
-            {/* ════════ FOOTER ════════ */}
+            {/* ═══ FOOTER ═══ */}
             <footer className="footer">
                 <div style={{ maxWidth: '82rem', margin: '0 auto', padding: '0 2rem' }}>
                     <div className="footer-grid">

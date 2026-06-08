@@ -6,18 +6,25 @@ export default function Gallery() {
     // Modal States
     const [showAddModal, setShowAddModal] = useState(false);
     const [showViewModal, setShowViewModal] = useState(false);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false); // ✅ NEW: Delete confirmation modal
     const [selectedImage, setSelectedImage] = useState(null);
 
     // API Data States
     const [galleryImages, setGalleryImages] = useState([]);
     const [loading, setLoading] = useState(true);
 
+    // ✅ NEW: Toast Notification State
+    const [toast, setToast] = useState({
+        show: false,
+        message: '',
+        type: 'success', // 'success' | 'error'
+    });
+
     // Form State
     const [formData, setFormData] = useState({
         image: null,
         imagePreview: null,
         title: '',
-        category: '3D Printing',
         description: '',
     });
     const [uploading, setUploading] = useState(false);
@@ -26,6 +33,21 @@ export default function Gallery() {
     useEffect(() => {
         fetchGalleryImages();
     }, []);
+
+    // ✅ NEW: Auto-hide toast after 3 seconds
+    useEffect(() => {
+        if (toast.show) {
+            const timer = setTimeout(() => {
+                setToast({ show: false, message: '', type: 'success' });
+            }, 3000);
+            return () => clearTimeout(timer);
+        }
+    }, [toast]);
+
+    // ✅ NEW: Show Toast Notification
+    const showToast = (message, type = 'success') => {
+        setToast({ show: true, message, type });
+    };
 
     const fetchGalleryImages = async () => {
         try {
@@ -42,7 +64,7 @@ export default function Gallery() {
             setGalleryImages(response.data.galleries);
         } catch (error) {
             console.error('Error fetching gallery:', error);
-            alert('Failed to load gallery images. Please try again.');
+            showToast('Failed to load gallery images. Please try again.', 'error');
         } finally {
             setLoading(false);
         }
@@ -81,7 +103,6 @@ export default function Gallery() {
             image: null,
             imagePreview: null,
             title: '',
-            category: '3D Printing',
             description: '',
         });
         setShowAddModal(true);
@@ -92,7 +113,7 @@ export default function Gallery() {
         e.preventDefault();
 
         if (!formData.image) {
-            alert('Please select an image to upload.');
+            showToast('Please select an image to upload.', 'error');
             return;
         }
 
@@ -104,7 +125,6 @@ export default function Gallery() {
             const formDataToSend = new FormData();
             formDataToSend.append('image', formData.image);
             formDataToSend.append('title', formData.title);
-            formDataToSend.append('category', formData.category);
             formDataToSend.append('description', formData.description);
 
             const response = await axios.post(
@@ -122,21 +142,22 @@ export default function Gallery() {
             // Add new image to list
             setGalleryImages([response.data.gallery, ...galleryImages]);
             setShowAddModal(false);
-            alert('Image uploaded successfully!');
+            showToast('Image uploaded successfully!', 'success');
         } catch (error) {
             console.error('Error uploading image:', error);
-            alert('Failed to upload image. Please try again.');
+            showToast('Failed to upload image. Please try again.', 'error');
         } finally {
             setUploading(false);
         }
     };
 
-    // Delete Image
-    const handleDeleteImage = async () => {
-        if (!window.confirm('Are you sure you want to delete this image?')) {
-            return;
-        }
+    // ✅ NEW: Show Delete Confirmation Modal
+    const handleDeleteImage = () => {
+        setShowDeleteConfirm(true);
+    };
 
+    // ✅ NEW: Confirm Delete
+    const confirmDelete = async () => {
         try {
             const adminToken = localStorage.getItem('admin_token');
 
@@ -152,23 +173,30 @@ export default function Gallery() {
 
             setGalleryImages(galleryImages.filter(img => img.id !== selectedImage.id));
             setShowViewModal(false);
+            setShowDeleteConfirm(false);
             setSelectedImage(null);
-            alert('Image deleted successfully!');
+            showToast('Image deleted successfully!', 'success');
         } catch (error) {
             console.error('Error deleting image:', error);
-            alert('Failed to delete image. Please try again.');
+            showToast('Failed to delete image. Please try again.', 'error');
+            setShowDeleteConfirm(false);
         }
+    };
+
+    // ✅ NEW: Cancel Delete
+    const cancelDelete = () => {
+        setShowDeleteConfirm(false);
     };
 
     // Close All Modals
     const closeAllModals = () => {
         setShowAddModal(false);
         setShowViewModal(false);
+        setShowDeleteConfirm(false);
         setSelectedImage(null);
     };
 
     return (
-        // ✅ JUST the main content - sidebar is in AdminLayout now
         <div className="flex-1">
             {/* Top Header */}
             <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
@@ -247,10 +275,7 @@ export default function Gallery() {
                                 {/* Card Content */}
                                 <div className="p-4">
                                     <h3 className="font-semibold text-gray-900 mb-2 line-clamp-1">{image.title}</h3>
-                                    <div className="flex items-center justify-between">
-                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                            {image.category}
-                                        </span>
+                                    <div className="flex items-center justify-end">
                                         <span className="text-xs text-gray-500">{image.uploadedAt}</span>
                                     </div>
                                 </div>
@@ -315,24 +340,6 @@ export default function Gallery() {
                                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                         required
                                     />
-                                </div>
-
-                                {/* Category */}
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
-                                    <select
-                                        name="category"
-                                        value={formData.category}
-                                        onChange={handleInputChange}
-                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                    >
-                                        <option>3D Printing</option>
-                                        <option>Laser Cutting</option>
-                                        <option>CNC Machining</option>
-                                        <option>PCB Fabrication</option>
-                                        <option>Vinyl Cutting</option>
-                                        <option>Electronics</option>
-                                    </select>
                                 </div>
 
                                 {/* Description */}
@@ -401,10 +408,7 @@ export default function Gallery() {
                             </div>
 
                             {/* Meta Info - Below image */}
-                            <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200">
-                                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                    {selectedImage.category}
-                                </span>
+                            <div className="flex items-center justify-end mt-4 pt-4 border-t border-gray-200">
                                 <span className="text-sm text-gray-600">
                                     Uploaded by <span className="font-medium">{selectedImage.uploadedBy}</span> on {selectedImage.uploadedAt}
                                 </span>
@@ -429,6 +433,79 @@ export default function Gallery() {
                                 Close
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ✅ NEW: DELETE CONFIRMATION MODAL */}
+            {showDeleteConfirm && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4" onClick={closeAllModals}>
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+                        {/* Header */}
+                        <div className="px-6 py-4 border-b border-gray-200 flex items-center gap-3">
+                            <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                                <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-bold text-gray-900">Confirm Delete</h3>
+                                <p className="text-sm text-gray-600">This action cannot be undone</p>
+                            </div>
+                        </div>
+
+                        {/* Body */}
+                        <div className="p-6">
+                            <p className="text-gray-700 mb-6">
+                                Are you sure you want to delete <span className="font-semibold">"{selectedImage?.title}"</span>? This will permanently remove the image from the gallery.
+                            </p>
+
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={cancelDelete}
+                                    className="flex-1 px-4 py-2 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-semibold"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={confirmDelete}
+                                    className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-semibold shadow-lg"
+                                >
+                                    Yes, Delete
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ✅ NEW: TOAST NOTIFICATION */}
+            {toast.show && (
+                <div className="fixed top-6 right-6 z-[9999] animate-fade-in">
+                    <div className={`px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 min-w-[350px] ${toast.type === 'success'
+                            ? 'bg-gradient-to-r from-green-500 to-emerald-600'
+                            : 'bg-gradient-to-r from-red-500 to-rose-600'
+                        } text-white`}>
+                        {toast.type === 'success' ? (
+                            <svg className="w-6 h-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        ) : (
+                            <svg className="w-6 h-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        )}
+                        <div className="flex-1">
+                            <p className="font-semibold text-sm">{toast.message}</p>
+                        </div>
+                        <button
+                            onClick={() => setToast({ show: false, message: '', type: 'success' })}
+                            className="flex-shrink-0 text-white/80 hover:text-white transition-colors"
+                        >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
                     </div>
                 </div>
             )}

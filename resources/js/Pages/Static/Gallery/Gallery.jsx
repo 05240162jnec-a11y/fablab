@@ -96,13 +96,8 @@ export default function Gallery() {
     /* derive category options from real data */
     const categories = ['All', ...Array.from(new Set(images.map(i => i.category).filter(Boolean)))];
 
-    /* filter */
-    const filtered = images.filter(img => {
-        const imgYear = img.uploadedAt ? new Date(img.uploadedAt).getFullYear().toString() : '';
-        const matchYear = yearFilter === 'All' || imgYear === yearFilter;
-        const matchCat = catFilter === 'All' || img.category === catFilter;
-        return matchYear && matchCat;
-    });
+    /* no filters — show all images */
+    const filtered = images;
 
     const navigate = useCallback((dir) => {
         setLightbox(prev => {
@@ -245,9 +240,12 @@ export default function Gallery() {
                 .empty-state p { font-size:.9rem; }
 
                 /* ── LIGHTBOX ── */
-                .lightbox-backdrop { position:fixed; inset:0; z-index:999; background:rgba(5,10,25,.97); backdrop-filter:blur(16px); display:flex; align-items:center; justify-content:center; animation:lbFade .25s ease; }
+                .lightbox-backdrop { position:fixed; inset:0; z-index:999; display:flex; align-items:center; justify-content:center; animation:lbFade .25s ease; overflow:hidden; }
+                /* blurred image background */
+                .lightbox-bg { position:absolute; inset:-40px; background-size:cover; background-position:center; filter:blur(28px) brightness(.45) saturate(1.2); transform:scale(1.08); z-index:0; }
+                .lightbox-shade { position:absolute; inset:0; background:rgba(5,10,25,.35); z-index:1; }
                 @keyframes lbFade { from{opacity:0}to{opacity:1} }
-                .lightbox-inner { position:relative; max-width:90vw; max-height:90vh; display:flex; flex-direction:column; align-items:center; }
+                .lightbox-inner { position:relative; z-index:2; max-width:90vw; max-height:90vh; display:flex; flex-direction:column; align-items:center; }
                 .lightbox-img { max-width:88vw; max-height:75vh; border-radius:var(--radius-lg); box-shadow:0 32px 80px rgba(0,0,0,.6); object-fit:contain; display:block; animation:lbImg .2s ease; }
                 @keyframes lbImg { from{opacity:0;transform:scale(.97)}to{opacity:1;transform:scale(1)} }
                 .lightbox-info { text-align:center; margin-top:1.25rem; }
@@ -330,53 +328,8 @@ export default function Gallery() {
                     <p className="hero-sub">
                         Photos of activities, workshops, projects, and events captured inside the Fab Lab.
                     </p>
-                    <div className="hero-stats">
-                        {[
-                            [loading ? '…' : `${images.length}+`, 'Photos'],
-                            [loading ? '…' : `${years.length - 1}`, 'Years'],
-                            [loading ? '…' : `${categories.length - 1}`, 'Categories'],
-                        ].map(([n, l]) => (
-                            <div key={l} style={{ textAlign: 'center' }}>
-                                <span className="hero-stat-num">{n}</span>
-                                <span className="hero-stat-label">{l}</span>
-                            </div>
-                        ))}
-                    </div>
                 </div>
             </section>
-
-            {/* ═══ CONTROLS ═══ */}
-            <div className="controls-bar">
-                <div className="controls-inner">
-                    {/* Year filter — derived from real data */}
-                    <div className="filter-group">
-                        <span className="filter-label">Year</span>
-                        <div className="filter-pills">
-                            {years.map(y => (
-                                <button key={y} className={`pill ${yearFilter === y ? 'active' : ''}`}
-                                    onClick={() => setYearFilter(y)}>{y}</button>
-                            ))}
-                        </div>
-                    </div>
-
-                    <div className="controls-sep" />
-
-                    {/* Category filter — derived from real data */}
-                    <div className="filter-group">
-                        <span className="filter-label">Type</span>
-                        <div className="filter-pills">
-                            {categories.map(c => (
-                                <button key={c} className={`pill ${catFilter === c ? 'active' : ''}`}
-                                    onClick={() => setCatFilter(c)}>{c}</button>
-                            ))}
-                        </div>
-                    </div>
-
-                    <span className="results-count">
-                        {loading ? 'Loading…' : `${filtered.length} photo${filtered.length !== 1 ? 's' : ''}`}
-                    </span>
-                </div>
-            </div>
 
             {/* ═══ GALLERY ═══ */}
             <section className="gallery-section">
@@ -396,7 +349,7 @@ export default function Gallery() {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                             </svg>
                             <h3>No photos found</h3>
-                            <p>Try a different year or category filter.</p>
+                            <p>No photos have been added yet — check back soon!</p>
                         </div>
                     ) : (
                         <div className="masonry-grid">
@@ -436,6 +389,9 @@ export default function Gallery() {
             {/* ═══ LIGHTBOX ═══ */}
             {lightbox && (
                 <div className="lightbox-backdrop" onClick={() => setLightbox(null)}>
+                    {/* blurred version of the current image as background */}
+                    <div className="lightbox-bg" style={{ backgroundImage: `url(${lightbox.image})` }} />
+                    <div className="lightbox-shade" />
                     <div className="lightbox-inner" onClick={e => e.stopPropagation()}>
                         <button className="lb-close" onClick={() => setLightbox(null)}>
                             <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">

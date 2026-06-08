@@ -18,12 +18,11 @@ class GalleryController extends Controller
     {
         $galleries = Gallery::orderBy('uploaded_date', 'desc')->get();
         
-        // Transform data for frontend
+        // Transform data for frontend - ✅ REMOVED category
         $transformedGalleries = $galleries->map(function ($gallery) {
             return [
                 'id' => $gallery->id,
                 'title' => $gallery->title,
-                'category' => $gallery->category,
                 'description' => $gallery->description,
                 'image' => asset('storage/' . $gallery->image_path),
                 'uploadedBy' => $gallery->uploaded_by,
@@ -47,7 +46,6 @@ class GalleryController extends Controller
             'gallery' => [
                 'id' => $gallery->id,
                 'title' => $gallery->title,
-                'category' => $gallery->category,
                 'description' => $gallery->description,
                 'image' => asset('storage/' . $gallery->image_path),
                 'uploadedBy' => $gallery->uploaded_by,
@@ -57,14 +55,13 @@ class GalleryController extends Controller
     }
 
     /**
-     * Store a new gallery image
+     * Store a new gallery image - ✅ REMOVED category validation
      */
     public function store(Request $request)
     {
         $request->validate([
             'image' => 'required|image|mimes:jpeg,png,jpg,gif|max:5120',
             'title' => 'required|string|max:255',
-            'category' => 'required|string',
             'description' => 'nullable|string',
         ]);
 
@@ -78,7 +75,6 @@ class GalleryController extends Controller
                 'admin_id' => Auth::guard('admin')->id() ?? 1,
                 'title' => $request->title,
                 'image_path' => $imagePath,
-                'category' => $request->category,
                 'description' => $request->description,
                 'file_name' => $imageName,
                 'file_size' => $this->formatFileSize($image->getSize()),
@@ -92,7 +88,6 @@ class GalleryController extends Controller
                 'gallery' => [
                     'id' => $gallery->id,
                     'title' => $gallery->title,
-                    'category' => $gallery->category,
                     'description' => $gallery->description,
                     'image' => asset('storage/' . $gallery->image_path),
                     'uploadedBy' => $gallery->uploaded_by,
@@ -107,7 +102,7 @@ class GalleryController extends Controller
     }
 
     /**
-     * Update gallery image
+     * Update gallery image - ✅ REMOVED category
      */
     public function update(Request $request, $id)
     {
@@ -115,13 +110,11 @@ class GalleryController extends Controller
 
         $request->validate([
             'title' => 'sometimes|required|string|max:255',
-            'category' => 'sometimes|required|string',
             'description' => 'nullable|string',
         ]);
 
         $gallery->update([
             'title' => $request->title ?? $gallery->title,
-            'category' => $request->category ?? $gallery->category,
             'description' => $request->description ?? $gallery->description,
         ]);
 

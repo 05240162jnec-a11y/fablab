@@ -13,7 +13,7 @@ class Gallery extends Model
         'admin_id',
         'title',
         'image_path',
-        'category',
+        // ✅ REMOVED: 'category',
         'description',
         'file_name',
         'file_size',

@@ -20,6 +20,10 @@ Route::get('/home/users', [\App\Http\Controllers\Api\Admin\UserController::class
 Route::get('/home/products', [\App\Http\Controllers\Api\Admin\ProductController::class, 'index']); // ✅ Public product listing for Shop page
 Route::get('/home/projects', [\App\Http\Controllers\Api\AdminProjectController::class, 'index']); // ✅ Public approved projects listing
 Route::get('/home/gallery', [\App\Http\Controllers\Api\GalleryController::class, 'index']);       // ✅ Public gallery listing
+Route::get('/home/faq',     [\App\Http\Controllers\Api\FAQController::class, 'index']);            // ✅ Public FAQ listing
+
+// ✅ Public About page data
+Route::get('/public/about', [App\Http\Controllers\Api\PublicAboutController::class, 'index']);
 
 // ==========================================
 // ADMIN ROUTES (Now uses unified auth)
@@ -144,6 +148,15 @@ Route::prefix('admin')->middleware('auth:sanctum')->group(function () {
     Route::get('/settings/payment-deadline/hours', [App\Http\Controllers\Api\Admin\SettingController::class, 'getPaymentUploadDeadlineHours']);
     Route::get('/settings/stock-alert/threshold', [App\Http\Controllers\Api\Admin\SettingController::class, 'getStockAlertThreshold']);
     Route::put('/settings/stock-alert/threshold', [App\Http\Controllers\Api\Admin\SettingController::class, 'updateStockAlertThreshold']);
+
+    // ✅ About Page Management
+    Route::get('/about/sections', [App\Http\Controllers\Api\Admin\AboutController::class, 'getSections']);
+    Route::put('/about/sections/{id}', [App\Http\Controllers\Api\Admin\AboutController::class, 'updateSection']);
+    Route::get('/about/team-members', [App\Http\Controllers\Api\Admin\AboutController::class, 'getTeamMembers']);
+    Route::post('/about/team-members', [App\Http\Controllers\Api\Admin\AboutController::class, 'storeTeamMember']);
+    Route::put('/about/team-members/{id}', [App\Http\Controllers\Api\Admin\AboutController::class, 'updateTeamMember']);
+    Route::post('/about/team-members/{id}/toggle-status', [App\Http\Controllers\Api\Admin\AboutController::class, 'toggleTeamMemberStatus']);
+    Route::delete('/about/team-members/{id}', [App\Http\Controllers\Api\Admin\AboutController::class, 'destroyTeamMember']);
     
 }); // ← Close admin prefix with auth:sanctum
 

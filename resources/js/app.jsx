@@ -48,6 +48,7 @@ import AdminFAQ from './Pages/Admin/FAQ';
 import AdminProducts from './Pages/Admin/Products';
 import AdminLayout from './Pages/Admin/AdminLayout';
 import AdminProfile from './Pages/Admin/Profile';
+import AdminAbout from './Pages/Admin/About';
 
 // ✅ NEW: User Layout
 import UserLayout from './Pages/User/UserLayout';
@@ -133,6 +134,7 @@ root.render(
                     <Route path="projects" element={<AdminProjects />} />
                     <Route path="gallery" element={<AdminGallery />} />
                     <Route path="faq" element={<AdminFAQ />} />
+                    <Route path="about" element={<AdminAbout />} />
                 </Route>
 
                 {/* ✅ UPDATED: User Pages - Now wrapped in UserLayout */}

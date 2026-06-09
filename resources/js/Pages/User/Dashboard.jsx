@@ -1,27 +1,53 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Link, useNavigate } from 'react-router-dom';
+import {
+    Chart as ChartJS,
+    CategoryScale,
+    LinearScale,
+    BarElement,
+    LineElement,
+    PointElement,
+    ArcElement,
+    Title,
+    Tooltip,
+    Legend,
+    Filler,
+} from 'chart.js';
+import { Bar, Line } from 'react-chartjs-2';
+
+// ✅ Register Chart.js components
+ChartJS.register(
+    CategoryScale,
+    LinearScale,
+    BarElement,
+    LineElement,
+    PointElement,
+    ArcElement,
+    Title,
+    Tooltip,
+    Legend,
+    Filler
+);
 
 export default function Dashboard() {
     const navigate = useNavigate();
 
     // API Data States
     const [student, setStudent] = useState(null);
-    const [stats, setStats] = useState({
-        totalBookings: 0,
-        pendingBookings: 0,
-        approvedBookings: 0,
-        ongoingCourses: 0,
-    });
-    const [announcements, setAnnouncements] = useState([]);
-    const [courses, setCourses] = useState([]);
-    const [recentActivity, setRecentActivity] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+
+    // ✅ NEW: Chart Data States
+    const [bookingActivity, setBookingActivity] = useState([]);
+    const [monthlySpending, setMonthlySpending] = useState([]);
+    const [topProducts, setTopProducts] = useState([]);
+    const [chartsLoading, setChartsLoading] = useState(true);
 
     // ✅ Fetch dashboard data on component mount
     useEffect(() => {
         fetchDashboardData();
+        fetchChartData();
     }, []);
 
     const fetchDashboardData = async () => {
@@ -37,7 +63,6 @@ export default function Dashboard() {
                 return;
             }
 
-            // ✅ FIXED: Correct endpoint - /api/user/dashboard (not /api/student/dashboard)
             const response = await axios.get('http://127.0.0.1:8000/api/user/dashboard', {
                 headers: {
                     'Accept': 'application/json',
@@ -45,35 +70,13 @@ export default function Dashboard() {
                 },
             });
 
-            // ✅ Update state with fresh data from API
             setStudent(response.data.student || response.data.user || null);
-            setStats(response.data.stats || {
-                totalBookings: 0,
-                pendingBookings: 0,
-                approvedBookings: 0,
-                ongoingCourses: 0,
-            });
-            setAnnouncements(response.data.announcements || []);
-            setCourses(response.data.courses || []);
-            setRecentActivity(response.data.recentActivity || []);
 
         } catch (error) {
             console.error('Error fetching dashboard:', error);
             setError('Failed to load dashboard. Please try again.');
-
-            // ✅ FIXED: For new users or API errors, show EMPTY state (not sample data)
             setStudent(null);
-            setStats({
-                totalBookings: 0,
-                pendingBookings: 0,
-                approvedBookings: 0,
-                ongoingCourses: 0,
-            });
-            setAnnouncements([]);
-            setCourses([]);
-            setRecentActivity([]);
 
-            // ✅ If 401/403, redirect to login (token expired or invalid)
             if (error.response?.status === 401 || error.response?.status === 403) {
                 sessionStorage.removeItem('auth_token');
                 navigate('/login');
@@ -84,26 +87,230 @@ export default function Dashboard() {
         }
     };
 
-    // Get badge color based on type
-    const getBadgeClass = (type) => {
-        const badges = {
-            update: 'bg-blue-100 text-blue-800',
-            course: 'bg-green-100 text-green-800',
-            important: 'bg-red-100 text-red-800',
-        };
-        return badges[type] || 'bg-gray-100 text-gray-800';
+    // ✅ NEW: Fetch chart data
+    const fetchChartData = async () => {
+        try {
+            setChartsLoading(true);
+            const authToken = sessionStorage.getItem('auth_token');
+
+            if (!authToken) return;
+
+            const headers = {
+                'Accept': 'application/json',
+                'Authorization': `Bearer ${authToken}`,
+            };
+
+            // Fetch all 3 chart endpoints in parallel
+            const [bookingRes, spendingRes, productsRes] = await Promise.all([
+                axios.get('http://127.0.0.1:8000/api/user/dashboard/booking-activity', { headers }),
+                axios.get('http://127.0.0.1:8000/api/user/dashboard/monthly-spending', { headers }),
+                axios.get('http://127.0.0.1:8000/api/user/dashboard/top-products', { headers }),
+            ]);
+
+            if (bookingRes.data.success) setBookingActivity(bookingRes.data.data);
+            if (spendingRes.data.success) setMonthlySpending(spendingRes.data.data);
+            if (productsRes.data.success) setTopProducts(productsRes.data.data);
+
+        } catch (error) {
+            console.error('Error fetching chart data:', error);
+        } finally {
+            setChartsLoading(false);
+        }
     };
 
-    // Get status badge color
-    const getStatusBadgeClass = (status) => {
-        const badges = {
-            Pending: 'bg-yellow-100 text-yellow-800',
-            Approved: 'bg-green-100 text-green-800',
-            Rejected: 'bg-red-100 text-red-800',
-            Open: 'bg-green-100 text-green-800',
-            Closed: 'bg-gray-100 text-gray-800',
-        };
-        return badges[status] || 'bg-gray-100 text-gray-800';
+    // ✅ NEW: Booking Activity Chart Data
+    const bookingActivityData = {
+        labels: bookingActivity.map((item) => 
+            item.machine_name.length > 15 ? item.machine_name.substring(0, 15) + '...' : item.machine_name
+        ),
+        datasets: [
+            {
+                label: 'Bookings',
+                data: bookingActivity.map((item) => item.booking_count),
+                backgroundColor: [
+                    'rgba(59, 130, 246, 0.8)',
+                    'rgba(16, 185, 129, 0.8)',
+                    'rgba(245, 158, 11, 0.8)',
+                    'rgba(139, 92, 246, 0.8)',
+                    'rgba(239, 68, 68, 0.8)',
+                ],
+                borderColor: [
+                    '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444',
+                ],
+                borderWidth: 2,
+                borderRadius: 8,
+            },
+        ],
+    };
+
+    const bookingActivityOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { display: false },
+            tooltip: {
+                backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                padding: 12,
+                cornerRadius: 8,
+                callbacks: {
+                    title: function (context) {
+                        const idx = context[0].dataIndex;
+                        return bookingActivity[idx]?.machine_name || '';
+                    },
+                    label: function (context) {
+                        return `Bookings: ${context.parsed.y}`;
+                    },
+                },
+            },
+        },
+        scales: {
+            x: {
+                grid: { display: false },
+                ticks: { font: { size: 10 }, maxRotation: 45, minRotation: 45 },
+            },
+            y: {
+                beginAtZero: true,
+                grid: { color: 'rgba(0, 0, 0, 0.05)' },
+                ticks: {
+                    font: { size: 11 },
+                    stepSize: 1,
+                },
+            },
+        },
+    };
+
+    // ✅ NEW: Monthly Spending Chart Data
+    const monthlySpendingData = {
+        labels: monthlySpending.map((item) => item.month),
+        datasets: [
+            {
+                label: 'Product Orders',
+                data: monthlySpending.map((item) => item.product_revenue),
+                borderColor: '#3b82f6',
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                borderWidth: 3,
+                fill: true,
+                tension: 0.4,
+                pointBackgroundColor: '#3b82f6',
+                pointBorderColor: '#ffffff',
+                pointBorderWidth: 2,
+                pointRadius: 5,
+                pointHoverRadius: 7,
+            },
+            {
+                label: 'Custom Orders',
+                data: monthlySpending.map((item) => item.custom_revenue),
+                borderColor: '#10b981',
+                backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                borderWidth: 3,
+                fill: true,
+                tension: 0.4,
+                pointBackgroundColor: '#10b981',
+                pointBorderColor: '#ffffff',
+                pointBorderWidth: 2,
+                pointRadius: 5,
+                pointHoverRadius: 7,
+            },
+        ],
+    };
+
+    const monthlySpendingOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'top',
+                labels: {
+                    padding: 20,
+                    usePointStyle: true,
+                    pointStyle: 'circle',
+                    font: { size: 12, weight: '500' },
+                },
+            },
+            tooltip: {
+                backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                padding: 12,
+                cornerRadius: 8,
+                callbacks: {
+                    label: function (context) {
+                        return `${context.dataset.label}: Nu. ${context.parsed.y.toLocaleString()}`;
+                    },
+                },
+            },
+        },
+        scales: {
+            x: {
+                grid: { display: false },
+                ticks: { font: { size: 11 } },
+            },
+            y: {
+                beginAtZero: true,
+                grid: { color: 'rgba(0, 0, 0, 0.05)' },
+                ticks: {
+                    font: { size: 11 },
+                    callback: function (value) {
+                        return 'Nu. ' + value.toLocaleString();
+                    },
+                },
+            },
+        },
+    };
+
+    // ✅ NEW: Top Products Chart Data
+    const topProductsData = {
+        labels: topProducts.map((item) => 
+            item.name.length > 20 ? item.name.substring(0, 20) + '...' : item.name
+        ),
+        datasets: [
+            {
+                label: 'Quantity Ordered',
+                data: topProducts.map((item) => item.total_quantity),
+                backgroundColor: 'rgba(59, 130, 246, 0.8)',
+                borderColor: '#3b82f6',
+                borderWidth: 2,
+                borderRadius: 6,
+                hoverBackgroundColor: 'rgba(59, 130, 246, 1)',
+            },
+        ],
+    };
+
+    const topProductsOptions = {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { display: false },
+            tooltip: {
+                backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                padding: 12,
+                cornerRadius: 8,
+                callbacks: {
+                    title: function (context) {
+                        const idx = context[0].dataIndex;
+                        return topProducts[idx]?.name || '';
+                    },
+                    label: function (context) {
+                        const idx = context.dataIndex;
+                        const product = topProducts[idx];
+                        return [
+                            `Quantity: ${product?.total_quantity || 0}`,
+                            `Revenue: Nu. ${product?.total_revenue?.toLocaleString() || 0}`,
+                        ];
+                    },
+                },
+            },
+        },
+        scales: {
+            x: {
+                beginAtZero: true,
+                grid: { color: 'rgba(0, 0, 0, 0.05)' },
+                ticks: { font: { size: 11 } },
+            },
+            y: {
+                grid: { display: false },
+                ticks: { font: { size: 11 } },
+            },
+        },
     };
 
     return (
@@ -139,179 +346,108 @@ export default function Dashboard() {
                             <p className="text-gray-600">The JNEC Fab Lab is your space to design, prototype, and build. Book machines, register for training courses, and bring your ideas to life.</p>
                         </div>
 
-                        {/* Stats Cards */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-                            {/* Total Bookings */}
-                            <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
-                                <div className="flex items-center justify-between mb-4">
-                                    <span className="text-sm font-medium text-gray-600">Total Bookings</span>
-                                    <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                    </svg>
+                        {/* ✅ NEW: Charts Section - ONLY 3 CHARTS */}
+                        <div className="mb-6">
+                            {/* Charts Header */}
+                            <div className="flex items-center justify-between mb-4">
+                                <div>
+                                    <h3 className="text-lg font-bold text-gray-900">My Activity Analytics</h3>
+                                    <p className="text-sm text-gray-500">Track your bookings, spending, and favorite products</p>
                                 </div>
-                                <div className="text-3xl font-bold text-gray-900">{stats.totalBookings}</div>
-                                <p className="text-xs text-gray-500 mt-1">All time</p>
-                            </div>
-
-                            {/* Pending Bookings */}
-                            <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
-                                <div className="flex items-center justify-between mb-4">
-                                    <span className="text-sm font-medium text-gray-600">Pending Bookings</span>
-                                    <svg className="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
-                                </div>
-                                <div className="text-3xl font-bold text-gray-900">{stats.pendingBookings}</div>
-                                <p className="text-xs text-gray-500 mt-1">Awaiting approval</p>
-                            </div>
-
-                            {/* Approved Bookings */}
-                            <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
-                                <div className="flex items-center justify-between mb-4">
-                                    <span className="text-sm font-medium text-gray-600">Approved Bookings</span>
-                                    <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
-                                </div>
-                                <div className="text-3xl font-bold text-gray-900">{stats.approvedBookings}</div>
-                                <p className="text-xs text-gray-500 mt-1">Confirmed</p>
-                            </div>
-
-                            {/* Ongoing Courses */}
-                            <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
-                                <div className="flex items-center justify-between mb-4">
-                                    <span className="text-sm font-medium text-gray-600">Ongoing Courses</span>
-                                    <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 14l9-5-9-5-9 5 9 5z" />
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
-                                    </svg>
-                                </div>
-                                <div className="text-3xl font-bold text-gray-900">{stats.ongoingCourses}</div>
-                                <p className="text-xs text-gray-500 mt-1">In progress</p>
-                            </div>
-                        </div>
-
-                        {/* Announcements & Course Highlights */}
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                            {/* Announcements */}
-                            <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
-                                <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                        <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
+                                {chartsLoading && (
+                                    <div className="flex items-center gap-2 text-sm text-blue-600">
+                                        <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                                         </svg>
-                                        <h2 className="text-lg font-bold text-gray-900">Announcements</h2>
+                                        Loading charts...
                                     </div>
-                                    <Link to="/user/announcements" className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1">
-                                        View All
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
-                                        </svg>
-                                    </Link>
-                                </div>
-                                <div className="p-6">
-                                    {announcements.length > 0 ? (
-                                        <div className="space-y-4">
-                                            {announcements.map((announcement) => (
-                                                <div key={announcement.id} className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                                                    <div className="flex items-center gap-2 mb-2">
-                                                        <h3 className="font-semibold text-gray-900">{announcement.title}</h3>
-                                                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${getBadgeClass(announcement.type)}`}>
-                                                            {announcement.type}
-                                                        </span>
-                                                    </div>
-                                                    <p className="text-sm text-gray-600 mb-2">{announcement.message}</p>
-                                                    <p className="text-xs text-gray-500">{announcement.date}</p>
-                                                </div>
-                                            ))}
+                                )}
+                            </div>
+
+                            {/* Charts Grid */}
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                                {/* Booking Activity (Bar Chart) */}
+                                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <div>
+                                            <h4 className="text-base font-bold text-gray-900">My Booking Activity</h4>
+                                            <p className="text-xs text-gray-500 mt-1">Top 5 most used machines</p>
+                                        </div>
+                                        <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                                            <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    {chartsLoading ? (
+                                        <div className="h-64 flex items-center justify-center">
+                                            <div className="animate-spin rounded-full h-10 w-10 border-4 border-blue-500 border-t-transparent"></div>
+                                        </div>
+                                    ) : bookingActivity.length === 0 ? (
+                                        <div className="h-64 flex items-center justify-center text-gray-400 text-sm">
+                                            No booking data available
                                         </div>
                                     ) : (
-                                        <p className="text-center text-gray-500 py-8">No announcements at this time.</p>
+                                        <div className="h-64">
+                                            <Bar data={bookingActivityData} options={bookingActivityOptions} />
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Monthly Spending (Line Chart) */}
+                                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <div>
+                                            <h4 className="text-base font-bold text-gray-900">Monthly Spending</h4>
+                                            <p className="text-xs text-gray-500 mt-1">Last 6 months spending trend</p>
+                                        </div>
+                                        <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                                            <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    {chartsLoading ? (
+                                        <div className="h-64 flex items-center justify-center">
+                                            <div className="animate-spin rounded-full h-10 w-10 border-4 border-green-500 border-t-transparent"></div>
+                                        </div>
+                                    ) : monthlySpending.length === 0 ? (
+                                        <div className="h-64 flex items-center justify-center text-gray-400 text-sm">
+                                            No spending data available
+                                        </div>
+                                    ) : (
+                                        <div className="h-64">
+                                            <Line data={monthlySpendingData} options={monthlySpendingOptions} />
+                                        </div>
                                     )}
                                 </div>
                             </div>
 
-                            {/* Course Highlights */}
-                            <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
-                                <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                        <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 14l9-5-9-5-9 5 9 5z" />
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
-                                        </svg>
-                                        <h2 className="text-lg font-bold text-gray-900">Course Highlights</h2>
+                            {/* Top Products Chart (Full Width) */}
+                            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div>
+                                        <h4 className="text-base font-bold text-gray-900">Top Products I Order</h4>
+                                        <p className="text-xs text-gray-500 mt-1">Most frequently purchased products</p>
                                     </div>
-                                    <Link to="/user/courses" className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1">
-                                        View All
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                                    <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                                        <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                                         </svg>
-                                    </Link>
+                                    </div>
                                 </div>
-                                <div className="p-6">
-                                    {courses.length > 0 ? (
-                                        <div className="space-y-3">
-                                            {courses.map((course) => (
-                                                <div key={course.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
-                                                    <div>
-                                                        <h3 className="font-semibold text-gray-900">{course.title}</h3>
-                                                        <p className="text-sm text-gray-500">{course.duration}</p>
-                                                    </div>
-                                                    <div className="flex items-center gap-2">
-                                                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(course.status)}`}>
-                                                            {course.status}
-                                                        </span>
-                                                        {course.enrolled ? (
-                                                            <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">Enrolled</span>
-                                                        ) : (
-                                                            <button className="px-3 py-1 bg-white border border-gray-300 text-gray-700 rounded-full text-xs font-medium hover:bg-gray-50 transition-colors">
-                                                                View Details
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    ) : (
-                                        <p className="text-center text-gray-500 py-8">No courses available.</p>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* My Activity Summary */}
-                        <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
-                            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                    <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                                    </svg>
-                                    <h2 className="text-lg font-bold text-gray-900">My Activity Summary</h2>
-                                </div>
-                                <Link to="/user/my-bookings" className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1">
-                                    View All
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
-                                    </svg>
-                                </Link>
-                            </div>
-                            <div className="divide-y divide-gray-200">
-                                {recentActivity.length > 0 ? (
-                                    recentActivity.map((activity) => (
-                                        <div key={activity.id} className="px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
-                                            <div>
-                                                <p className="font-medium text-gray-900">{activity.action}</p>
-                                                <p className="text-sm text-gray-500 mt-1">{activity.date}</p>
-                                            </div>
-                                            <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(activity.status)}`}>
-                                                {activity.status}
-                                            </span>
-                                        </div>
-                                    ))
+                                {chartsLoading ? (
+                                    <div className="h-64 flex items-center justify-center">
+                                        <div className="animate-spin rounded-full h-10 w-10 border-4 border-purple-500 border-t-transparent"></div>
+                                    </div>
+                                ) : topProducts.length === 0 ? (
+                                    <div className="h-64 flex items-center justify-center text-gray-400 text-sm">
+                                        No product order data available
+                                    </div>
                                 ) : (
-                                    <div className="px-6 py-8 text-center text-gray-500">
-                                        <p>No recent activity.</p>
-                                        <p className="text-sm mt-1">Start by booking a machine or enrolling in a course!</p>
+                                    <div className="h-64">
+                                        <Bar data={topProductsData} options={topProductsOptions} />
                                     </div>
                                 )}
                             </div>

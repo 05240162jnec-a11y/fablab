@@ -14,6 +14,7 @@ export default function Users() {
     const [showViewModal, setShowViewModal] = useState(false);
     const [showEditModal, setShowEditModal] = useState(false);
     const [showToggleModal, setShowToggleModal] = useState(false);
+    const [showImagePreviewModal, setShowImagePreviewModal] = useState(false); // ✅ NEW
     const [selectedUser, setSelectedUser] = useState(null);
 
     // Dropdown States
@@ -39,7 +40,7 @@ export default function Users() {
 
     // Backend State
     const [users, setUsers] = useState([]);
-    const [stats, setStats] = useState({ total: 0, students: 0, faculty: 0, outsiders: 0, production_team: 0 });
+    const [stats, setStats] = useState({ total: 0, students: 0, faculty: 0, outsiders: 0, production_team: 0, active: 0, inactive: 0 });
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
@@ -173,6 +174,13 @@ export default function Users() {
         setShowViewModal(true);
     };
 
+    // ✅ NEW: Open user photo preview
+    const openUserPhotoPreview = () => {
+        if (selectedUser?.profile_photo) {
+            setShowImagePreviewModal(true);
+        }
+    };
+
     // Open Edit Modal
     const handleEditUser = (user) => {
         setSelectedUser(user);
@@ -242,6 +250,7 @@ export default function Users() {
         setShowViewModal(false);
         setShowEditModal(false);
         setShowToggleModal(false);
+        setShowImagePreviewModal(false); // ✅ NEW
         setSelectedUser(null);
     };
 
@@ -269,8 +278,8 @@ export default function Users() {
                             <button
                                 onClick={() => setActiveTab('active')}
                                 className={`pb-3 px-1 text-sm font-medium transition-colors border-b-2 ${activeTab === 'active'
-                                        ? 'border-blue-600 text-blue-600'
-                                        : 'border-transparent text-gray-500 hover:text-gray-700'
+                                    ? 'border-blue-600 text-blue-600'
+                                    : 'border-transparent text-gray-500 hover:text-gray-700'
                                     }`}
                             >
                                 Active Users ({stats.active})
@@ -278,8 +287,8 @@ export default function Users() {
                             <button
                                 onClick={() => setActiveTab('disabled')}
                                 className={`pb-3 px-1 text-sm font-medium transition-colors border-b-2 ${activeTab === 'disabled'
-                                        ? 'border-blue-600 text-blue-600'
-                                        : 'border-transparent text-gray-500 hover:text-gray-700'
+                                    ? 'border-blue-600 text-blue-600'
+                                    : 'border-transparent text-gray-500 hover:text-gray-700'
                                     }`}
                             >
                                 Disabled Users ({stats.inactive})
@@ -394,9 +403,18 @@ export default function Users() {
                                             <tr key={user.id} className="hover:bg-gray-50 transition-colors">
                                                 <td className="py-4 px-4 cursor-pointer" onClick={() => handleViewUser(user)}>
                                                     <div className="flex items-center gap-3">
-                                                        <div className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center text-white font-semibold text-xs flex-shrink-0">
-                                                            {getInitials(user.name)}
-                                                        </div>
+                                                        {/* ✅ UPDATED: Show profile photo if available */}
+                                                        {user.profile_photo ? (
+                                                            <img
+                                                                src={user.profile_photo}
+                                                                alt={user.name}
+                                                                className="w-10 h-10 rounded-full object-cover flex-shrink-0"
+                                                            />
+                                                        ) : (
+                                                            <div className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center text-white font-semibold text-xs flex-shrink-0">
+                                                                {getInitials(user.name)}
+                                                            </div>
+                                                        )}
                                                         <div>
                                                             <p className="font-semibold text-gray-900 text-sm">{user.name}</p>
                                                             <p className="text-xs text-gray-500">{user.email}</p>
@@ -446,9 +464,22 @@ export default function Users() {
                         </div>
                         <div className="p-6">
                             <div className="flex items-center gap-4 mb-6">
-                                <div className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center text-white font-bold text-lg">
-                                    {getInitials(selectedUser.name)}
-                                </div>
+                                {/* ✅ UPDATED: Show profile photo if available - CLICKABLE */}
+                                {selectedUser.profile_photo ? (
+                                    <img
+                                        src={selectedUser.profile_photo}
+                                        alt={selectedUser.name}
+                                        onClick={openUserPhotoPreview}
+                                        className="w-16 h-16 rounded-full object-cover cursor-pointer hover:shadow-lg transition-shadow"
+                                    />
+                                ) : (
+                                    <div
+                                        onClick={openUserPhotoPreview}
+                                        className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center text-white font-bold text-lg cursor-pointer hover:shadow-lg transition-shadow"
+                                    >
+                                        {getInitials(selectedUser.name)}
+                                    </div>
+                                )}
                                 <div>
                                     <h4 className="text-lg font-bold text-gray-900">{selectedUser.name}</h4>
                                     <span className={`inline-flex px-3 py-1 rounded-full text-xs font-medium ${getRoleBadgeClass(selectedUser.role)}`}>
@@ -501,6 +532,34 @@ export default function Users() {
                                 </svg>
                                 {selectedUser.is_active ? 'Disable' : 'Enable'}
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ✅ NEW: User Photo Preview Modal */}
+            {showImagePreviewModal && selectedUser?.profile_photo && (
+                <div
+                    className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-[200] p-4"
+                    onClick={() => setShowImagePreviewModal(false)}
+                >
+                    <div className="relative max-w-2xl max-h-[90vh]">
+                        <img
+                            src={selectedUser.profile_photo}
+                            alt={selectedUser.name}
+                            className="max-w-full max-h-[90vh] rounded-lg object-contain"
+                            onClick={(e) => e.stopPropagation()}
+                        />
+                        <button
+                            onClick={() => setShowImagePreviewModal(false)}
+                            className="absolute top-4 right-4 w-10 h-10 bg-white/20 hover:bg-white/40 rounded-full flex items-center justify-center text-white transition-colors"
+                        >
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black/60 text-white px-4 py-2 rounded-full text-sm">
+                            {selectedUser.name}
                         </div>
                     </div>
                 </div>

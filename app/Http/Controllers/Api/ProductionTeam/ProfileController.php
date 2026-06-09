@@ -6,7 +6,9 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rules\Password;
+use Illuminate\Validation\Rule;
 
 class ProfileController extends Controller
 {
@@ -25,27 +27,54 @@ class ProfileController extends Controller
                 'email' => $user->email,
                 'phone' => $user->phone,
                 'gender' => $user->gender,
+                'department' => $user->department,
                 'specialization' => $user->specialization ?? null,
                 'role' => $user->role,
-                'created_at' => $user->created_at?->format('Y-m-d'),
+                'profile_photo' => $user->profile_photo ? asset('storage/' . $user->profile_photo) : null,
+                'created_at' => $user->created_at?->format('M d, Y'),
             ]
         ]);
     }
 
-    /**
-     * Update production team profile (phone, gender, specialization)
+        /**
+     * ✅ UPDATED: Update production team profile (name, email, phone, gender + photo)
      */
     public function update(Request $request)
     {
         $user = Auth::user();
 
-        $validated = $request->validate([
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|string|email|max:255|unique:users,email,' . $user->id,
             'phone' => 'nullable|string|max:20',
-            'gender' => 'nullable|in:male,female,other,prefer-not-to-say',
-            'specialization' => 'nullable|in:3d-printing,laser-cutting,cnc-machining,electronics,general',
+            'gender' => ['nullable', Rule::in(['male', 'female', 'other', 'prefer-not-to-say'])],
+            'profile_photo' => 'nullable|image|mimes:png|max:2048', // PNG only, max 2MB
         ]);
 
-        $user->update($validated);
+        $updateData = [
+            'name' => $request->name,
+            'email' => $request->email,
+            'phone' => $request->phone,
+            'gender' => $request->gender,
+        ];
+
+        // Handle profile photo upload
+        if ($request->hasFile('profile_photo')) {
+            // Delete old photo if exists
+            if ($user->profile_photo) {
+                Storage::disk('public')->delete($user->profile_photo);
+            }
+
+            $photo = $request->file('profile_photo');
+            $photoName = 'production_team_profile_' . $user->id . '_' . time() . '.png';
+            $photoPath = $photo->storeAs('profile-photos', $photoName, 'public');
+            $updateData['profile_photo'] = $photoPath;
+        }
+
+        $user->update($updateData);
+        
+        // ✅ Use fresh() to get latest data from database
+        $user = $user->fresh();
 
         return response()->json([
             'success' => true,
@@ -56,7 +85,9 @@ class ProfileController extends Controller
                 'email' => $user->email,
                 'phone' => $user->phone,
                 'gender' => $user->gender,
-                'specialization' => $user->specialization,
+                'role' => $user->role,
+                'profile_photo' => $user->profile_photo ? asset('storage/' . $user->profile_photo) : null,
+                'created_at' => $user->created_at?->format('M d, Y'),
             ]
         ]);
     }

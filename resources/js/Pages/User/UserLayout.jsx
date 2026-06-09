@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import UserSidebar from './UserSidebar';
 import NotificationBell from '../../Components/NotificationBell';
 
@@ -13,20 +14,46 @@ export default function UserLayout() {
     const [showProfileDropdown, setShowProfileDropdown] = useState(false);
     const profileDropdownRef = useRef(null);
 
+    // ✅ NEW: Image preview modal state
+    const [showImageModal, setShowImageModal] = useState(false);
+
     // Logout confirmation
     const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
-    // Fetch user data from sessionStorage (unified login)
+    // Fetch user data from sessionStorage AND API
     useEffect(() => {
-        const storedUser = sessionStorage.getItem('user');
-        if (storedUser) {
-            try {
-                const parsed = JSON.parse(storedUser);
-                setUser(parsed);
-            } catch (e) {
-                console.error('Error parsing user data:', e);
+        const fetchUserData = async () => {
+            const storedUser = sessionStorage.getItem('user');
+            const token = sessionStorage.getItem('auth_token');
+
+            if (storedUser && token) {
+                try {
+                    const parsed = JSON.parse(storedUser);
+
+                    // Fetch fresh data from API to get profile_photo
+                    const response = await axios.get('http://127.0.0.1:8000/api/user/profile', {
+                        headers: {
+                            'Accept': 'application/json',
+                            'Authorization': `Bearer ${token}`,
+                        }
+                    });
+
+                    if (response.data.success) {
+                        const freshUser = response.data.user;
+                        setUser(freshUser);
+                        // Update sessionStorage with fresh data including profile_photo
+                        sessionStorage.setItem('user', JSON.stringify(freshUser));
+                    } else {
+                        setUser(parsed);
+                    }
+                } catch (e) {
+                    console.error('Error fetching user data:', e);
+                    setUser(parsed);
+                }
             }
-        }
+        };
+
+        fetchUserData();
     }, []);
 
     // Close profile dropdown when clicking outside
@@ -79,6 +106,13 @@ export default function UserLayout() {
         navigate('/user/profile');
     };
 
+    // ✅ NEW: Open image preview modal
+    const openImagePreview = () => {
+        if (user?.profile_photo) {
+            setShowImageModal(true);
+        }
+    };
+
     // Get user initials
     const getUserInitials = () => {
         if (user?.name) {
@@ -116,13 +150,25 @@ export default function UserLayout() {
                                     onClick={() => setShowProfileDropdown(!showProfileDropdown)}
                                     className="flex items-center gap-3 focus:outline-none"
                                 >
-                                    {/* ✅ UPDATED: Blue gradient avatar */}
-                                    <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-cyan-600 rounded-full flex items-center justify-center text-white font-bold text-sm cursor-pointer hover:shadow-md transition-shadow">
-                                        {getUserInitials()}
-                                    </div>
-                                    <div className="hidden md:block text-left">
-                                        <p className="text-sm font-medium text-gray-900">{user?.name?.split(' ')[0] || 'User'}</p>
-                                        <p className="text-xs text-gray-500">{user?.department || 'Student'}</p>
+                                    {/* ✅ UPDATED: Larger profile photo (w-12 h-12) and clickable */}
+                                    {user?.profile_photo ? (
+                                        <img
+                                            src={user.profile_photo}
+                                            alt={user.name}
+                                            onClick={openImagePreview}
+                                            className="w-12 h-12 rounded-full object-cover cursor-pointer hover:shadow-lg transition-shadow"
+                                        />
+                                    ) : (
+                                        <div
+                                            onClick={openImagePreview}
+                                            className="w-12 h-12 bg-gradient-to-br from-blue-600 to-cyan-600 rounded-full flex items-center justify-center text-white font-bold text-base cursor-pointer hover:shadow-lg transition-shadow"
+                                        >
+                                            {getUserInitials()}
+                                        </div>
+                                    )}
+                                    <div className="hidden md:block text-left max-w-[100px]">
+                                        <p className="text-sm font-semibold text-gray-900 truncate">{user?.name?.split(' ')[0] || 'User'}</p>
+                                        <p className="text-xs text-gray-500 truncate">{user?.department || 'Student'}</p>
                                     </div>
                                 </button>
 
@@ -131,9 +177,28 @@ export default function UserLayout() {
                                     <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-[110] animate-fade-in">
                                         {/* User Info */}
                                         <div className="px-4 py-3 border-b border-gray-100">
-                                            <p className="font-semibold text-gray-900">{user?.name || 'User'}</p>
-                                            <p className="text-sm text-gray-500 truncate">{user?.email || 'user@example.com'}</p>
-                                            <span className="inline-flex mt-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                                            <div className="flex items-center gap-3 mb-2">
+                                                {user?.profile_photo ? (
+                                                    <img
+                                                        src={user.profile_photo}
+                                                        alt={user.name}
+                                                        className="w-16 h-16 rounded-full object-cover cursor-pointer"
+                                                        onClick={openImagePreview}
+                                                    />
+                                                ) : (
+                                                    <div
+                                                        onClick={openImagePreview}
+                                                        className="w-16 h-16 bg-gradient-to-br from-blue-600 to-cyan-600 rounded-full flex items-center justify-center text-white font-bold text-xl cursor-pointer"
+                                                    >
+                                                        {getUserInitials()}
+                                                    </div>
+                                                )}
+                                                <div className="min-w-0 flex-1">
+                                                    <p className="font-semibold text-gray-900 truncate">{user?.name || 'User'}</p>
+                                                    <p className="text-sm text-gray-500 truncate">{user?.email || 'user@example.com'}</p>
+                                                </div>
+                                            </div>
+                                            <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
                                                 {user?.department || 'Student'}
                                             </span>
                                         </div>
@@ -175,6 +240,34 @@ export default function UserLayout() {
                     <Outlet />
                 </div>
             </div>
+
+            {/* ✅ NEW: Image Preview Modal */}
+            {showImageModal && user?.profile_photo && (
+                <div
+                    className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-[200] p-4"
+                    onClick={() => setShowImageModal(false)}
+                >
+                    <div className="relative max-w-2xl max-h-[90vh]">
+                        <img
+                            src={user.profile_photo}
+                            alt={user.name}
+                            className="max-w-full max-h-[90vh] rounded-lg object-contain"
+                            onClick={(e) => e.stopPropagation()}
+                        />
+                        <button
+                            onClick={() => setShowImageModal(false)}
+                            className="absolute top-4 right-4 w-10 h-10 bg-white/20 hover:bg-white/40 rounded-full flex items-center justify-center text-white transition-colors"
+                        >
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black/60 text-white px-4 py-2 rounded-full text-sm">
+                            {user.name}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Logout Confirmation Modal */}
             {showLogoutConfirm && (

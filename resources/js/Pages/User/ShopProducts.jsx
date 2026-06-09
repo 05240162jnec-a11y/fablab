@@ -148,13 +148,12 @@ export default function ShopProducts({
         });
     };
 
-    // Refresh cart stock
+    // Refresh cart stock - ✅ FIXED with functional updates
     const refreshCartStock = async () => {
         if (cart.length === 0) return;
 
         try {
             const userToken = localStorage.getItem('auth_token');
-            const productIds = cart.map(item => item.id);
 
             const response = await axios.get('http://127.0.0.1:8000/api/user/products', {
                 headers: {
@@ -166,7 +165,8 @@ export default function ShopProducts({
             if (response.data.success) {
                 const latestProducts = response.data.products;
 
-                const updatedCart = cart.map(cartItem => {
+                // ✅ Use functional update to avoid stale closure
+                setCart(prevCart => prevCart.map(cartItem => {
                     const latestProduct = latestProducts.find(p => p.id === cartItem.id);
                     if (latestProduct) {
                         return {
@@ -177,10 +177,7 @@ export default function ShopProducts({
                         };
                     }
                     return cartItem;
-                });
-
-                setCart(updatedCart);
-                localStorage.setItem('cart', JSON.stringify(updatedCart));
+                }));
             }
         } catch (error) {
             console.error('Error refreshing cart stock:', error);
@@ -190,25 +187,15 @@ export default function ShopProducts({
     // Fetch products on mount
     useEffect(() => {
         fetchProducts();
-
-        // ✅ Load user-specific cart
-        const user = JSON.parse(localStorage.getItem('user'));
-        if (user?.id) {
-            const savedCart = localStorage.getItem(`cart_${user.id}`);
-            if (savedCart) {
-                const parsedCart = JSON.parse(savedCart);
-                setCart(parsedCart);
-                setCartProductIds(parsedCart.map(item => item.id));
-            }
-        }
+        // ✅ REMOVED: Cart loading logic - now handled by parent ShopOrders.jsx
     }, []);
 
-    // Refresh cart stock when cart drawer opens
+    // Refresh cart stock when cart drawer opens - ✅ FIXED dependencies
     useEffect(() => {
         if (showCartDrawer && cart.length > 0) {
             refreshCartStock();
         }
-    }, [showCartDrawer]);
+    }, [showCartDrawer, cart.length]); // ✅ Added cart.length
 
     // Update "Select All" checkbox
     useEffect(() => {
@@ -305,25 +292,23 @@ export default function ShopProducts({
         setCurrentImageIndex(index);
     };
 
-    // Add to cart
+    // Add to cart - ✅ FIXED with functional updates
     const addToCart = (product, qty = 1) => {
-        const existingItem = cart.find(item => item.id === product.id);
+        setCart(prevCart => {
+            const existingItem = prevCart.find(item => item.id === product.id);
 
-        if (existingItem) {
-            const newCart = cart.map(item =>
-                item.id === product.id
-                    ? { ...item, quantity: item.quantity + qty }
-                    : item
-            );
-            setCart(newCart);
-            localStorage.setItem(`cart_${JSON.parse(localStorage.getItem('user'))?.id}`, JSON.stringify(newCart));
+            if (existingItem) {
+                return prevCart.map(item =>
+                    item.id === product.id
+                        ? { ...item, quantity: item.quantity + qty }
+                        : item
+                );
+            } else {
+                return [...prevCart, { ...product, quantity: qty }];
+            }
+        });
 
-        } else {
-            const newCart = [...cart, { ...product, quantity: qty }];
-            setCart(newCart);
-            localStorage.setItem(`cart_${JSON.parse(localStorage.getItem('user'))?.id}`, JSON.stringify(newCart));
-            setCartProductIds(prev => [...prev, product.id]);
-        }
+        // ✅ REMOVED: setCartProductIds - parent handles this
 
         setShowNotification(true);
         setTimeout(() => {
@@ -373,7 +358,7 @@ export default function ShopProducts({
         }
     };
 
-    // Delete selected items
+    // Delete selected items - ✅ FIXED
     const deleteSelectedItems = () => {
         if (selectedCartItems.length === 0) return;
 
@@ -382,11 +367,11 @@ export default function ShopProducts({
             'Delete Items',
             `Are you sure you want to remove ${selectedCartItems.length} item(s) from your cart?`,
             () => {
-                const newCart = cart.filter(item => !selectedCartItems.includes(item.id));
-                setCart(newCart);
-                localStorage.setItem('cart', JSON.stringify(newCart));
+                // ✅ Use functional update
+                setCart(prevCart => prevCart.filter(item => !selectedCartItems.includes(item.id)));
+
+                // ✅ REMOVED: setCartProductIds - parent handles this
                 setSelectedCartItems([]);
-                setCartProductIds(prev => prev.filter(id => !selectedCartItems.includes(id)));
                 closeDialog();
                 showDialog('success', 'Deleted', 'Selected items have been removed from your cart.', closeDialog);
             },
@@ -394,24 +379,23 @@ export default function ShopProducts({
         );
     };
 
-    // Remove from cart
+    // Remove from cart - ✅ FIXED
     const removeFromCart = (productId) => {
-        const newCart = cart.filter(item => item.id !== productId);
-        setCart(newCart);
-        localStorage.setItem('cart', JSON.stringify(newCart));
-        setCartProductIds(prev => prev.filter(id => id !== productId));
+        // ✅ Use functional update
+        setCart(prevCart => prevCart.filter(item => item.id !== productId));
+
+        // ✅ REMOVED: setCartProductIds - parent handles this
         setSelectedCartItems(prev => prev.filter(id => id !== productId));
     };
 
-    // Update cart quantity
+    // Update cart quantity - ✅ FIXED
     const updateCartQuantity = (productId, newQty) => {
         if (newQty < 1) return;
 
-        const newCart = cart.map(item =>
+        // ✅ Use functional update
+        setCart(prevCart => prevCart.map(item =>
             item.id === productId ? { ...item, quantity: newQty } : item
-        );
-        setCart(newCart);
-        localStorage.setItem('cart', JSON.stringify(newCart));
+        ));
     };
 
     // Calculate totals for SELECTED items only
@@ -541,6 +525,7 @@ export default function ShopProducts({
                 }
             );
 
+            // Inside submitOrder, in the success callback - ✅ FIXED
             if (response.data.success) {
                 showDialog(
                     'success',
@@ -551,10 +536,10 @@ export default function ShopProducts({
                             ? [directCheckoutProduct.id]
                             : selectedCartItems;
 
-                        const remainingCart = cart.filter(item => !purchasedIds.includes(item.id));
-                        setCart(remainingCart);
-                        localStorage.setItem('cart', JSON.stringify(remainingCart));
-                        setCartProductIds(prev => prev.filter(id => !purchasedIds.includes(id)));
+                        // ✅ Use functional update
+                        setCart(prevCart => prevCart.filter(item => !purchasedIds.includes(item.id)));
+
+                        // ✅ REMOVED: setCartProductIds - parent handles this
 
                         setSelectedCartItems([]);
                         setDirectCheckoutProduct(null);

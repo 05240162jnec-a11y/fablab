@@ -6,8 +6,11 @@ export default function Projects() {
     const [showViewModal, setShowViewModal] = useState(false);
     const [showRejectModal, setShowRejectModal] = useState(false);
     const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
+    const [showDocumentPreviewModal, setShowDocumentPreviewModal] = useState(false);
+    const [showImagePreviewModal, setShowImagePreviewModal] = useState(false); // ✅ NEW
     const [selectedProject, setSelectedProject] = useState(null);
     const [rejectionReason, setRejectionReason] = useState('');
+    const [documentUrl, setDocumentUrl] = useState(null);
 
     // Data States
     const [projects, setProjects] = useState([]);
@@ -15,11 +18,11 @@ export default function Projects() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    // ✅ NEW: Search & Filter
+    // Search & Filter
     const [searchTerm, setSearchTerm] = useState('');
     const [filterStatus, setFilterStatus] = useState('all');
 
-    // ✅ NEW: Bulk Selection
+    // Bulk Selection
     const [selectedProjects, setSelectedProjects] = useState([]);
 
     // Toast
@@ -48,6 +51,8 @@ export default function Projects() {
             });
 
             if (response.data.success) {
+                console.log('📸 Projects data:', response.data.data);
+                console.log('📸 First project student_photo:', response.data.data[0]?.student_photo);
                 setProjects(response.data.data);
                 setStats(response.data.stats);
                 setError(null);
@@ -60,7 +65,8 @@ export default function Projects() {
         }
     };
 
-    // ✅ Filter projects
+
+    // Filter projects
     const filteredProjects = projects.filter(project => {
         const matchesSearch =
             project.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -72,7 +78,7 @@ export default function Projects() {
         return matchesSearch && matchesFilter;
     });
 
-    // ✅ Bulk Selection Handlers
+    // Bulk Selection Handlers
     const handleSelectProject = (projectId) => {
         setSelectedProjects(prev =>
             prev.includes(projectId)
@@ -89,7 +95,7 @@ export default function Projects() {
         }
     };
 
-    // ✅ Bulk Delete
+    // Bulk Delete
     const handleBulkDelete = () => {
         if (selectedProjects.length === 0) {
             showToast('❌ Please select at least one project', 'error');
@@ -132,6 +138,88 @@ export default function Projects() {
         setSelectedProject(project);
         setRejectionReason('');
         setShowRejectModal(true);
+    };
+
+    // ✅ NEW: Open student photo preview
+    const openStudentPhotoPreview = () => {
+        if (selectedProject?.student_photo) {
+            setShowImagePreviewModal(true);
+        }
+    };
+
+    // Open Document Preview
+    const handlePreviewDocument = async (project) => {
+        try {
+            const adminToken = localStorage.getItem('admin_token');
+            const response = await axios.get(
+                `http://127.0.0.1:8000/api/admin/projects/${project.id}/preview`,
+                {
+                    headers: {
+                        'Authorization': `Bearer ${adminToken}`,
+                    },
+                    responseType: 'blob',
+                }
+            );
+
+            // Get the content type from response headers
+            const contentType = response.headers['content-type'];
+
+            // Create blob with correct MIME type
+            const blob = new Blob([response.data], { type: contentType || 'application/pdf' });
+            const url = window.URL.createObjectURL(blob);
+
+            setDocumentUrl(url);
+            setShowDocumentPreviewModal(true);
+        } catch (error) {
+            console.error('Preview error:', error);
+            showToast('❌ Failed to load document preview', 'error');
+        }
+    };
+
+    // Download Document
+    const handleDownloadDocument = async (project) => {
+        try {
+            const adminToken = localStorage.getItem('admin_token');
+            const response = await axios.get(
+                `http://127.0.0.1:8000/api/admin/projects/${project.id}/download`,
+                {
+                    headers: {
+                        'Authorization': `Bearer ${adminToken}`,
+                    },
+                    responseType: 'blob',
+                }
+            );
+
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+
+            const contentDisposition = response.headers['content-disposition'];
+            let filename = `project_${project.id}_document`;
+            if (contentDisposition) {
+                const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+                if (filenameMatch && filenameMatch[1]) {
+                    filename = filenameMatch[1].replace(/['"]/g, '');
+                }
+            } else {
+                const originalPath = project.document_path;
+                if (originalPath) {
+                    const extension = originalPath.split('.').pop();
+                    filename = `${project.title.replace(/\s+/g, '_')}.${extension}`;
+                }
+            }
+
+            link.setAttribute('download', filename);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+
+            showToast('✅ Document downloaded successfully!', 'success');
+        } catch (error) {
+            console.error('Download error:', error);
+            showToast('❌ Failed to download document', 'error');
+        }
     };
 
     // Confirm Reject
@@ -191,52 +279,6 @@ export default function Projects() {
         }
     };
 
-    // ✅ Download Document
-    const handleDownloadDocument = async (project) => {
-        try {
-            const adminToken = localStorage.getItem('admin_token');
-            const response = await axios.get(
-                `http://127.0.0.1:8000/api/admin/projects/${project.id}/download`,
-                {
-                    headers: {
-                        'Authorization': `Bearer ${adminToken}`,
-                    },
-                    responseType: 'blob',
-                }
-            );
-
-            const url = window.URL.createObjectURL(new Blob([response.data]));
-            const link = document.createElement('a');
-            link.href = url;
-
-            const contentDisposition = response.headers['content-disposition'];
-            let filename = `project_${project.id}_document`;
-            if (contentDisposition) {
-                const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-                if (filenameMatch && filenameMatch[1]) {
-                    filename = filenameMatch[1].replace(/['"]/g, '');
-                }
-            } else {
-                const originalPath = project.document_path;
-                if (originalPath) {
-                    const extension = originalPath.split('.').pop();
-                    filename = `${project.title.replace(/\s+/g, '_')}.${extension}`;
-                }
-            }
-
-            link.setAttribute('download', filename);
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            window.URL.revokeObjectURL(url);
-
-            showToast('✅ Document downloaded successfully!', 'success');
-        } catch (error) {
-            console.error('Download error:', error);
-            showToast('❌ Failed to download document', 'error');
-        }
-    };
-
     // Format date
     const formatDate = (dateString) => {
         if (!dateString) return '—';
@@ -286,13 +328,64 @@ export default function Projects() {
         }
     };
 
+    // ✅ NEW: Get file extension
+    const getFileExtension = (path) => {
+        if (!path) return 'file';
+        return path.split('.').pop().toLowerCase();
+    };
+
+    // ✅ NEW: Get file icon based on extension (Google Drive style)
+    const getFileIcon = (path) => {
+        const ext = getFileExtension(path);
+        switch (ext) {
+            case 'pdf':
+                return { color: 'text-red-600', bg: 'bg-red-50', label: 'PDF' };
+            case 'doc':
+            case 'docx':
+                return { color: 'text-blue-600', bg: 'bg-blue-50', label: 'DOC' };
+            case 'xls':
+            case 'xlsx':
+                return { color: 'text-green-600', bg: 'bg-green-50', label: 'XLS' };
+            case 'ppt':
+            case 'pptx':
+                return { color: 'text-orange-600', bg: 'bg-orange-50', label: 'PPT' };
+            case 'txt':
+                return { color: 'text-gray-600', bg: 'bg-gray-50', label: 'TXT' };
+            case 'jpg':
+            case 'jpeg':
+            case 'png':
+            case 'gif':
+                return { color: 'text-purple-600', bg: 'bg-purple-50', label: 'IMG' };
+            case 'zip':
+            case 'rar':
+                return { color: 'text-yellow-600', bg: 'bg-yellow-50', label: 'ZIP' };
+            default:
+                return { color: 'text-gray-600', bg: 'bg-gray-50', label: ext.toUpperCase().substring(0, 3) };
+        }
+    };
+
+    // ✅ NEW: Close only preview modal (keep view modal open)
+    const closePreviewModal = () => {
+        setShowDocumentPreviewModal(false);
+        if (documentUrl) {
+            window.URL.revokeObjectURL(documentUrl);
+            setDocumentUrl(null);
+        }
+    };
+
     // Close all modals
     const closeAllModals = () => {
         setShowViewModal(false);
         setShowRejectModal(false);
         setShowBulkDeleteModal(false);
+        setShowDocumentPreviewModal(false);
+        setShowImagePreviewModal(false); // ✅ NEW
         setSelectedProject(null);
         setRejectionReason('');
+        if (documentUrl) {
+            window.URL.revokeObjectURL(documentUrl);
+            setDocumentUrl(null);
+        }
     };
 
     return (
@@ -410,7 +503,7 @@ export default function Projects() {
                             </div>
                         </div>
 
-                        {/* ✅ Bulk Actions Bar */}
+                        {/* Bulk Actions Bar */}
                         {selectedProjects.length > 0 && (
                             <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between">
                                 <div className="flex items-center gap-3">
@@ -502,9 +595,18 @@ export default function Projects() {
                                                 </td>
                                                 <td className="py-4 px-4">
                                                     <div className="flex items-center gap-2">
-                                                        <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-gray-700 font-semibold text-xs">
-                                                            {getInitials(project.user?.name)}
-                                                        </div>
+                                                        {/* ✅ UPDATED: Show student photo or initials */}
+                                                        {project.student_photo ? (
+                                                            <img
+                                                                src={project.student_photo}
+                                                                alt={project.user?.name || 'Student'}
+                                                                className="w-8 h-8 rounded-full object-cover"
+                                                            />
+                                                        ) : (
+                                                            <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-gray-700 font-semibold text-xs">
+                                                                {getInitials(project.user?.name)}
+                                                            </div>
+                                                        )}
                                                         <div>
                                                             <p className="text-sm font-medium text-gray-900">{project.user?.name || 'Unknown'}</p>
                                                             <p className="text-xs text-gray-500">{project.user?.email || ''}</p>
@@ -571,9 +673,22 @@ export default function Projects() {
                         <div className="p-6">
                             {/* Header with student info */}
                             <div className="flex items-center gap-4 mb-6 pb-6 border-b border-gray-200">
-                                <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full flex items-center justify-center text-white font-bold text-xl flex-shrink-0">
-                                    {getInitials(selectedProject.user?.name)}
-                                </div>
+                                {/* ✅ UPDATED: Show student photo or initials - CLICKABLE */}
+                                {selectedProject.student_photo ? (
+                                    <img
+                                        src={selectedProject.student_photo}
+                                        alt={selectedProject.user?.name || 'Student'}
+                                        onClick={openStudentPhotoPreview}
+                                        className="w-16 h-16 rounded-full object-cover cursor-pointer hover:shadow-lg transition-shadow"
+                                    />
+                                ) : (
+                                    <div
+                                        onClick={openStudentPhotoPreview}
+                                        className="w-16 h-16 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full flex items-center justify-center text-white font-bold text-xl flex-shrink-0 cursor-pointer hover:shadow-lg transition-shadow"
+                                    >
+                                        {getInitials(selectedProject.user?.name)}
+                                    </div>
+                                )}
                                 <div className="flex-1">
                                     <h4 className="text-xl font-bold text-gray-900">{selectedProject.title}</h4>
                                     <p className="text-sm text-gray-600">
@@ -591,27 +706,29 @@ export default function Projects() {
                                 <p className="text-gray-600 leading-relaxed whitespace-pre-wrap">{selectedProject.description}</p>
                             </div>
 
-                            {/* Document */}
+                            {/* ✅ UPDATED: Google Drive-style Document Card */}
                             <div className="mb-6">
                                 <h5 className="font-semibold text-gray-900 mb-3">Project Document</h5>
                                 <button
-                                    onClick={() => handleDownloadDocument(selectedProject)}
-                                    className="flex items-center gap-3 p-4 bg-gray-50 rounded-lg hover:bg-blue-50 transition-colors border border-gray-200 hover:border-blue-300 group w-full"
+                                    onClick={() => handlePreviewDocument(selectedProject)}
+                                    className="w-full flex items-center gap-3 p-4 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-all group cursor-pointer"
                                 >
-                                    <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                                        <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                                        </svg>
-                                    </div>
-                                    <div className="flex-1 text-left">
-                                        <p className="text-sm font-medium text-gray-900 group-hover:text-blue-600 transition-colors">
-                                            {selectedProject.document_path?.split('/').pop() || 'Document'}
+                                    {/* File Icon based on type */}
+                                    {(() => {
+                                        const fileInfo = getFileIcon(selectedProject.document_path);
+                                        return (
+                                            <div className={`flex-shrink-0 w-12 h-12 ${fileInfo.bg} rounded flex items-center justify-center`}>
+                                                <span className={`text-xs font-bold ${fileInfo.color}`}>{fileInfo.label}</span>
+                                            </div>
+                                        );
+                                    })()}
+
+                                    {/* Filename */}
+                                    <div className="flex-1 text-left min-w-0">
+                                        <p className="text-sm font-medium text-gray-900 truncate group-hover:text-gray-700">
+                                            {selectedProject.document_path?.split('/').pop() || 'Project Document'}
                                         </p>
-                                        <p className="text-xs text-gray-500">Click to download</p>
                                     </div>
-                                    <svg className="w-5 h-5 text-gray-400 group-hover:text-blue-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                                    </svg>
                                 </button>
                             </div>
 
@@ -699,6 +816,62 @@ export default function Projects() {
                                 </div>
                             )}
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ✅ NEW: Student Photo Preview Modal */}
+            {showImagePreviewModal && selectedProject?.student_photo && (
+                <div
+                    className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-[200] p-4"
+                    onClick={() => setShowImagePreviewModal(false)}
+                >
+                    <div className="relative max-w-2xl max-h-[90vh]">
+                        <img
+                            src={selectedProject.student_photo}
+                            alt={selectedProject.user?.name || 'Student'}
+                            className="max-w-full max-h-[90vh] rounded-lg object-contain"
+                            onClick={(e) => e.stopPropagation()}
+                        />
+                        <button
+                            onClick={() => setShowImagePreviewModal(false)}
+                            className="absolute top-4 right-4 w-10 h-10 bg-white/20 hover:bg-white/40 rounded-full flex items-center justify-center text-white transition-colors"
+                        >
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black/60 text-white px-4 py-2 rounded-full text-sm">
+                            {selectedProject.user?.name || 'Student'}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ✅ DOCUMENT PREVIEW MODAL - With Fixed Back Button */}
+            {showDocumentPreviewModal && documentUrl && (
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[100] p-0" onClick={closePreviewModal}>
+                    <div className="bg-white w-full h-full flex flex-col" onClick={(e) => e.stopPropagation()}>
+                        {/* Preview Content - Full Screen */}
+                        <div className="flex-1 bg-gray-100 overflow-auto relative">
+                            <iframe
+                                src={documentUrl}
+                                className="w-full h-full"
+                                title="Document Preview"
+                                style={{ border: 'none' }}
+                            />
+                        </div>
+
+                        {/* ✅ Simple Back Arrow Button - Returns to Project Details Modal */}
+                        <button
+                            onClick={closePreviewModal}
+                            className="absolute top-4 left-4 w-10 h-10 bg-white/90 hover:bg-white rounded-full flex items-center justify-center shadow-lg transition-all hover:shadow-xl group z-10"
+                            title="Back to Project Details"
+                        >
+                            <svg className="w-5 h-5 text-gray-700 group-hover:text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                            </svg>
+                        </button>
                     </div>
                 </div>
             )}

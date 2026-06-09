@@ -12,6 +12,7 @@ export default function ProductionTeam() {
     const [showAddModal, setShowAddModal] = useState(false);
     const [showEditModal, setShowEditModal] = useState(false);
     const [showToggleModal, setShowToggleModal] = useState(false);
+    const [showImagePreviewModal, setShowImagePreviewModal] = useState(false); // ✅ NEW
     const [selectedMember, setSelectedMember] = useState(null);
 
     // Dropdown States
@@ -150,6 +151,13 @@ export default function ProductionTeam() {
         return name.split(' ').map(n => n?.[0] || '').join('').substring(0, 2).toUpperCase();
     };
 
+    // ✅ NEW: Open member photo preview
+    const openMemberPhotoPreview = () => {
+        if (selectedMember?.profile_photo) {
+            setShowImagePreviewModal(true);
+        }
+    };
+
     // Open View Modal
     const handleViewMember = (member) => {
         setSelectedMember(member);
@@ -269,6 +277,7 @@ export default function ProductionTeam() {
         setShowAddModal(false);
         setShowEditModal(false);
         setShowToggleModal(false);
+        setShowImagePreviewModal(false); // ✅ NEW
         setSelectedMember(null);
     };
 
@@ -355,10 +364,18 @@ export default function ProductionTeam() {
                                             <tr key={member.id} className="hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => handleViewMember(member)}>
                                                 <td className="py-4 px-4">
                                                     <div className="flex items-center gap-3">
-                                                        {/* ✅ Changed avatar color to black */}
-                                                        <div className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center text-white font-semibold text-xs flex-shrink-0">
-                                                            {getInitials(member?.name)}
-                                                        </div>
+                                                        {/* ✅ UPDATED: Show profile photo if available */}
+                                                        {member.profile_photo ? (
+                                                            <img
+                                                                src={member.profile_photo}
+                                                                alt={member.name}
+                                                                className="w-10 h-10 rounded-full object-cover flex-shrink-0"
+                                                            />
+                                                        ) : (
+                                                            <div className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center text-white font-semibold text-xs flex-shrink-0">
+                                                                {getInitials(member?.name)}
+                                                            </div>
+                                                        )}
                                                         <div>
                                                             <p className="font-semibold text-gray-900 text-sm">{member?.name || 'Unknown'}</p>
                                                             <p className="text-xs text-gray-500">{member?.email || 'No email'}</p>
@@ -377,8 +394,8 @@ export default function ProductionTeam() {
                                                 <td className="py-4 px-4">
                                                     {/* ✅ Verification Status - Professional Design */}
                                                     <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border ${member.is_verified
-                                                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                                            : 'bg-amber-50 text-amber-700 border-amber-200'
+                                                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                                        : 'bg-amber-50 text-amber-700 border-amber-200'
                                                         }`}>
                                                         {member.is_verified ? (
                                                             <>
@@ -400,8 +417,8 @@ export default function ProductionTeam() {
                                                 <td className="py-4 px-4">
                                                     {/* ✅ Account Status - Professional Design */}
                                                     <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border ${member.is_active !== false
-                                                            ? 'bg-blue-50 text-blue-700 border-blue-200'
-                                                            : 'bg-rose-50 text-rose-700 border-rose-200'
+                                                        ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                                        : 'bg-rose-50 text-rose-700 border-rose-200'
                                                         }`}>
                                                         <span className={`w-1.5 h-1.5 rounded-full ${member.is_active !== false ? 'bg-blue-600' : 'bg-rose-600'
                                                             }`}></span>
@@ -535,10 +552,22 @@ export default function ProductionTeam() {
 
                         <div className="p-6">
                             <div className="flex items-center gap-4 mb-6">
-                                {/* ✅ Changed avatar color to black */}
-                                <div className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center text-white font-bold text-lg">
-                                    {getInitials(selectedMember?.name)}
-                                </div>
+                                {/* ✅ UPDATED: Show profile photo if available - CLICKABLE */}
+                                {selectedMember.profile_photo ? (
+                                    <img
+                                        src={selectedMember.profile_photo}
+                                        alt={selectedMember.name}
+                                        onClick={openMemberPhotoPreview}
+                                        className="w-16 h-16 rounded-full object-cover cursor-pointer hover:shadow-lg transition-shadow"
+                                    />
+                                ) : (
+                                    <div
+                                        onClick={openMemberPhotoPreview}
+                                        className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center text-white font-bold text-lg cursor-pointer hover:shadow-lg transition-shadow"
+                                    >
+                                        {getInitials(selectedMember?.name)}
+                                    </div>
+                                )}
                                 <div>
                                     <h4 className="text-lg font-bold text-gray-900">{selectedMember?.name || 'Unknown'}</h4>
                                     {/* ✅ Changed role badge color to black */}
@@ -591,8 +620,8 @@ export default function ProductionTeam() {
                                                 : 'Invited but has not logged in yet'}
                                         </p>
                                         <div className={`inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-md text-xs font-medium ${selectedMember.is_verified
-                                                ? 'bg-emerald-100 text-emerald-700'
-                                                : 'bg-amber-100 text-amber-700'
+                                            ? 'bg-emerald-100 text-emerald-700'
+                                            : 'bg-amber-100 text-amber-700'
                                             }`}>
                                             {selectedMember.is_verified ? (
                                                 <>
@@ -623,8 +652,8 @@ export default function ProductionTeam() {
                                                 : 'Account is disabled and cannot login'}
                                         </p>
                                         <div className={`inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-md text-xs font-medium ${selectedMember.is_active !== false
-                                                ? 'bg-blue-100 text-blue-700'
-                                                : 'bg-rose-100 text-rose-700'
+                                            ? 'bg-blue-100 text-blue-700'
+                                            : 'bg-rose-100 text-rose-700'
                                             }`}>
                                             <span className={`w-1.5 h-1.5 rounded-full ${selectedMember.is_active !== false ? 'bg-blue-600' : 'bg-rose-600'
                                                 }`}></span>
@@ -660,6 +689,34 @@ export default function ProductionTeam() {
                                 </svg>
                                 {selectedMember.is_active !== false ? 'Disable' : 'Enable'}
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ✅ NEW: Member Photo Preview Modal */}
+            {showImagePreviewModal && selectedMember?.profile_photo && (
+                <div
+                    className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-[200] p-4"
+                    onClick={() => setShowImagePreviewModal(false)}
+                >
+                    <div className="relative max-w-2xl max-h-[90vh]">
+                        <img
+                            src={selectedMember.profile_photo}
+                            alt={selectedMember.name}
+                            className="max-w-full max-h-[90vh] rounded-lg object-contain"
+                            onClick={(e) => e.stopPropagation()}
+                        />
+                        <button
+                            onClick={() => setShowImagePreviewModal(false)}
+                            className="absolute top-4 right-4 w-10 h-10 bg-white/20 hover:bg-white/40 rounded-full flex items-center justify-center text-white transition-colors"
+                        >
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black/60 text-white px-4 py-2 rounded-full text-sm">
+                            {selectedMember.name}
                         </div>
                     </div>
                 </div>

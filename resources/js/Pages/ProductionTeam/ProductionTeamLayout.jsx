@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import ProductionTeamSidebar from '../../Components/ProductionTeamSidebar';
 import NotificationBell from '../../Components/NotificationBell';
 
@@ -7,12 +8,15 @@ export default function ProductionTeamLayout() {
     const [expandedMenus, setExpandedMenus] = useState({});
     const navigate = useNavigate();
 
-    // ✅ FIXED: Production team member data state
+    // ✅ Production team member data state
     const [teamMember, setTeamMember] = useState(null);
 
     // Profile dropdown state
     const [showProfileDropdown, setShowProfileDropdown] = useState(false);
     const profileDropdownRef = useRef(null);
+
+    // ✅ NEW: Image preview modal state
+    const [showImageModal, setShowImageModal] = useState(false);
 
     // Logout confirmation
     const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
@@ -24,30 +28,52 @@ export default function ProductionTeamLayout() {
         }));
     };
 
-    // ✅ FIXED: Fetch production team member data from sessionStorage
+    // ✅ Fetch production team member data from API to get profile_photo
     useEffect(() => {
-        // Try sessionStorage first (unified login)
-        const storedUser = sessionStorage.getItem('user');
+        const fetchTeamMemberData = async () => {
+            const token = sessionStorage.getItem('auth_token');
 
-        if (storedUser) {
-            try {
-                const parsed = JSON.parse(storedUser);
-                setTeamMember(parsed);
-            } catch (e) {
-                console.error('Error parsing user data:', e);
-            }
-        } else {
-            // Fallback to localStorage for backward compatibility
-            const legacyData = localStorage.getItem('production_team_data');
-            if (legacyData) {
+            if (token) {
                 try {
-                    const parsed = JSON.parse(legacyData);
-                    setTeamMember(parsed);
+                    const response = await axios.get('http://127.0.0.1:8000/api/production-team/profile', {
+                        headers: {
+                            'Accept': 'application/json',
+                            'Authorization': `Bearer ${token}`,
+                        }
+                    });
+
+                    if (response.data.success) {
+                        const memberData = response.data.user;
+                        setTeamMember(memberData);
+                        // Update sessionStorage with fresh data including profile_photo
+                        sessionStorage.setItem('user', JSON.stringify(memberData));
+                    }
                 } catch (e) {
-                    console.error('Error parsing legacy data:', e);
+                    console.error('Error fetching team member data:', e);
+                    // Fallback to sessionStorage
+                    const storedUser = sessionStorage.getItem('user');
+                    if (storedUser) {
+                        try {
+                            setTeamMember(JSON.parse(storedUser));
+                        } catch (parseError) {
+                            console.error('Error parsing user data:', parseError);
+                        }
+                    }
+                }
+            } else {
+                // No token - try to get from sessionStorage
+                const storedUser = sessionStorage.getItem('user');
+                if (storedUser) {
+                    try {
+                        setTeamMember(JSON.parse(storedUser));
+                    } catch (parseError) {
+                        console.error('Error parsing user data:', parseError);
+                    }
                 }
             }
-        }
+        };
+
+        fetchTeamMemberData();
     }, []);
 
     // Close profile dropdown when clicking outside
@@ -66,9 +92,8 @@ export default function ProductionTeamLayout() {
         setShowProfileDropdown(false);
     };
 
-    // ✅ FIXED: Clear sessionStorage on logout
+    // ✅ Clear sessionStorage on logout
     const confirmLogout = () => {
-        // Clear session storage (unified auth)
         sessionStorage.clear();
 
         // Also clear any legacy localStorage keys
@@ -98,6 +123,13 @@ export default function ProductionTeamLayout() {
         navigate('/production-team/profile');
     };
 
+    // ✅ NEW: Open image preview modal
+    const openImagePreview = () => {
+        if (teamMember?.profile_photo) {
+            setShowImageModal(true);
+        }
+    };
+
     // Get team member initials
     const getInitials = () => {
         if (teamMember?.name) {
@@ -123,8 +155,8 @@ export default function ProductionTeamLayout() {
             <div className="flex-1 flex flex-col min-w-0">
 
                 {/* Global Top Header */}
-                <header className="bg-white border-b border-gray-200 sticky top-0 z-40 px-6 py-3 shadow-sm">
-                    <div className="flex items-center justify-between">
+                <header className="bg-white border-b border-gray-200 sticky top-0 z-40 h-16 px-4 sm:px-6 py-3 shadow-sm">
+                    <div className="flex items-center justify-between min-w-0">
                         <div>
                             <h2 className="text-lg font-semibold text-gray-800">Production Team Portal</h2>
                         </div>
@@ -139,10 +171,22 @@ export default function ProductionTeamLayout() {
                                     onClick={() => setShowProfileDropdown(!showProfileDropdown)}
                                     className="flex items-center gap-3 focus:outline-none"
                                 >
-                                    {/* ✅ Blue gradient avatar */}
-                                    <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-cyan-600 rounded-full flex items-center justify-center text-white font-bold text-sm cursor-pointer hover:shadow-md transition-shadow">
-                                        {getInitials()}
-                                    </div>
+                                    {/* ✅ UPDATED: Larger profile photo (w-12 h-12) and clickable */}
+                                    {teamMember?.profile_photo ? (
+                                        <img
+                                            src={teamMember.profile_photo}
+                                            alt={teamMember.name}
+                                            onClick={openImagePreview}
+                                            className="w-12 h-12 rounded-full object-cover cursor-pointer hover:shadow-lg transition-shadow"
+                                        />
+                                    ) : (
+                                        <div
+                                            onClick={openImagePreview}
+                                            className="w-12 h-12 bg-gradient-to-br from-blue-600 to-cyan-600 rounded-full flex items-center justify-center text-white font-bold text-base cursor-pointer hover:shadow-lg transition-shadow"
+                                        >
+                                            {getInitials()}
+                                        </div>
+                                    )}
                                     <div className="hidden md:block text-left">
                                         <p className="text-sm font-medium text-gray-900">{teamMember?.name?.split(' ')[0] || 'Team Member'}</p>
                                         <p className="text-xs text-gray-500">Production Team</p>
@@ -154,9 +198,28 @@ export default function ProductionTeamLayout() {
                                     <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-[110] animate-fade-in">
                                         {/* Team Member Info */}
                                         <div className="px-4 py-3 border-b border-gray-100">
-                                            <p className="font-semibold text-gray-900">{teamMember?.name || 'Team Member'}</p>
-                                            <p className="text-sm text-gray-500 truncate">{teamMember?.email || 'team@fablab.jnec.rub.edu.bt'}</p>
-                                            <span className="inline-flex mt-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                                            <div className="flex items-center gap-3 mb-2">
+                                                {teamMember?.profile_photo ? (
+                                                    <img
+                                                        src={teamMember.profile_photo}
+                                                        alt={teamMember.name}
+                                                        className="w-16 h-16 rounded-full object-cover cursor-pointer"
+                                                        onClick={openImagePreview}
+                                                    />
+                                                ) : (
+                                                    <div
+                                                        onClick={openImagePreview}
+                                                        className="w-16 h-16 bg-gradient-to-br from-blue-600 to-cyan-600 rounded-full flex items-center justify-center text-white font-bold text-xl cursor-pointer"
+                                                    >
+                                                        {getInitials()}
+                                                    </div>
+                                                )}
+                                                <div>
+                                                    <p className="font-semibold text-gray-900">{teamMember?.name || 'Team Member'}</p>
+                                                    <p className="text-sm text-gray-500 truncate">{teamMember?.email || 'team@fablab.jnec.rub.edu.bt'}</p>
+                                                </div>
+                                            </div>
+                                            <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
                                                 Production Team
                                             </span>
                                         </div>
@@ -198,6 +261,34 @@ export default function ProductionTeamLayout() {
                     <Outlet />
                 </div>
             </div>
+
+            {/* ✅ NEW: Image Preview Modal */}
+            {showImageModal && teamMember?.profile_photo && (
+                <div
+                    className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-[200] p-4"
+                    onClick={() => setShowImageModal(false)}
+                >
+                    <div className="relative max-w-2xl max-h-[90vh]">
+                        <img
+                            src={teamMember.profile_photo}
+                            alt={teamMember.name}
+                            className="max-w-full max-h-[90vh] rounded-lg object-contain"
+                            onClick={(e) => e.stopPropagation()}
+                        />
+                        <button
+                            onClick={() => setShowImageModal(false)}
+                            className="absolute top-4 right-4 w-10 h-10 bg-white/20 hover:bg-white/40 rounded-full flex items-center justify-center text-white transition-colors"
+                        >
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black/60 text-white px-4 py-2 rounded-full text-sm">
+                            {teamMember.name}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Logout Confirmation Modal */}
             {showLogoutConfirm && (

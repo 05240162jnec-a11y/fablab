@@ -16,30 +16,29 @@ class UserController extends Controller
     protected $protectedAdminId = 1;
 
     // Get all users with filters
-    public function index(Request $request)
+        public function index(Request $request)
     {
         $query = User::query();
 
+        // Filter by status (active/disabled)
+        $status = $request->get('status', 'active');
+        $query->where('is_active', $status === 'active');
+
+        // Filter by role
+        if ($request->filled('role')) {
+            $query->where('role', $request->role);
+        }
+
         // Search by name or email
-        if ($request->has('search') && $request->search) {
+        if ($request->filled('search')) {
             $search = $request->search;
-            $query->where(function($q) use ($search) {
+            $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
                   ->orWhere('email', 'like', "%{$search}%");
             });
         }
 
-        // Filter by role
-        if ($request->has('role') && $request->role !== 'all') {
-            $query->where('role', $request->role);
-        }
-
-        // Filter by Active/Disabled status based on the tab
-        if ($request->has('status')) {
-            $query->where('is_active', $request->status === 'active');
-        }
-
-        $users = $query->latest()->get();
+        $users = $query->orderBy('created_at', 'desc')->get();
 
         // Calculate stats
         $stats = [
@@ -54,8 +53,21 @@ class UserController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $users,
-            'stats' => $stats
+            'data' => $users->map(function ($user) {
+                return [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'role' => $user->role,
+                    'gender' => $user->gender,
+                    'phone' => $user->phone,
+                    'department' => $user->department,
+                    'is_active' => $user->is_active,
+                    'profile_photo' => $user->profile_photo ? asset('storage/' . $user->profile_photo) : null, // ✅ Add this
+                    'created_at' => $user->created_at,
+                ];
+            }),
+            'stats' => $stats,
         ]);
     }
 

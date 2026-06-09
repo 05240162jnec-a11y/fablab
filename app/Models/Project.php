@@ -4,11 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes; // ✅ ADD THIS
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Project extends Model
 {
-    use HasFactory, SoftDeletes; // ✅ ADD SoftDeletes HERE
+    use HasFactory, SoftDeletes;
 
     protected $table = 'projects';
 
@@ -17,6 +17,7 @@ class Project extends Model
         'title',
         'description',
         'document_path',
+        'student_photo', // ✅ ADDED THIS LINE - This was the missing piece!
         'status',
         'admin_comments',
         'submitted_at',
@@ -29,7 +30,7 @@ class Project extends Model
         return [
             'submitted_at' => 'datetime',
             'reviewed_at' => 'datetime',
-            'deleted_at' => 'datetime', // ✅ ADD THIS
+            'deleted_at' => 'datetime',
         ];
     }
 

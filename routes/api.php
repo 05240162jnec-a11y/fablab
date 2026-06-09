@@ -157,7 +157,14 @@ Route::prefix('admin')->middleware('auth:sanctum')->group(function () {
     Route::put('/about/team-members/{id}', [App\Http\Controllers\Api\Admin\AboutController::class, 'updateTeamMember']);
     Route::post('/about/team-members/{id}/toggle-status', [App\Http\Controllers\Api\Admin\AboutController::class, 'toggleTeamMemberStatus']);
     Route::delete('/about/team-members/{id}', [App\Http\Controllers\Api\Admin\AboutController::class, 'destroyTeamMember']);
-    
+        // Admin Project Routes
+    Route::get('/projects', [App\Http\Controllers\Api\AdminProjectController::class, 'index']);
+    Route::post('/projects/{id}/approve', [App\Http\Controllers\Api\AdminProjectController::class, 'approve']);
+    Route::post('/projects/{id}/reject', [App\Http\Controllers\Api\AdminProjectController::class, 'reject']);
+    Route::delete('/projects/{id}', [App\Http\Controllers\Api\AdminProjectController::class, 'destroy']);
+    Route::post('/projects/bulk-delete', [App\Http\Controllers\Api\AdminProjectController::class, 'bulkDelete']);
+    Route::get('/projects/{id}/download', [App\Http\Controllers\Api\AdminProjectController::class, 'download']);
+    Route::get('/projects/{id}/preview', [App\Http\Controllers\Api\AdminProjectController::class, 'preview']); // ✅ NEW
 }); // ← Close admin prefix with auth:sanctum
 
 // ==========================================
@@ -171,6 +178,10 @@ Route::middleware('auth:sanctum')->group(function () {
     
     // User Dashboard
     Route::get('/user/dashboard', [App\Http\Controllers\Api\DashboardController::class, 'userDashboard']);
+        // ✅ NEW: User Dashboard Chart Endpoints
+    Route::get('/user/dashboard/booking-activity', [App\Http\Controllers\Api\DashboardController::class, 'getBookingActivity']);
+    Route::get('/user/dashboard/monthly-spending', [App\Http\Controllers\Api\DashboardController::class, 'getMonthlySpending']);
+    Route::get('/user/dashboard/top-products', [App\Http\Controllers\Api\DashboardController::class, 'getTopProducts']);
 
     // User Profile Routes
     Route::get('/user/profile', [\App\Http\Controllers\Api\User\ProfileController::class, 'show']);

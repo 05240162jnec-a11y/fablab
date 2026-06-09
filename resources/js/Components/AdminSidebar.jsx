@@ -31,8 +31,8 @@ export default function AdminSidebar({ expandedMenus, toggleSubmenu }) {
             '/admin/projects': 'resources',
             '/admin/gallery': 'contentMedia',
             '/admin/faq': 'contentMedia',
-            '/admin/feedback': 'contentMedia',
-            '/admin/about': 'contentMedia', // ✅ NEW: About Page route mapping
+            '/admin/about': 'contentMedia',
+            // ✅ REMOVED: '/admin/feedback': 'contentMedia',
         };
 
         const matchingMenu = Object.entries(routeToMenu).find(([route]) =>
@@ -194,9 +194,8 @@ export default function AdminSidebar({ expandedMenus, toggleSubmenu }) {
                             <div className="ml-4 mt-1 space-y-1">
                                 <Link to="/admin/gallery" className={linkClass('/admin/gallery')}>Gallery</Link>
                                 <Link to="/admin/faq" className={linkClass('/admin/faq')}>FAQ</Link>
-                                <Link to="/admin/feedback" className={linkClass('/admin/feedback')}>Feedback</Link>
-                                {/* ✅ NEW: About Page Link */}
                                 <Link to="/admin/about" className={linkClass('/admin/about')}>About Page</Link>
+                                {/* ✅ REMOVED: Feedback link */}
                             </div>
                         )}
                     </div>

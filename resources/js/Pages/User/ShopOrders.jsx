@@ -1,21 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import TabNavigation from './TabNavigation';
-
-// ✅ Import your EXISTING components
 import ShopProducts from './ShopProducts';
 import MyOrders from './MyOrders';
 import CustomOrders from './CustomOrders';
 
 export default function ShopOrders() {
     const location = useLocation();
-
-    // Read tab from URL, fallback to 'products'
     const searchParams = new URLSearchParams(location.search);
     const urlTab = searchParams.get('tab') || 'products';
     const [activeTab, setActiveTab] = useState(urlTab);
 
-    // Keep state in sync with URL
     useEffect(() => {
         const tab = searchParams.get('tab');
         if (tab && ['products', 'orders', 'custom'].includes(tab)) {
@@ -25,30 +20,60 @@ export default function ShopOrders() {
         }
     }, [location.search]);
 
-    // ✅ Lifted Cart State (so Cart button works in header)
-    const [cart, setCart] = useState([]);
-    const [cartProductIds, setCartProductIds] = useState([]);
+    // ✅ 1. Helper to get User ID safely
+    // Uses sessionStorage first (more reliable on refresh/login in this app),
+    // then falls back to localStorage legacy key.
+    const getUserId = () => {
+        try {
+            const raw = sessionStorage.getItem('user') || localStorage.getItem('user');
+            if (!raw) return null;
+            const user = JSON.parse(raw);
+            return user?.id || null;
+        } catch {
+            return null;
+        }
+    };
+
+
+    // ✅ 2. Helper to get Cart safely based on User ID
+    const getInitialCart = (userId) => {
+        if (!userId) return [];
+        try {
+            const saved = localStorage.getItem(`cart_${userId}`);
+            return saved ? JSON.parse(saved) : [];
+        } catch {
+            return [];
+        }
+    };
+
+    // ✅ 3. LAZY INITIALIZATION: Load data immediately on first render
+    const [currentUserId, setCurrentUserId] = useState(getUserId);
+    const [cart, setCart] = useState(() => getInitialCart(getUserId()));
+    const [cartProductIds, setCartProductIds] = useState(() => getInitialCart(getUserId()).map(item => item.id));
     const [showCartDrawer, setShowCartDrawer] = useState(false);
 
-    // ✅ NEW: Load cart from localStorage on mount
+    // ✅ 4. Auto-save to localStorage ONLY when cart changes
     useEffect(() => {
-        const user = JSON.parse(localStorage.getItem('user'));
-        if (user?.id) {
-            const cartKey = `cart_${user.id}`;
-            const savedCart = localStorage.getItem(cartKey);
-            if (savedCart) {
-                try {
-                    const parsedCart = JSON.parse(savedCart);
-                    setCart(parsedCart);
-                    setCartProductIds(parsedCart.map(item => item.id));
-                } catch (e) {
-                    console.error('Failed to parse cart data:', e);
-                    setCart([]);
-                    setCartProductIds([]);
-                }
-            }
+        if (currentUserId) {
+            localStorage.setItem(`cart_${currentUserId}`, JSON.stringify(cart));
         }
-    }, []);
+        setCartProductIds(cart.map(item => item.id));
+    }, [cart, currentUserId]);
+
+    // ✅ 5. Handle User Logout/Login (Clears cart if user changes)
+    useEffect(() => {
+        const checkUser = () => {
+            const newUserId = getUserId();
+            if (newUserId !== currentUserId) {
+                setCurrentUserId(newUserId);
+                setCart(getInitialCart(newUserId)); // Load new user's cart or empty array
+            }
+        };
+
+        // Check when window regains focus (e.g., after logging out/in)
+        window.addEventListener('focus', checkUser);
+        return () => window.removeEventListener('focus', checkUser);
+    }, [currentUserId]);
 
     const tabs = [
         { value: 'products', label: 'Product List' },
@@ -56,16 +81,13 @@ export default function ShopOrders() {
         { value: 'custom', label: 'Custom Orders' },
     ];
 
-    // ✅ Cart Badge Count
     const cartItemCount = cartProductIds.length;
 
-    // ✅ Render your EXISTING components based on active tab
     const renderTabContent = () => {
         switch (activeTab) {
             case 'products':
                 return (
                     <ShopProducts
-                        // Pass cart state and functions to ShopProducts
                         cart={cart}
                         setCart={setCart}
                         cartProductIds={cartProductIds}
@@ -74,10 +96,8 @@ export default function ShopOrders() {
                         setShowCartDrawer={setShowCartDrawer}
                     />
                 );
-            case 'orders':
-                return <MyOrders />;
-            case 'custom':
-                return <CustomOrders />;
+            case 'orders': return <MyOrders />;
+            case 'custom': return <CustomOrders />;
             default:
                 return (
                     <ShopProducts
@@ -94,7 +114,6 @@ export default function ShopOrders() {
 
     return (
         <>
-            {/* ✅ Header with Cart Button - Page-specific header */}
             <header className="bg-white/80 backdrop-blur-md border-b border-gray-200 sticky top-0 z-30 shadow-sm">
                 <div className="flex items-center justify-between px-6 py-4">
                     <div>
@@ -102,7 +121,6 @@ export default function ShopOrders() {
                         <p className="text-sm text-gray-500">Browse products and manage your orders</p>
                     </div>
 
-                    {/* ✅ Cart Button with Badge - ONLY show on Product List tab */}
                     {activeTab === 'products' && (
                         <button
                             onClick={() => setShowCartDrawer(true)}
@@ -124,8 +142,6 @@ export default function ShopOrders() {
 
             <main className="p-6">
                 <TabNavigation tabs={tabs} basePath="/user/shop-orders" />
-
-                {/* ✅ Your existing components render here */}
                 <div className="w-full">
                     {renderTabContent()}
                 </div>

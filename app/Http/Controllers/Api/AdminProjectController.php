@@ -15,72 +15,73 @@ class AdminProjectController extends Controller
     /**
      * Get all project submissions (for admin dashboard)
      */
-    public function index()
-{
-    $projects = Project::with(['user', 'reviewer'])
-        ->where('status', '!=', 'cancelled') // ✅ EXCLUDE cancelled projects
-        ->orderBy('created_at', 'desc')
-        ->get()
-        ->map(function($project) {
-            // If reviewer doesn't exist in users table, check if it's an admin
-            $reviewer = null;
-            if ($project->reviewer) {
-                $reviewer = [
-                    'id' => $project->reviewer->id,
-                    'name' => $project->reviewer->name,
-                    'email' => $project->reviewer->email,
-                ];
-            } elseif ($project->reviewed_by) {
-                // Try to find in users table with a direct query
-                $user = \App\Models\User::find($project->reviewed_by);
-                if ($user) {
+        public function index()
+    {
+        $projects = Project::with(['user', 'reviewer'])
+            ->where('status', '!=', 'cancelled')
+            ->orderBy('created_at', 'desc')
+            ->get()
+            ->map(function($project) {
+                $reviewer = null;
+                
+                if ($project->reviewer) {
                     $reviewer = [
-                        'id' => $user->id,
-                        'name' => $user->name,
-                        'email' => $user->email,
+                        'id' => $project->reviewer->id,
+                        'name' => $project->reviewer->name,
+                        'email' => $project->reviewer->email,
                     ];
-                } else {
-                    // Reviewer doesn't exist - mark as "Admin" or "Unknown"
-                    $reviewer = [
-                        'id' => $project->reviewed_by,
-                        'name' => 'Admin User',
-                        'email' => 'admin@jnec.rub.edu.bt',
-                    ];
+                } elseif ($project->reviewed_by) {
+                    $user = \App\Models\User::find($project->reviewed_by);
+                    if ($user) {
+                        $reviewer = [
+                            'id' => $user->id,
+                            'name' => $user->name,
+                            'email' => $user->email,
+                        ];
+                    } else {
+                        $reviewer = [
+                            'id' => $project->reviewed_by,
+                            'name' => 'Admin User',
+                            'email' => 'admin@jnec.rub.edu.bt',
+                        ];
+                    }
                 }
-            }
 
-            return [
-                'id' => $project->id,
-                'title' => $project->title,
-                'description' => $project->description,
-                'document_path' => $project->document_path,
-                'status' => $project->status,
-                'admin_comments' => $project->admin_comments,
-                'submitted_at' => $project->submitted_at,
-                'reviewed_at' => $project->reviewed_at,
-                'user' => [
-                    'id' => $project->user->id ?? null,
-                    'name' => $project->user->name ?? 'Unknown',
-                    'email' => $project->user->email ?? null,
-                ],
-                'reviewer' => $reviewer,
-            ];
-        });
+                return [
+                    'id' => $project->id,
+                    'title' => $project->title,
+                    'description' => $project->description,
+                    'document_path' => $project->document_path,
+                    // ✅ Make sure this returns full URL
+                    'student_photo' => $project->student_photo 
+                        ? url('storage/' . $project->student_photo) 
+                        : null,
+                    'status' => $project->status,
+                    'admin_comments' => $project->admin_comments,
+                    'submitted_at' => $project->submitted_at,
+                    'reviewed_at' => $project->reviewed_at,
+                    'user' => [
+                        'id' => $project->user->id ?? null,
+                        'name' => $project->user->name ?? 'Unknown',
+                        'email' => $project->user->email ?? null,
+                    ],
+                    'reviewer' => $reviewer,
+                ];
+            });
 
-    // Calculate stats (excluding cancelled)
-    $stats = [
-        'total' => $projects->count(),
-        'pending' => $projects->where('status', 'pending')->count(),
-        'approved' => $projects->where('status', 'approved')->count(),
-        'rejected' => $projects->where('status', 'rejected')->count(),
-    ];
+        $stats = [
+            'total' => $projects->count(),
+            'pending' => $projects->where('status', 'pending')->count(),
+            'approved' => $projects->where('status', 'approved')->count(),
+            'rejected' => $projects->where('status', 'rejected')->count(),
+        ];
 
-    return response()->json([
-        'success' => true,
-        'data' => $projects,
-        'stats' => $stats
-    ]);
-}
+        return response()->json([
+            'success' => true,
+            'data' => $projects,
+            'stats' => $stats
+        ]);
+    }
 
     /**
      * Approve a project
@@ -218,4 +219,51 @@ public function download($id)
     
     return response()->download($filePath, basename($project->document_path));
 }
+        /**
+     * Preview project document (for viewing in browser)
+     */
+    public function preview($id)
+    {
+        $project = Project::findOrFail($id);
+        
+        $possiblePaths = [
+            storage_path('app/public/' . $project->document_path),
+            storage_path('app/' . $project->document_path),
+            public_path('storage/' . $project->document_path),
+        ];
+        
+        $filePath = null;
+        foreach ($possiblePaths as $path) {
+            if (file_exists($path)) {
+                $filePath = $path;
+                break;
+            }
+        }
+        
+        if (!$filePath) {
+            return response()->json(['message' => 'File not found'], 404);
+        }
+
+        // ✅ Get file extension and set correct MIME type
+        $extension = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
+        
+        $mimeTypes = [
+            'pdf' => 'application/pdf',
+            'jpg' => 'image/jpeg',
+            'jpeg' => 'image/jpeg',
+            'png' => 'image/png',
+            'gif' => 'image/gif',
+            'doc' => 'application/msword',
+            'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'txt' => 'text/plain',
+        ];
+
+        $mimeType = $mimeTypes[$extension] ?? 'application/octet-stream';
+
+        // ✅ Return with correct headers for inline viewing
+        return response()->file($filePath, [
+            'Content-Type' => $mimeType,
+            'Content-Disposition' => 'inline; filename="' . basename($project->document_path) . '"',
+        ]);
+    }
 }

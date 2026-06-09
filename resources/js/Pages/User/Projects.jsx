@@ -6,15 +6,15 @@ export default function UserProjects() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    // ✅ Search & Filter States
+    // Search & Filter States
     const [searchTerm, setSearchTerm] = useState('');
     const [filterStatus, setFilterStatus] = useState('all');
 
-    // ✅ Bulk Selection State
+    // Bulk Selection State
     const [selectedProjects, setSelectedProjects] = useState([]);
     const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
 
-    // ✅ Cancel Modal State
+    // Cancel Modal State
     const [showCancelModal, setShowCancelModal] = useState(false);
 
     // Modal States
@@ -28,6 +28,8 @@ export default function UserProjects() {
         title: '',
         description: '',
         document: null,
+        photo: null,
+        photoPreview: null,
     });
 
     // Toast
@@ -66,7 +68,7 @@ export default function UserProjects() {
         fetchProjects();
     }, []);
 
-    // ✅ Calculate stats
+    // Calculate stats
     const stats = {
         total: projects.length,
         pending: projects.filter(p => p.status === 'pending').length,
@@ -75,7 +77,7 @@ export default function UserProjects() {
         cancelled: projects.filter(p => p.status === 'cancelled').length,
     };
 
-    // ✅ Filter projects based on search term AND status
+    // Filter projects based on search term AND status
     const filteredProjects = projects.filter(project => {
         const searchLower = searchTerm.toLowerCase();
         const matchesSearch =
@@ -140,8 +142,7 @@ export default function UserProjects() {
         }
     };
 
-
-    // ✅ Open Cancel Modal (close View modal first)
+    // Open Cancel Modal (close View modal first)
     const handleCancelClick = (project) => {
         console.log('🔵 Cancel button clicked for project:', project);
         setSelectedProject(project);
@@ -149,7 +150,7 @@ export default function UserProjects() {
         setShowCancelModal(true); // ✅ Open Cancel modal
     };
 
-    // ✅ Confirm Cancel
+    // Confirm Cancel
     const confirmCancel = async () => {
         console.log('🟡 Confirm Cancel clicked');
         console.log('🟡 Selected project:', selectedProject);
@@ -189,7 +190,13 @@ export default function UserProjects() {
 
     // Open Submit Modal
     const handleOpenSubmit = () => {
-        setFormState({ title: '', description: '', document: null });
+        setFormState({
+            title: '',
+            description: '',
+            document: null,
+            photo: null,
+            photoPreview: null,
+        });
         setShowSubmitModal(true);
     };
 
@@ -200,6 +207,8 @@ export default function UserProjects() {
             title: project.title,
             description: project.description,
             document: null,
+            photo: null,
+            photoPreview: project.student_photo || null,
         });
         setShowEditModal(true);
     };
@@ -210,7 +219,42 @@ export default function UserProjects() {
         setShowViewModal(true);
     };
 
-    // Submit new project
+    // ✅ Handle photo upload
+    const handlePhotoChange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            // Validate file type
+            if (!['image/png', 'image/jpeg', 'image/jpg'].includes(file.type)) {
+                showToast('❌ Only PNG and JPG images are allowed', 'error');
+                return;
+            }
+
+            // Validate file size (2MB max)
+            if (file.size > 2 * 1024 * 1024) {
+                showToast('❌ Image size must be less than 2MB', 'error');
+                return;
+            }
+
+            setFormState({ ...formState, photo: file });
+
+            // Create preview
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setFormState(prev => ({ ...prev, photoPreview: reader.result }));
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    // ✅ Remove photo
+    const removePhoto = () => {
+        setFormState({
+            ...formState,
+            photo: null,
+            photoPreview: null,
+        });
+    };
+
     const handleSubmitProject = async (e) => {
         e.preventDefault();
 
@@ -225,6 +269,11 @@ export default function UserProjects() {
             formData.append('title', formState.title);
             formData.append('description', formState.description);
             formData.append('document', formState.document);
+
+            // ✅ ADD THIS - Append photo if exists
+            if (formState.photo) {
+                formData.append('photo', formState.photo);
+            }
 
             await axios.post('/user/projects', formData, {
                 headers: {
@@ -262,6 +311,10 @@ export default function UserProjects() {
 
             if (formState.document) {
                 formData.append('document', formState.document);
+            }
+
+            if (formState.photo) {
+                formData.append('photo', formState.photo);
             }
 
             await axios.post(`/user/projects/${selectedProject.id}`, formData, {
@@ -355,6 +408,12 @@ export default function UserProjects() {
             month: 'short',
             day: 'numeric'
         });
+    };
+
+    // Get initials
+    const getInitials = (name) => {
+        if (!name) return 'U';
+        return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
     };
 
     // Get status badge
@@ -453,7 +512,7 @@ export default function UserProjects() {
                                 />
                             </div>
 
-                            {/* ✅ NEW: Status Filter Dropdown */}
+                            {/* NEW: Status Filter Dropdown */}
                             <select
                                 value={filterStatus}
                                 onChange={(e) => setFilterStatus(e.target.value)}
@@ -545,11 +604,24 @@ export default function UserProjects() {
                                             </td>
                                             <td className="py-4 px-4">
                                                 <div className="flex items-center gap-3">
-                                                    <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center text-white flex-shrink-0">
-                                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                                        </svg>
-                                                    </div>
+                                                    {/* ✅ UPDATED: Show student photo or initials */}
+                                                    {project.student_photo ? (
+                                                        <img
+                                                            src={project.student_photo}  // ✅ Just use the URL directly!
+                                                            alt={project.title}
+                                                            className="w-10 h-10 rounded-full object-cover"
+                                                            onError={(e) => {
+                                                                e.target.onerror = null;
+                                                                e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjZTJlOGYwIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzZiNzI4MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPlVOPC90ZXh0Pjwvc3ZnPg==';
+                                                            }}
+                                                        />
+                                                    ) : (
+                                                        <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center text-white flex-shrink-0">
+                                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                            </svg>
+                                                        </div>
+                                                    )}
                                                     <div>
                                                         <p className="font-semibold text-gray-900 text-sm">{project.title}</p>
                                                         <p className="text-xs text-gray-500 line-clamp-1">{project.description}</p>
@@ -735,6 +807,54 @@ export default function UserProjects() {
                                 />
                             </div>
 
+                            {/* ✅ NEW: Photo Upload Section */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Your Photo <span className="text-xs text-gray-500">(Optional - for public display)</span>
+                                </label>
+
+                                {!formState.photoPreview ? (
+                                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-500 transition-colors">
+                                        <input
+                                            type="file"
+                                            onChange={handlePhotoChange}
+                                            className="hidden"
+                                            id="photo-upload"
+                                            accept="image/png,image/jpeg,image/jpg"
+                                        />
+                                        <label htmlFor="photo-upload" className="cursor-pointer block">
+                                            <svg className="w-10 h-10 text-gray-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                            </svg>
+                                            <p className="text-sm text-gray-600">
+                                                <span className="font-medium text-blue-600">Click to upload</span> your photo
+                                            </p>
+                                            <p className="text-xs text-gray-500 mt-1">PNG or JPG, max 2MB</p>
+                                        </label>
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-col items-center justify-center">
+                                        <div className="relative">
+                                            <img
+                                                src={formState.photoPreview}
+                                                alt="Preview"
+                                                className="w-32 h-32 rounded-full object-cover border-4 border-blue-500 shadow-lg"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={removePhoto}
+                                                className="absolute -top-2 -right-2 w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors shadow-lg"
+                                            >
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                                </svg>
+                                            </button>
+                                        </div>
+                                        <p className="text-xs text-gray-500 mt-2">Click X to remove photo</p>
+                                    </div>
+                                )}
+                            </div>
+
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
                                     Project Document <span className="text-red-500">*</span>
@@ -809,11 +929,24 @@ export default function UserProjects() {
 
                         <div className="p-6 space-y-4">
                             <div className="flex items-center gap-3 mb-4">
-                                <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center text-white">
-                                    <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                    </svg>
-                                </div>
+                                {/* ✅ Show student photo or initials */}
+                                {selectedProject.student_photo ? (
+                                    <img
+                                        src={selectedProject.student_photo}  // ✅ Just use the URL directly!
+                                        alt={selectedProject.title}
+                                        className="w-14 h-14 rounded-full object-cover"
+                                        onError={(e) => {
+                                            e.target.onerror = null;
+                                            e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTYiIGhlaWdodD0iNTYiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjU2IiBoZWlnaHQ9IjU2IiBmaWxsPSIjZTJlOGYwIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxOCIgZmlsbD0iIzZiNzI4MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPlVOPC90ZXh0Pjwvc3ZnPg==';
+                                        }}
+                                    />
+                                ) : (
+                                    <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center text-white">
+                                        <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                        </svg>
+                                    </div>
+                                )}
                                 <div>
                                     <h4 className="text-lg font-bold text-gray-900">{selectedProject.title}</h4>
                                     {getStatusBadge(selectedProject.status)}
@@ -888,7 +1021,7 @@ export default function UserProjects() {
                         </div>
 
                         <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-100">
-                            {/* ✅ Cancel button for PENDING projects */}
+                            {/* Cancel button for PENDING projects */}
                             {selectedProject.status === 'pending' && (
                                 <button
                                     onClick={() => handleCancelClick(selectedProject)}
@@ -988,6 +1121,51 @@ export default function UserProjects() {
                                     rows="4"
                                     className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                                 />
+                            </div>
+
+                            {/* ✅ NEW: Photo Upload Section (Edit) */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Your Photo <span className="text-xs text-gray-500">(Optional - for public display)</span>
+                                </label>
+
+                                {!formState.photoPreview ? (
+                                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-500 transition-colors">
+                                        <input
+                                            type="file"
+                                            onChange={handlePhotoChange}
+                                            className="hidden"
+                                            id="photo-edit"
+                                            accept="image/png,image/jpeg,image/jpg"
+                                        />
+                                        <label htmlFor="photo-edit" className="cursor-pointer block">
+                                            <svg className="w-10 h-10 text-gray-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                            </svg>
+                                            <p className="text-sm text-gray-600">
+                                                <span className="font-medium text-blue-600">Click to upload</span> your photo
+                                            </p>
+                                            <p className="text-xs text-gray-500 mt-1">PNG or JPG, max 2MB</p>
+                                        </label>
+                                    </div>
+                                ) : (
+                                    <div className="relative inline-block">
+                                        <img
+                                            src={formState.photoPreview}
+                                            alt="Preview"
+                                            className="w-24 h-24 rounded-full object-cover border-2 border-blue-500"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={removePhoto}
+                                            className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors"
+                                        >
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                )}
                             </div>
 
                             <div>

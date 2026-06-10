@@ -132,6 +132,13 @@ Route::prefix('admin')->middleware('auth:sanctum')->group(function () {
     Route::post('/profile/update', [\App\Http\Controllers\Api\Admin\ProfileController::class, 'update']);
     Route::post('/profile/change-password', [\App\Http\Controllers\Api\Admin\ProfileController::class, 'changePassword']);
     
+    // Admin Notification Routes
+    Route::get('/notifications', [App\Http\Controllers\Api\NotificationController::class, 'index']);
+    Route::get('/notifications/unread-count', [App\Http\Controllers\Api\NotificationController::class, 'unreadCount']);
+    Route::post('/notifications/{id}/read', [App\Http\Controllers\Api\NotificationController::class, 'markAsRead']);
+    Route::post('/notifications/mark-all-read', [App\Http\Controllers\Api\NotificationController::class, 'markAllAsRead']);
+    Route::delete('/notifications/clear-all', [App\Http\Controllers\Api\NotificationController::class, 'clearAll']);
+
     // Admin Dashboard Stats
     Route::get('/dashboard/stats', [App\Http\Controllers\Api\Admin\DashboardController::class, 'index']);
 
@@ -140,6 +147,12 @@ Route::prefix('admin')->middleware('auth:sanctum')->group(function () {
     Route::get('/dashboard/top-products', [App\Http\Controllers\Api\Admin\DashboardController::class, 'getTopSellingProducts']);
     Route::get('/dashboard/monthly-revenue', [App\Http\Controllers\Api\Admin\DashboardController::class, 'getMonthlyRevenue']);
     Route::get('/dashboard/most-booked-machines', [App\Http\Controllers\Api\Admin\DashboardController::class, 'getMostBookedMachines']);
+
+    // Admin Notification Routes
+    Route::get('/notifications', [App\Http\Controllers\Api\NotificationController::class, 'index']);
+    Route::get('/notifications/unread-count', [App\Http\Controllers\Api\NotificationController::class, 'unreadCount']);
+    Route::post('/notifications/{id}/read', [App\Http\Controllers\Api\NotificationController::class, 'markAsRead']);
+    Route::post('/notifications/mark-all-read', [App\Http\Controllers\Api\NotificationController::class, 'markAllAsRead']);
 
     // Settings Routes
     Route::get('/settings', [App\Http\Controllers\Api\Admin\SettingController::class, 'index']);
@@ -174,6 +187,8 @@ Route::middleware('auth:sanctum')->group(function () {
     // Notification Routes
     Route::get('/user/notifications', [App\Http\Controllers\Api\NotificationController::class, 'index']);
     Route::get('/user/notifications/unread-count', [App\Http\Controllers\Api\NotificationController::class, 'unreadCount']);
+    Route::post('/user/notifications/mark-all-read', [App\Http\Controllers\Api\NotificationController::class, 'markAllAsRead']);
+    Route::delete('/user/notifications/clear-all', [App\Http\Controllers\Api\NotificationController::class, 'clearAll']);
     Route::post('/user/notifications/{id}/read', [App\Http\Controllers\Api\NotificationController::class, 'markAsRead']);
     
     // User Dashboard
@@ -241,6 +256,13 @@ Route::middleware('auth:sanctum')->group(function () {
 // ==========================================
 Route::middleware('auth:sanctum')->prefix('production-team')->group(function () {
     
+    // Production Team Notification Routes
+    Route::get('/notifications', [App\Http\Controllers\Api\NotificationController::class, 'index']);
+    Route::get('/notifications/unread-count', [App\Http\Controllers\Api\NotificationController::class, 'unreadCount']);
+    Route::post('/notifications/{id}/read', [App\Http\Controllers\Api\NotificationController::class, 'markAsRead']);
+    Route::post('/notifications/mark-all-read', [App\Http\Controllers\Api\NotificationController::class, 'markAllAsRead']);
+    Route::delete('/notifications/clear-all', [App\Http\Controllers\Api\NotificationController::class, 'clearAll']);
+
     // Assigned Orders
     Route::get('/assigned-orders', [\App\Http\Controllers\Api\ProductionTeam\AssignedOrdersController::class, 'index']);
     Route::post('/assigned-orders/{id}/update-status', [\App\Http\Controllers\Api\ProductionTeam\AssignedOrdersController::class, 'updateStatus']);
@@ -254,6 +276,12 @@ Route::middleware('auth:sanctum')->prefix('production-team')->group(function () 
     Route::post('/projects/bulk-delete', [App\Http\Controllers\Api\ProductionTeam\ProjectController::class, 'bulkDelete']);
     Route::get('/projects/{id}/download', [App\Http\Controllers\Api\ProductionTeam\ProjectController::class, 'download']);
     
+    // Production Team Notification Routes
+    Route::get('/notifications', [App\Http\Controllers\Api\NotificationController::class, 'index']);
+    Route::get('/notifications/unread-count', [App\Http\Controllers\Api\NotificationController::class, 'unreadCount']);
+    Route::post('/notifications/{id}/read', [App\Http\Controllers\Api\NotificationController::class, 'markAsRead']);
+    Route::post('/notifications/mark-all-read', [App\Http\Controllers\Api\NotificationController::class, 'markAllAsRead']);
+
     // Profile routes
     Route::get('/profile', [\App\Http\Controllers\Api\ProductionTeam\ProfileController::class, 'show']);
     Route::post('/profile/update', [\App\Http\Controllers\Api\ProductionTeam\ProfileController::class, 'update']);

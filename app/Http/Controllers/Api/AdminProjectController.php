@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
+use App\Notifications\ProjectStatusNotification;
 
 class AdminProjectController extends Controller
 {
@@ -96,6 +97,14 @@ class AdminProjectController extends Controller
             'reviewed_by' => Auth::id(),
         ]);
 
+        // Notify user via database notification
+        $project->user->notify(new ProjectStatusNotification($project, 'approved'));
+
+        // In-app notification
+        if ($project->user) {
+            $project->user->notify(new ProjectStatusNotification($project, 'approved'));
+        }
+
         // ✅ Send Approval Email
         $user = User::find($project->user_id);
         if ($user) {
@@ -131,6 +140,15 @@ class AdminProjectController extends Controller
             'reviewed_at' => now(),
             'reviewed_by' => Auth::id(),
         ]);
+
+        // Notify user via database notification
+        $project->load('user');
+        $project->user->notify(new ProjectStatusNotification($project, 'rejected', $request->reason));
+
+        // In-app notification
+        if ($project->user) {
+            $project->user->notify(new ProjectStatusNotification($project, 'rejected', $request->reason));
+        }
 
         // ✅ Send Rejection Email with Reason
         $user = User::find($project->user_id);

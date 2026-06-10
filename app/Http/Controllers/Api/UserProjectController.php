@@ -7,6 +7,8 @@ use App\Models\Project;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
+use App\Models\User;
+use App\Notifications\NewProjectNotification;
 
 class UserProjectController extends Controller
 {
@@ -73,6 +75,17 @@ class UserProjectController extends Controller
             'status' => 'pending',
             'submitted_at' => now(),
         ]);
+
+        // Notify admin
+        $admin = User::where('role', 'admin')->first();
+        if ($admin) $admin->notify(new NewProjectNotification($project->load('user')));
+
+        // Notify admin
+        $admins = User::where('role', 'admin')->get();
+        $project->load('user');
+        foreach ($admins as $admin) {
+            $admin->notify(new NewProjectNotification($project));
+        }
 
         return response()->json([
             'success' => true,

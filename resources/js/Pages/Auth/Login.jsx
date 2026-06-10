@@ -16,37 +16,24 @@ export default function Login() {
         if (errors[name]) setErrors(prev => ({ ...prev, [name]: '' }));
     };
 
-    // ── UNIFIED LOGIN (All roles use /api/login) ──
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
         setMessage('');
         setErrors({});
-
         try {
-            // ✅ SIMPLIFIED: Only use /api/login for all roles
             const response = await axios.post('http://127.0.0.1:8000/api/login', formData);
-
-            // Clear per-tab old data
             sessionStorage.clear();
-
-            // Save token
             sessionStorage.setItem('auth_token', response.data.token);
-
-            // ✅ SIMPLIFIED: Save user data (no more admin fallback)
             if (response.data.user) {
                 sessionStorage.setItem('user', JSON.stringify(response.data.user));
             }
-
-            // Get user role and redirect
             const userRole = response.data.user?.role;
             const redirectPath =
                 userRole === 'admin' ? '/admin/dashboard' :
                     userRole === 'production_team' ? '/production-team/dashboard' :
                         '/user/dashboard';
-
             window.location.href = redirectPath;
-
         } catch (error) {
             if (error.response?.status === 403) {
                 setMessage(error.response.data.message?.includes('verify')
@@ -65,7 +52,6 @@ export default function Login() {
         }
     };
 
-    // Logout helper
     const handleLogout = () => {
         sessionStorage.clear();
         ['admin_token', 'user_data', 'enrollments', 'courses', 'bookings', 'machines'].forEach(k => localStorage.removeItem(k));
@@ -76,148 +62,91 @@ export default function Login() {
     };
 
     return (
-        <div style={styles.root}>
+        <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', fontFamily: "'DM Sans', sans-serif", padding: '16px' }}>
             <style>{`
                 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap');
+                * { box-sizing:border-box; margin:0; padding:0; }
 
-                * { box-sizing: border-box; margin: 0; padding: 0; }
+                .login-bg { position:fixed; inset:0; background:url('/images/fablab-bg.jpg') no-repeat center center / cover; z-index:0; }
+                .login-bg::after { content:''; position:absolute; inset:0; background:rgba(0,0,0,0.52); }
 
-                /* ── Background ── */
-                .login-bg {
-                    position: fixed; inset: 0;
-                    background: url('/images/fablab-bg.jpg') no-repeat center center / cover;
-                    z-index: 0;
-                }
-                .login-bg::after {
-                    content: '';
-                    position: absolute; inset: 0;
-                    background: rgba(0,0,0,0.52);
-                }
-
-                /* ── Glass card ── */
                 .glass-card {
-                    background: rgba(255,255,255,0.11);
-                    backdrop-filter: blur(18px);
-                    -webkit-backdrop-filter: blur(18px);
-                    border-radius: 22px;
-                    border: 1px solid rgba(255,255,255,0.20);
-                    box-shadow: 0 8px 40px rgba(0,0,0,0.45);
-                    padding: 40px 36px;
-                    width: 100%;
-                    max-width: 420px;
+                    background:rgba(255,255,255,0.11);
+                    backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px);
+                    border-radius:22px; border:1px solid rgba(255,255,255,0.20);
+                    box-shadow:0 8px 40px rgba(0,0,0,0.45);
+                    padding:32px 24px;
+                    width:100%; max-width:420px;
                 }
+                @media (min-width:480px) { .glass-card { padding:40px 36px; } }
 
-                /* ── Logo circle ── */
                 .logo-circle {
-                    width: 100px; height: 100px; border-radius: 50%;
-                    background: rgba(255,255,255,0.95);
-                    display: flex; align-items: center; justify-content: center;
-                    margin: 0 auto 28px;
-                    box-shadow: 0 4px 28px rgba(0,0,0,0.35);
-                    overflow: hidden;
-                    padding: 12px;
+                    width:80px; height:80px; border-radius:50%;
+                    background:rgba(255,255,255,0.95);
+                    display:flex; align-items:center; justify-content:center;
+                    margin:0 auto 22px;
+                    box-shadow:0 4px 28px rgba(0,0,0,0.35);
+                    overflow:hidden; padding:10px;
                 }
-                .logo-circle img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
-                .logo-fallback { font-size: 2.2rem; font-weight: 900; color: #0066FF; }
+                @media (min-width:480px) { .logo-circle { width:100px; height:100px; padding:12px; margin-bottom:28px; } }
+                .logo-circle img { width:100%; height:100%; object-fit:cover; border-radius:50%; }
+                .logo-fallback { font-size:2rem; font-weight:900; color:#0066FF; }
 
-                /* ── Tabs ── */
-                .tabs { display: flex; justify-content: center; gap: 2.5rem; margin-bottom: 28px; }
-                .tab-link {
-                    color: rgba(255,255,255,0.65);
-                    font-size: 1rem; font-weight: 500;
-                    text-decoration: none; padding-bottom: 8px;
-                    border-bottom: 2px solid transparent;
-                    transition: all .25s;
-                }
-                .tab-link:hover { color: white; }
-                .tab-link.active { color: white; border-bottom-color: white; }
+                .tabs { display:flex; justify-content:center; gap:2rem; margin-bottom:24px; }
+                @media (min-width:480px) { .tabs { gap:2.5rem; margin-bottom:28px; } }
+                .tab-link { color:rgba(255,255,255,0.65); font-size:.95rem; font-weight:500; text-decoration:none; padding-bottom:8px; border-bottom:2px solid transparent; transition:all .25s; }
+                .tab-link:hover { color:white; }
+                .tab-link.active { color:white; border-bottom-color:white; }
 
-                /* ── Message banner ── */
-                .msg-banner {
-                    padding: 10px 14px; border-radius: 10px;
-                    font-size: .85rem; font-weight: 500;
-                    margin-bottom: 18px;
-                    backdrop-filter: blur(8px);
-                    line-height: 1.5;
-                }
-                .msg-success { background: rgba(22,163,74,.25); color: #bbf7d0; border: 1px solid rgba(22,163,74,.35); }
-                .msg-warning { background: rgba(217,119,6,.25);  color: #fde68a; border: 1px solid rgba(217,119,6,.35); }
-                .msg-error   { background: rgba(239,68,68,.2);   color: #fecaca; border: 1px solid rgba(239,68,68,.3); }
+                .msg-banner { padding:10px 14px; border-radius:10px; font-size:.85rem; font-weight:500; margin-bottom:16px; backdrop-filter:blur(8px); line-height:1.5; word-break:break-word; }
+                .msg-success { background:rgba(22,163,74,.25); color:#bbf7d0; border:1px solid rgba(22,163,74,.35); }
+                .msg-warning { background:rgba(217,119,6,.25); color:#fde68a; border:1px solid rgba(217,119,6,.35); }
+                .msg-error   { background:rgba(239,68,68,.2);  color:#fecaca; border:1px solid rgba(239,68,68,.3); }
 
-                /* ── Inputs ── */
-                .field { margin-bottom: 18px; position: relative; }
-                .login-input {
-                    width: 100%;
-                    padding: 13px 44px 13px 18px;
-                    background: rgba(255,255,255,.15);
-                    border: 1px solid rgba(255,255,255,.2);
-                    border-radius: 10px;
-                    color: white; font-size: .95rem;
-                    font-family: 'DM Sans', sans-serif;
-                    outline: none; transition: all .25s;
-                }
-                .login-input::placeholder { color: rgba(255,255,255,.55); }
-                .login-input:focus {
-                    background: rgba(255,255,255,.24);
-                    border-color: rgba(255,255,255,.45);
-                    box-shadow: 0 0 0 3px rgba(255,255,255,.08);
-                }
-                .login-input.err {
-                    border-color: rgba(252,165,165,.7);
-                    box-shadow: 0 0 0 3px rgba(239,68,68,.12);
-                }
-                .err-txt { color: #fca5a5; font-size: .75rem; margin-top: 5px; font-weight: 500; }
+                .field { margin-bottom:16px; position:relative; }
+                @media (min-width:480px) { .field { margin-bottom:18px; } }
+                .login-input { width:100%; padding:12px 44px 12px 16px; background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.2); border-radius:10px; color:white; font-size:.9rem; font-family:'DM Sans',sans-serif; outline:none; transition:all .25s; }
+                @media (min-width:480px) { .login-input { padding:13px 44px 13px 18px; font-size:.95rem; } }
+                .login-input::placeholder { color:rgba(255,255,255,.55); }
+                .login-input:focus { background:rgba(255,255,255,.24); border-color:rgba(255,255,255,.45); box-shadow:0 0 0 3px rgba(255,255,255,.08); }
+                .login-input.err { border-color:rgba(252,165,165,.7); box-shadow:0 0 0 3px rgba(239,68,68,.12); }
+                .err-txt { color:#fca5a5; font-size:.75rem; margin-top:5px; font-weight:500; }
 
-                /* ── Eye toggle ── */
-                .eye-btn {
-                    position: absolute; right: 15px; top: 50%; transform: translateY(-50%);
-                    background: none; border: none; cursor: pointer;
-                    color: rgba(255,255,255,.55); font-size: 1rem;
-                    transition: color .2s; padding: 0; z-index: 10;
-                }
-                .eye-btn:hover { color: rgba(255,255,255,.9); }
+                .eye-btn { position:absolute; right:14px; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; color:rgba(255,255,255,.55); font-size:1rem; transition:color .2s; padding:0; z-index:10; }
+                .eye-btn:hover { color:rgba(255,255,255,.9); }
 
-                /* ── Forgot link ── */
-                .forgot-wrap { text-align: right; margin-top: 6px; margin-bottom: 6px; }
-                .forgot-link {
-                    color: rgba(255,255,255,.75); font-size: .82rem;
-                    text-decoration: none; transition: color .2s;
-                }
-                .forgot-link:hover { color: white; text-decoration: underline; }
+                .forgot-wrap { text-align:right; margin-top:6px; margin-bottom:6px; }
+                .forgot-link { color:rgba(255,255,255,.75); font-size:.82rem; text-decoration:none; transition:color .2s; }
+                .forgot-link:hover { color:white; text-decoration:underline; }
 
-                /* ── Submit button ── */
-                .login-btn {
-                    width: 100%; padding: 14px;
-                    background: #0066FF;
-                    border: none; border-radius: 11px;
-                    color: white; font-size: 1rem; font-weight: 700;
-                    cursor: pointer; margin-top: 8px;
-                    font-family: 'DM Sans', sans-serif;
-                    box-shadow: 0 4px 18px rgba(0,102,255,.45);
-                    transition: all .3s;
-                }
-                .login-btn:hover:not(:disabled) {
-                    background: #0051cc;
-                    transform: translateY(-2px);
-                    box-shadow: 0 8px 28px rgba(0,102,255,.55);
-                }
-                .login-btn:active:not(:disabled) { transform: translateY(0); }
-                .login-btn:disabled {
-                    background: rgba(255,255,255,.18);
-                    cursor: not-allowed; color: rgba(255,255,255,.45);
-                    box-shadow: none;
-                }
-
-                /* Font Awesome via CDN */
-                @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+                .login-btn { width:100%; padding:13px; background:#0066FF; border:none; border-radius:11px; color:white; font-size:.95rem; font-weight:700; cursor:pointer; margin-top:8px; font-family:'DM Sans',sans-serif; box-shadow:0 4px 18px rgba(0,102,255,.45); transition:all .3s; }
+                @media (min-width:480px) { .login-btn { padding:14px; font-size:1rem; } }
+                .login-btn:hover:not(:disabled) { background:#0051cc; transform:translateY(-2px); box-shadow:0 8px 28px rgba(0,102,255,.55); }
+                .login-btn:active:not(:disabled) { transform:translateY(0); }
+                .login-btn:disabled { background:rgba(255,255,255,.18); cursor:not-allowed; color:rgba(255,255,255,.45); box-shadow:none; }
             `}</style>
 
-            {/* Background */}
             <div className="login-bg" />
 
-            {/* Card */}
-            <div style={styles.wrap}>
+            <div style={{ position: 'relative', zIndex: 2, width: '100%', maxWidth: '420px' }}>
                 <div className="glass-card">
+
+                    {/* Home button */}
+                    <a href="/" style={{
+                        display: 'inline-flex', alignItems: 'center', gap: '.375rem',
+                        fontSize: '.78rem', fontWeight: 600, color: 'rgba(255,255,255,.7)',
+                        textDecoration: 'none', marginBottom: '1rem',
+                        padding: '.35rem .75rem', borderRadius: '9999px',
+                        background: 'rgba(255,255,255,.1)', border: '1px solid rgba(255,255,255,.2)',
+                        transition: 'all .2s',
+                    }}
+                        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,.2)'; e.currentTarget.style.color = 'white'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,.1)'; e.currentTarget.style.color = 'rgba(255,255,255,.7)'; }}>
+                        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                        </svg>
+                        Back to Home
+                    </a>
 
                     {/* Logo */}
                     <div className="logo-circle">
@@ -232,54 +161,37 @@ export default function Login() {
                         <Link to="/register" className="tab-link">Register</Link>
                     </div>
 
-                    {/* Message banner */}
+                    {/* Message */}
                     {message && (
-                        <div className={`msg-banner ${message.startsWith('✅') ? 'msg-success' :
-                            message.startsWith('⚠️') ? 'msg-warning' :
-                                'msg-error'
-                            }`}>
+                        <div className={`msg-banner ${message.startsWith('✅') ? 'msg-success' : message.startsWith('⚠️') ? 'msg-warning' : 'msg-error'}`}>
                             {message}
                         </div>
                     )}
 
                     <form onSubmit={handleSubmit}>
-
                         {/* Email */}
                         <div className="field">
-                            <input
-                                type="email" name="email"
-                                value={formData.email} onChange={handleChange}
-                                placeholder="Email" required
-                                className={`login-input ${errors.email ? 'err' : ''}`}
-                            />
-                            {errors.email && (
-                                <p className="err-txt">
-                                    {Array.isArray(errors.email) ? errors.email[0] : errors.email}
-                                </p>
-                            )}
+                            <input type="email" name="email" value={formData.email} onChange={handleChange}
+                                placeholder="Email" required className={`login-input ${errors.email ? 'err' : ''}`} />
+                            {errors.email && <p className="err-txt">{Array.isArray(errors.email) ? errors.email[0] : errors.email}</p>}
                         </div>
 
                         {/* Password */}
                         <div className="field">
-                            <input
-                                type={showPwd ? 'text' : 'password'}
-                                name="password"
+                            <input type={showPwd ? 'text' : 'password'} name="password"
                                 value={formData.password} onChange={handleChange}
-                                placeholder="Password" required
-                                className={`login-input ${errors.password ? 'err' : ''}`}
-                            />
-                            <button type="button" className="eye-btn" onClick={() => setShowPwd(p => !p)}>
-                                <i className={`fas ${showPwd ? 'fa-eye' : 'fa-eye-slash'}`}
-                                    style={{ fontFamily: "'Font Awesome 6 Free'", fontWeight: 900 }} />
+                                placeholder="Password" required className={`login-input ${errors.password ? 'err' : ''}`} />
+                            <button type="button" className="eye-btn" onClick={() => setShowPwd(p => !p)} aria-label="Toggle password">
+                                {showPwd ? (
+                                    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                                ) : (
+                                    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
+                                )}
                             </button>
-                            {errors.password && (
-                                <p className="err-txt">
-                                    {Array.isArray(errors.password) ? errors.password[0] : errors.password}
-                                </p>
-                            )}
+                            {errors.password && <p className="err-txt">{Array.isArray(errors.password) ? errors.password[0] : errors.password}</p>}
                         </div>
 
-                        {/* Forgot Password */}
+                        {/* Forgot */}
                         <div className="forgot-wrap">
                             <Link to="/forgot-password" className="forgot-link">Forgot Password?</Link>
                         </div>
@@ -291,30 +203,6 @@ export default function Login() {
                     </form>
                 </div>
             </div>
-
-            {/* Font Awesome CDN */}
-            <link
-                rel="stylesheet"
-                href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
-            />
         </div>
     );
 }
-
-const styles = {
-    root: {
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        position: 'relative',
-        fontFamily: "'DM Sans', sans-serif",
-        padding: '20px',
-    },
-    wrap: {
-        position: 'relative',
-        zIndex: 2,
-        width: '100%',
-        maxWidth: '420px',
-    },
-};

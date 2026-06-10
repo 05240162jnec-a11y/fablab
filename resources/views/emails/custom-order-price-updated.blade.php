@@ -1,83 +1,190 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <meta charset="utf-8">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Custom Order Price Updated</title>
-    <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
-        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 8px 8px 0 0; text-align: center; }
-        .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px; }
-        .order-info { background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #667eea; }
-        .price { font-size: 24px; font-weight: bold; color: #667eea; text-align: center; margin: 20px 0; }
-        .breakdown { background: #e8f5e9; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #4caf50; }
-        .breakdown h4 { color: #2e7d32; margin-top: 0; }
-        .breakdown p { margin: 10px 0; line-height: 1.8; white-space: pre-line; }
-        .button { display: inline-block; background: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; margin: 20px 0; }
-        .button:hover { background: #5568d3; }
-        .footer { text-align: center; margin-top: 30px; color: #666; font-size: 12px; }
-    </style>
 </head>
-<body>
-    <div class="header">
-        <h2>🎨 JNEC Fab Lab</h2>
-        <p>Custom Order Update</p>
-    </div>
-    
-    <div class="content">
-        <p>Hello <strong>{{ $user->name }}</strong>,</p>
-        
-        <p>Great news! Our team has reviewed your custom order design and we're ready to proceed.</p>
-        
-        <div class="order-info">
-            <h3>📋 Order Details</h3>
-            <p><strong>Order #:</strong> {{ $customOrder->order_number }}</p>
-            <p><strong>Title:</strong> {{ $customOrder->title }}</p>
-            <p><strong>Quantity:</strong> {{ $customOrder->quantity }}</p>
-        </div>
-        
-        {{-- ✅ NEW: Price Breakdown Section --}}
-        @if($customOrder->price_breakdown)
-        <div class="breakdown">
-            <h4>💰 Price Breakdown</h4>
-            <p>{{ $customOrder->price_breakdown }}</p>
-        </div>
-        @endif
-        
-        <div class="price">
-            Total Estimated Price: Nu. {{ number_format($customOrder->estimated_price, 2) }}
-        </div>
-        
-        <p>To proceed with your order, please complete the payment using the details below:</p>
-        
-        <div style="background: #fff3cd; padding: 15px; border-radius: 6px; border-left: 4px solid #ffc107; margin: 20px 0;">
-            <strong>💳 Payment Instructions:</strong>
-            <ul style="margin: 10px 0 0 0; padding-left: 20px;">
-                <li>Transfer to: [Your Bank Details]</li>
-                <li>Reference: <code>{{ $customOrder->order_number }}</code></li>
-                <li>Amount: <strong>Nu. {{ number_format($customOrder->estimated_price, 2) }}</strong></li>
-            </ul>
-        </div>
-        
-        <p>After making the payment, please upload your payment screenshot in your Fab Lab account:</p>
-        
-        <div style="text-align: center;">
-            <a href="http://127.0.0.1:8000/user/custom-orders" class="button">
-                👉 Upload Payment Screenshot
-            </a>
-        </div>
-        
-        <p><strong>⏰ Note:</strong> Please complete payment within 48 hours to avoid order cancellation.</p>
-        
-        <p>If you have any questions, reply to this email or contact our support team.</p>
-        
-        <p>Best regards,<br>
-        <strong>JNEC Fab Lab Team</strong></p>
-    </div>
-    
-    <div class="footer">
-        <p>JNEC Fab Lab | College of Science and Technology<br>
-        Royal University of Bhutan</p>
-        <p>This is an automated message. Please do not reply directly to this email.</p>
-    </div>
+<body style="margin:0;padding:0;background-color:#f1f5f9;font-family:'Segoe UI',Arial,sans-serif;">
+
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f1f5f9;padding:40px 0;">
+        <tr>
+            <td align="center">
+                <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+
+                    <!-- Logo Header -->
+                    <tr>
+                        <td align="center" style="padding-bottom:24px;">
+                            <img src="{{ asset('images/logo.png') }}" alt="JNEC Fab Lab" width="72" height="72"
+                                style="border-radius:50%;display:block;margin:0 auto;" />
+                            <div style="margin-top:12px;font-size:18px;font-weight:700;color:#0f172a;letter-spacing:-0.3px;">
+                                JNEC Fab Lab
+                            </div>
+                            <div style="font-size:12px;color:#64748b;margin-top:2px;letter-spacing:0.5px;text-transform:uppercase;">
+                                Fabrication Laboratory
+                            </div>
+                        </td>
+                    </tr>
+
+                    <!-- Card -->
+                    <tr>
+                        <td style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
+
+                            <div style="height:4px;background:#1e40af;"></div>
+
+                            <table width="100%" cellpadding="0" cellspacing="0">
+                                <tr>
+                                    <td style="padding:40px 40px 32px;">
+
+                                        <h1 style="margin:0 0 24px;font-size:20px;font-weight:700;color:#0f172a;letter-spacing:-0.3px;">
+                                            Custom Order Price Update
+                                        </h1>
+
+                                        <p style="margin:0 0 16px;font-size:15px;color:#374151;line-height:1.7;">
+                                            Dear <strong>{{ $user->name }}</strong>,
+                                        </p>
+
+                                        <p style="margin:0 0 24px;font-size:15px;color:#374151;line-height:1.7;">
+                                            Our team has reviewed your custom order design and we are ready to proceed.
+                                            Please find your order details and estimated price below.
+                                        </p>
+
+                                        <!-- Order details -->
+                                        <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:20px;">
+                                            <tr>
+                                                <td style="background:#f8fafc;border:1px solid #e2e8f0;border-left:3px solid #1e40af;border-radius:6px;padding:20px 24px;">
+                                                    <p style="margin:0 0 14px;font-size:13px;font-weight:700;color:#0f172a;text-transform:uppercase;letter-spacing:0.5px;">
+                                                        Order Details
+                                                    </p>
+                                                    <table width="100%" cellpadding="0" cellspacing="0">
+                                                        <tr>
+                                                            <td style="font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:0.4px;width:110px;padding-bottom:10px;">Order No.</td>
+                                                            <td style="font-size:14px;color:#0f172a;font-weight:600;padding-bottom:10px;">{{ $customOrder->order_number }}</td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td style="font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:0.4px;width:110px;padding-bottom:10px;">Title</td>
+                                                            <td style="font-size:14px;color:#0f172a;font-weight:600;padding-bottom:10px;">{{ $customOrder->title }}</td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td style="font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:0.4px;width:110px;">Quantity</td>
+                                                            <td style="font-size:14px;color:#0f172a;font-weight:600;">{{ $customOrder->quantity }}</td>
+                                                        </tr>
+                                                    </table>
+                                                </td>
+                                            </tr>
+                                        </table>
+
+                                        {{-- Price Breakdown --}}
+                                        @if($customOrder->price_breakdown)
+                                        <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:20px;">
+                                            <tr>
+                                                <td style="background:#f8fafc;border:1px solid #e2e8f0;border-left:3px solid #1e40af;border-radius:6px;padding:20px 24px;">
+                                                    <p style="margin:0 0 10px;font-size:13px;font-weight:700;color:#0f172a;text-transform:uppercase;letter-spacing:0.5px;">
+                                                        Price Breakdown
+                                                    </p>
+                                                    <p style="margin:0;font-size:14px;color:#475569;line-height:1.7;white-space:pre-line;">{{ $customOrder->price_breakdown }}</p>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                        @endif
+
+                                        <!-- Total price -->
+                                        <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:28px;">
+                                            <tr>
+                                                <td style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:16px 24px;">
+                                                    <table width="100%" cellpadding="0" cellspacing="0">
+                                                        <tr>
+                                                            <td style="font-size:14px;color:#64748b;font-weight:600;">Total Estimated Price</td>
+                                                            <td align="right" style="font-size:22px;font-weight:700;color:#0f172a;">
+                                                                Nu. {{ number_format($customOrder->estimated_price, 2) }}
+                                                            </td>
+                                                        </tr>
+                                                    </table>
+                                                </td>
+                                            </tr>
+                                        </table>
+
+                                        <p style="margin:0 0 16px;font-size:15px;font-weight:600;color:#0f172a;">
+                                            Payment Instructions
+                                        </p>
+
+                                        <!-- Payment instructions -->
+                                        <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:28px;">
+                                            <tr>
+                                                <td style="background:#f8fafc;border:1px solid #e2e8f0;border-left:3px solid #1e40af;border-radius:6px;padding:20px 24px;">
+                                                    <table width="100%" cellpadding="0" cellspacing="0">
+                                                        <tr>
+                                                            <td style="font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:0.4px;width:110px;padding-bottom:10px;">Transfer To</td>
+                                                            <td style="font-size:14px;color:#0f172a;font-weight:600;padding-bottom:10px;">JNEC Fab Lab Bank Account</td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td style="font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:0.4px;width:110px;padding-bottom:10px;">Reference</td>
+                                                            <td style="font-size:14px;color:#0f172a;font-weight:600;padding-bottom:10px;">{{ $customOrder->order_number }}</td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td style="font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:0.4px;width:110px;">Amount</td>
+                                                            <td style="font-size:14px;color:#0f172a;font-weight:600;">Nu. {{ number_format($customOrder->estimated_price, 2) }}</td>
+                                                        </tr>
+                                                    </table>
+                                                </td>
+                                            </tr>
+                                        </table>
+
+                                        <p style="margin:0 0 24px;font-size:14px;color:#475569;line-height:1.7;">
+                                            After completing the payment, please upload your payment screenshot
+                                            through your Fab Lab account. Please complete payment within
+                                            <strong style="color:#0f172a;">48 hours</strong> to avoid order cancellation.
+                                        </p>
+
+                                        <!-- CTA -->
+                                        <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:32px;">
+                                            <tr>
+                                                <td align="center">
+                                                    <a href="{{ url('/user/shop-orders?tab=custom') }}"
+                                                        style="display:inline-block;padding:12px 32px;background:#1e40af;color:#ffffff;text-decoration:none;border-radius:6px;font-size:14px;font-weight:600;letter-spacing:0.2px;">
+                                                        Upload Payment Screenshot
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                        </table>
+
+                                        <p style="margin:0 0 8px;font-size:14px;color:#475569;line-height:1.7;">
+                                            If you have any questions, please contact our support team.
+                                        </p>
+
+                                        <!-- Sign off -->
+                                        <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:32px;padding-top:24px;border-top:1px solid #f1f5f9;">
+                                            <tr>
+                                                <td>
+                                                    <p style="margin:0;font-size:14px;color:#374151;font-weight:600;">JNEC Fab Lab Team</p>
+                                                    <p style="margin:4px 0 0;font-size:13px;color:#64748b;">Jigme Namgyel Engineering College</p>
+                                                    <p style="margin:2px 0 0;font-size:13px;color:#64748b;">Dewathang, Samdrupjongkhar, Bhutan</p>
+                                                </td>
+                                            </tr>
+                                        </table>
+
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                        <td align="center" style="padding:24px 0 8px;">
+                            <p style="margin:0 0 4px;font-size:12px;color:#94a3b8;">
+                                This is an automated message. Please do not reply to this email.
+                            </p>
+                            <p style="margin:0;font-size:12px;color:#94a3b8;">
+                                &copy; {{ date('Y') }} JNEC Fab Lab, Jigme Namgyel Engineering College. All rights reserved.
+                            </p>
+                        </td>
+                    </tr>
+
+                </table>
+            </td>
+        </tr>
+    </table>
+
 </body>
 </html>

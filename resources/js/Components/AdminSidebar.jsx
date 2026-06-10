@@ -75,6 +75,10 @@ export default function AdminSidebar({ expandedMenus, toggleSubmenu }) {
 
     return (
         <>
+            <style>{`
+                .sidebar-nav::-webkit-scrollbar { display: none; }
+                .sidebar-nav { -ms-overflow-style: none; scrollbar-width: none; }
+            `}</style>
             <aside className="w-64 bg-slate-900 text-white flex flex-col h-screen sticky top-0">
                 <div className="flex items-center gap-3 px-6 py-5 border-b border-slate-700/50">
                     <img src="../images/logo.png" className="w-15 h-15 rounded-full object-cover" alt="Logo" />
@@ -84,7 +88,7 @@ export default function AdminSidebar({ expandedMenus, toggleSubmenu }) {
                     </div>
                 </div>
 
-                <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+                <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto sidebar-nav">
                     {/* Dashboard */}
                     <Link
                         to="/admin/dashboard"

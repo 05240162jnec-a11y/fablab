@@ -7,6 +7,7 @@ use App\Models\Booking;
 use App\Mail\BookingTerminatedMail;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
+use App\Notifications\BookingStatusNotification;
 
 class BookingController extends Controller
 {
@@ -15,24 +16,20 @@ class BookingController extends Controller
     {
         $query = Booking::with(['user:id,name,email', 'machine:id,name,type']);
 
-        // Filter by machine type
         if ($request->has('machine') && $request->machine !== 'all') {
             $query->whereHas('machine', function($q) use ($request) {
                 $q->where('type', 'like', "%{$request->machine}%");
             });
         }
 
-        // Filter by status
         if ($request->has('status') && $request->status !== 'all') {
             $query->where('status', $request->status);
         }
 
-        // Filter by date
         if ($request->has('date') && $request->date) {
             $query->whereDate('booking_date', $request->date);
         }
 
-        // Search
         if ($request->has('search') && $request->search) {
             $search = $request->search;
             $query->whereHas('user', function($q) use ($search) {
@@ -45,13 +42,10 @@ class BookingController extends Controller
 
         $bookings = $query->latest()->get();
 
-        return response()->json([
-            'success' => true,
-            'data' => $bookings
-        ]);
+        return response()->json(['success' => true, 'data' => $bookings]);
     }
 
-    // Update booking status (kept for backward compatibility, but admin UI won't use it)
+    // Update booking status
     public function updateStatus(Request $request, $id)
     {
         $validated = $request->validate([
@@ -62,50 +56,45 @@ class BookingController extends Controller
         $booking->status = $validated['status'];
         $booking->save();
 
+        // Notify user
+        if ($booking->user) {
+            $booking->user->notify(new BookingStatusNotification($booking->load('machine'), $validated['status']));
+        }
+
         return response()->json([
             'success' => true,
             'message' => 'Booking status updated',
-            'data' => $booking
+            'data'    => $booking
         ]);
     }
 
-    // ✅ NEW: Terminate booking for no-show (admin action)
+    // Terminate booking for no-show (admin action)
     public function terminateBooking($id)
     {
         $booking = Booking::with(['user', 'machine'])->findOrFail($id);
 
-        // Only allow termination for active bookings
         if (!in_array($booking->status, ['confirmed', 'upcoming'])) {
-            return response()->json([
-                'message' => 'This booking cannot be terminated.'
-            ], 422);
+            return response()->json(['message' => 'This booking cannot be terminated.'], 422);
         }
 
         try {
-            // Send termination email to user
             Mail::to($booking->user->email)->send(new BookingTerminatedMail($booking));
-
-            // Update booking status to 'terminated'
-            $booking->status = 'terminated';
-            $booking->save();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Booking terminated. User notified via email.',
-                'data' => $booking
-            ]);
         } catch (\Exception $e) {
-            // Log error but still update status
             \Log::error('Termination email failed: ' . $e->getMessage());
-            
-            $booking->status = 'terminated';
-            $booking->save();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Booking terminated (email notification failed).',
-                'data' => $booking
-            ]);
         }
+
+        $booking->status = 'terminated';
+        $booking->save();
+
+        // Notify user in-app
+        if ($booking->user) {
+            $booking->user->notify(new BookingStatusNotification($booking, 'terminated'));
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Booking terminated. User notified.',
+            'data'    => $booking
+        ]);
     }
 }

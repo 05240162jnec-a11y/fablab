@@ -8,6 +8,9 @@ use App\Models\CourseEnrollment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use App\Models\User;
+use App\Notifications\CourseEnrollmentNotification;
+use App\Notifications\NewEnrollmentNotification;
 
 class UserCourseController extends Controller
 {
@@ -268,6 +271,21 @@ class UserCourseController extends Controller
             // ✅ Refresh course data to ensure we return latest values
             $course->refresh();
 
+            // Notify the user
+            $user->notify(new CourseEnrollmentNotification($course, 'enrolled'));
+
+            // Notify admins
+            $admins = User::where('role', 'admin')->get();
+            foreach ($admins as $admin) {
+                $admin->notify(new NewEnrollmentNotification($user, $course));
+            }
+
+            // Notify user
+            $user->notify(new CourseEnrollmentNotification($course, 'enrolled'));
+            // Notify admin
+            $admin = User::where('role', 'admin')->first();
+            if ($admin) $admin->notify(new NewEnrollmentNotification($course, $user));
+
             return response()->json([
                 'message' => 'Successfully enrolled in course!',
                 'enrollment' => [
@@ -325,6 +343,12 @@ class UserCourseController extends Controller
                     $course->decrement('enrollment');
                 }
             });
+
+            // Notify user
+            $user->notify(new CourseEnrollmentNotification($course, 'unenrolled'));
+
+            // Notify the user
+            $user->notify(new CourseEnrollmentNotification($course, 'unenrolled'));
 
             return response()->json([
                 'message' => 'Successfully unenrolled from course.',

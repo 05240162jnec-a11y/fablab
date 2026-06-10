@@ -367,7 +367,7 @@ export default function About() {
                                     : 'border-transparent text-gray-600 hover:text-gray-800'
                                 }`}
                         >
-                            📄 About Sections
+                            About Sections
                         </button>
                         <button
                             onClick={() => setActiveTab('team')}
@@ -376,7 +376,7 @@ export default function About() {
                                     : 'border-transparent text-gray-600 hover:text-gray-800'
                                 }`}
                         >
-                            👥 Team Members
+                            Team Members
                         </button>
                     </div>
                 </div>
@@ -391,7 +391,7 @@ export default function About() {
                     <div className="space-y-4">
                         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                             <p className="text-sm text-blue-800">
-                                <strong>💡 Tip:</strong> Edit the content for each section. These sections appear on the public About page.
+                                <strong>Tip:</strong> Edit the content for each section. These sections appear on the public About page.
                             </p>
                         </div>
 

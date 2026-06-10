@@ -51,7 +51,8 @@ class ProductionTeamController extends Controller
                     'is_verified' => $user->email_verified_at !== null, // ✅ Added
                     'email_verified_at' => $user->email_verified_at,
                     'created_at' => $user->created_at,
-                ];
+                'profile_photo' => $user->profile_photo ? asset('storage/' . $user->profile_photo) : null,
+            ];
             }),
             'stats' => $stats
         ]);
@@ -75,6 +76,7 @@ class ProductionTeamController extends Controller
                 'is_verified' => $member->email_verified_at !== null, // ✅ Added
                 'email_verified_at' => $member->email_verified_at,
                 'created_at' => $member->created_at,
+                'profile_photo' => $member->profile_photo ? asset('storage/' . $member->profile_photo) : null,
             ]
         ]);
     }

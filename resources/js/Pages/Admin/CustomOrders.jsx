@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import axios from 'axios';
 import { useDialog } from '../../Components/UniformDialogManager';
 
@@ -37,6 +38,26 @@ export default function CustomOrders() {
     // Bulk Delete States
     const [selectedOrderIds, setSelectedOrderIds] = useState([]);
     const [isSelectAll, setIsSelectAll] = useState(false);
+
+    // Highlight (from notification click)
+    const location = useLocation();
+    const hlParams = new URLSearchParams(location.search);
+    const [highlightId, setHighlightId] = useState(hlParams.get('highlight') ? Number(hlParams.get('highlight')) : null);
+    const [dismissedDot, setDismissedDot] = useState(null);
+
+    useEffect(() => {
+        const s = document.createElement('style');
+        s.id = 'hl-style-co';
+        s.textContent = `
+            @keyframes hlPulse { 0%,100%{box-shadow:0 0 0 0 rgba(37,99,235,.5)} 50%{box-shadow:0 0 0 8px rgba(37,99,235,0)} }
+            .hl-card { border:2px solid #2563eb !important; animation:hlPulse 1.2s ease-in-out infinite; }
+        `;
+        if (!document.getElementById('hl-style-co')) document.head.appendChild(s);
+        if (highlightId) {
+            const el = document.getElementById(`card-${highlightId}`);
+            if (el) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'center' }), 400);
+        }
+    }, []);
 
     // Fetch orders on mount
     useEffect(() => {
@@ -463,9 +484,14 @@ export default function CustomOrders() {
                                         return (
                                             <tr
                                                 key={order.id}
-                                                onClick={() => openDetailsModal(order)}
-                                                className="hover:bg-gray-50 cursor-pointer"
+                                                id={`card-${order.id}`}
+                                                onClick={() => { openDetailsModal(order); setHighlightId(null); }}
+                                                className={`hover:bg-gray-50 cursor-pointer relative ${highlightId === order.id ? 'hl-card' : ''}`}
                                             >
+                                                {highlightId === order.id && dismissedDot !== order.id && (
+                                                    <div onClick={e => { e.stopPropagation(); setDismissedDot(order.id); }}
+                                                        style={{ position: 'absolute', top: 10, right: 10, width: 10, height: 10, background: '#2563eb', borderRadius: '50%', border: '2px solid white', boxShadow: '0 0 0 2px #2563eb', cursor: 'pointer', zIndex: 10 }} />
+                                                )}
                                                 <td className="px-6 py-4">
                                                     <input
                                                         type="checkbox"

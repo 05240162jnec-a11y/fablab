@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { Link, useNavigate } from 'react-router-dom';
+import CountrySelect from '../../Components/CountrySelect';
+import countries from '../../data/countries';
 
 export default function ProductionTeam() {
 
@@ -35,6 +37,12 @@ export default function ProductionTeam() {
         gender: 'male',
     });
 
+    // Phone validation state
+    const [addPhoneCountry, setAddPhoneCountry] = useState('BT');
+    const [addPhoneError, setAddPhoneError] = useState('');
+    const [editPhoneCountry, setEditPhoneCountry] = useState('BT');
+    const [editPhoneError, setEditPhoneError] = useState('');
+
     // Backend State
     const [members, setMembers] = useState([]);
     const [stats, setStats] = useState({ total: 0, active: 0, inactive: 0, verified: 0, not_verified: 0 });
@@ -47,6 +55,30 @@ export default function ProductionTeam() {
         setTimeout(() => {
             setToast({ show: false, message: '', type: 'success' });
         }, 3000);
+    };
+
+    // Phone validation helpers
+    const getCountryPhoneRules = (code) => {
+        const country = countries.find(c => c.code === code);
+        if (!country) return { max: 15, hint: '7–15 digits' };
+        const d = country.phone_digits;
+        const max = Array.isArray(d) ? d[1] : d;
+        return { max, hint: country.phone_hint };
+    };
+
+    const validatePhone = (phone, code) => {
+        if (!phone) return '';
+        if (code === 'BT') {
+            if (!/^(17|77)\d{6}$/.test(phone)) return 'Bhutan: must be 8 digits starting with 17 or 77';
+            return '';
+        }
+        const country = countries.find(c => c.code === code);
+        const d = country?.phone_digits;
+        const min = Array.isArray(d) ? d[0] : d;
+        const max = Array.isArray(d) ? d[1] : d;
+        if (!/^\d+$/.test(phone)) return 'Digits only';
+        if (phone.length < min || phone.length > max) return `Must be ${getCountryPhoneRules(code).hint}`;
+        return '';
     };
 
     // ✅ Fetch admin data from localStorage
@@ -166,24 +198,18 @@ export default function ProductionTeam() {
 
     // Open Add Modal
     const handleAddMember = () => {
-        setFormState({
-            name: '',
-            email: '',
-            phone: '',
-            gender: 'male',
-        });
+        setFormState({ name: '', email: '', phone: '', gender: 'male' });
+        setAddPhoneCountry('BT');
+        setAddPhoneError('');
         setShowAddModal(true);
     };
 
     // Open Edit Modal
     const handleEditMember = (member) => {
         setSelectedMember(member);
-        setFormState({
-            name: member.name || '',
-            email: member.email || '',
-            phone: member.phone || '',
-            gender: member.gender || 'male',
-        });
+        setFormState({ name: member.name || '', email: member.email || '', phone: member.phone || '', gender: member.gender || 'male' });
+        setEditPhoneCountry('BT');
+        setEditPhoneError('');
         setShowEditModal(true);
     };
 
@@ -218,6 +244,8 @@ export default function ProductionTeam() {
 
     // Save Add
     const handleSaveAdd = async () => {
+        const pErr = validatePhone(formState.phone, addPhoneCountry);
+        if (pErr) { setAddPhoneError(pErr); return; }
         try {
             const token = localStorage.getItem('auth_token');
             await axios.post('/admin/production-team', {
@@ -245,6 +273,8 @@ export default function ProductionTeam() {
 
     // Save Edit
     const handleSaveEdit = async () => {
+        const pErr = validatePhone(formState.phone, editPhoneCountry);
+        if (pErr) { setEditPhoneError(pErr); return; }
         try {
             const token = localStorage.getItem('auth_token');
             await axios.put(`/admin/production-team/${selectedMember.id}`, {
@@ -484,29 +514,52 @@ export default function ProductionTeam() {
                                 />
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
-                                    <input
-                                        type="tel"
-                                        placeholder="+975 17XXXXXX"
-                                        value={formState.phone}
-                                        onChange={(e) => setFormState({ ...formState, phone: e.target.value })}
-                                        className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    />
+                            {/* Phone + Gender row */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
+                                <div style={{ display: 'flex', gap: '.5rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                                    <div style={{ flexShrink: 0 }}>
+                                        <CountrySelect
+                                            value={addPhoneCountry}
+                                            onChange={(code) => {
+                                                setAddPhoneCountry(code);
+                                                if (formState.phone) setAddPhoneError(validatePhone(formState.phone, code));
+                                            }}
+                                            error={!!addPhoneError}
+                                        />
+                                    </div>
+                                    <div style={{ flex: 1, minWidth: 120 }}>
+                                        <input
+                                            type="tel"
+                                            value={formState.phone}
+                                            onChange={(e) => {
+                                                const { max } = getCountryPhoneRules(addPhoneCountry);
+                                                const val = e.target.value.replace(/\D/g, '').slice(0, max);
+                                                setFormState({ ...formState, phone: val });
+                                                setAddPhoneError(val ? validatePhone(val, addPhoneCountry) : '');
+                                            }}
+                                            placeholder={getCountryPhoneRules(addPhoneCountry).hint}
+                                            maxLength={getCountryPhoneRules(addPhoneCountry).max}
+                                            className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${addPhoneError ? 'border-red-400 bg-red-50' : 'border-gray-200'}`}
+                                        />
+                                    </div>
                                 </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Gender</label>
-                                    <select
-                                        value={formState.gender}
-                                        onChange={(e) => setFormState({ ...formState, gender: e.target.value })}
-                                        className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                                    >
-                                        <option value="male">Male</option>
-                                        <option value="female">Female</option>
-                                        <option value="other">Other</option>
-                                    </select>
-                                </div>
+                                {addPhoneError
+                                    ? <p className="text-xs text-red-600 mt-1">⚠️ {addPhoneError}</p>
+                                    : <p className="text-xs text-gray-500 mt-1">{countries.find(c => c.code === addPhoneCountry)?.flag} {getCountryPhoneRules(addPhoneCountry).hint}</p>}
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Gender</label>
+                                <select
+                                    value={formState.gender}
+                                    onChange={(e) => setFormState({ ...formState, gender: e.target.value })}
+                                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                                >
+                                    <option value="male">Male</option>
+                                    <option value="female">Female</option>
+                                    <option value="other">Other</option>
+                                </select>
                             </div>
 
                             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
@@ -759,28 +812,52 @@ export default function ProductionTeam() {
                                 />
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
-                                    <input
-                                        type="tel"
-                                        value={formState.phone}
-                                        onChange={(e) => setFormState({ ...formState, phone: e.target.value })}
-                                        className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    />
+                            {/* Phone */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
+                                <div style={{ display: 'flex', gap: '.5rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                                    <div style={{ flexShrink: 0 }}>
+                                        <CountrySelect
+                                            value={editPhoneCountry}
+                                            onChange={(code) => {
+                                                setEditPhoneCountry(code);
+                                                if (formState.phone) setEditPhoneError(validatePhone(formState.phone, code));
+                                            }}
+                                            error={!!editPhoneError}
+                                        />
+                                    </div>
+                                    <div style={{ flex: 1, minWidth: 120 }}>
+                                        <input
+                                            type="tel"
+                                            value={formState.phone}
+                                            onChange={(e) => {
+                                                const { max } = getCountryPhoneRules(editPhoneCountry);
+                                                const val = e.target.value.replace(/\D/g, '').slice(0, max);
+                                                setFormState({ ...formState, phone: val });
+                                                setEditPhoneError(val ? validatePhone(val, editPhoneCountry) : '');
+                                            }}
+                                            placeholder={getCountryPhoneRules(editPhoneCountry).hint}
+                                            maxLength={getCountryPhoneRules(editPhoneCountry).max}
+                                            className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${editPhoneError ? 'border-red-400 bg-red-50' : 'border-gray-200'}`}
+                                        />
+                                    </div>
                                 </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Gender</label>
-                                    <select
-                                        value={formState.gender}
-                                        onChange={(e) => setFormState({ ...formState, gender: e.target.value })}
-                                        className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                                    >
-                                        <option value="male">Male</option>
-                                        <option value="female">Female</option>
-                                        <option value="other">Other</option>
-                                    </select>
-                                </div>
+                                {editPhoneError
+                                    ? <p className="text-xs text-red-600 mt-1">⚠️ {editPhoneError}</p>
+                                    : <p className="text-xs text-gray-500 mt-1">{countries.find(c => c.code === editPhoneCountry)?.flag} {getCountryPhoneRules(editPhoneCountry).hint}</p>}
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Gender</label>
+                                <select
+                                    value={formState.gender}
+                                    onChange={(e) => setFormState({ ...formState, gender: e.target.value })}
+                                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                                >
+                                    <option value="male">Male</option>
+                                    <option value="female">Female</option>
+                                    <option value="other">Other</option>
+                                </select>
                             </div>
                         </div>
 

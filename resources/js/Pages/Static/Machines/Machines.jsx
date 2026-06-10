@@ -43,7 +43,7 @@ function MachineModal({ machine, onClose, isLoggedIn }) {
     if (!machine) return null;
     const imgSrc = getImageUrl(machine.image) || FALLBACK;
     const isAvail = machine.status === 'available';
-    const handleBook = () => { onClose(); navigate(isLoggedIn ? '/dashboard/bookings' : '/login'); };
+    const handleBook = () => { onClose(); navigate(isLoggedIn ? '/user/machines' : '/login'); };
 
     return (
         <div className="modal-backdrop" onClick={onClose}>
@@ -110,7 +110,16 @@ export default function Machines() {
     const [heroSlideIdx, setHeroSlideIdx] = useState(0);
 
     const heroSlides = ['../images/b1.jpg', '../images/b2.jpg', '../images/b3.webp'];
-    const isLoggedIn = !!localStorage.getItem('token');
+    const isLoggedIn = !!sessionStorage.getItem('auth_token');
+    const handleLogout = () => {
+        sessionStorage.clear();
+        ['auth_token', 'user', 'enrollments', 'courses', 'bookings', 'machines', 'cart_items'].forEach(k => {
+            localStorage.removeItem(k);
+            sessionStorage.removeItem(k);
+        });
+        window.location.href = '/';
+    };
+
 
     useEffect(() => {
         const fn = () => setScrolled(window.scrollY > 20);
@@ -145,7 +154,7 @@ export default function Machines() {
     }, [search]);
 
     const handleBookClick = useCallback(() => {
-        navigate(isLoggedIn ? '/dashboard/bookings' : '/login');
+        navigate(isLoggedIn ? '/user/machines' : '/login');
     }, [isLoggedIn, navigate]);
 
     const statusLabel = (s) => s === 'available' ? 'Available' : s === 'maintenance' ? 'Maintenance' : s === 'in_use' ? 'In Use' : 'Offline';
@@ -201,6 +210,9 @@ export default function Machines() {
                 .nav-login { padding:.45rem 1.1rem; font-size:.8rem; font-weight:600; color:var(--blue); background:var(--blue-lt); border:1.5px solid rgba(26,86,219,.2); border-radius:9999px; text-decoration:none; transition:all .25s; white-space:nowrap; }
                 @media (min-width:1100px) { .nav-login { padding:.5rem 1.4rem; font-size:.875rem; } }
                 .nav-login:hover { background:var(--blue); color:white; border-color:var(--blue); }
+                .nav-logout { padding:.5rem 1.25rem; font-size:.875rem; font-weight:600; color:#dc2626; background:#fef2f2; border:1.5px solid rgba(220,38,38,.2); border-radius:9999px; text-decoration:none; transition:all .25s; cursor:pointer; white-space:nowrap; }
+                .nav-logout:hover { background:#dc2626; color:white; border-color:#dc2626; box-shadow:0 4px 16px rgba(220,38,38,.3); }
+                .nav-mobile-logout { display:block; margin-top:.75rem; padding:.85rem; background:#dc2626; color:white; font-weight:700; font-size:1rem; border-radius:.75rem; text-align:center; cursor:pointer; border:none; width:100%; font-family:inherit; }
                 /* hamburger */
                 .nav-hamburger { display:none; flex-direction:column; justify-content:center; gap:5px; width:40px; height:40px; background:none; border:none; cursor:pointer; padding:6px; border-radius:.5rem; transition:background .2s; flex-shrink:0; }
                 .nav-hamburger:hover { background:rgba(0,0,0,.06); }
@@ -387,7 +399,10 @@ export default function Machines() {
                         <a href="/about" className="nav-link">About</a>
                         <a href="/gallery" className="nav-link">Gallery</a>
                         <a href="/faq" className="nav-link">FAQ</a>
-                        <Link to="/login" className="nav-login">Login</Link>
+                        {isLoggedIn
+                            ? <button className="nav-logout" onClick={handleLogout}>Logout</button>
+                            : <Link to="/login" className="nav-login">Login</Link>
+                        }
                     </div>
                     <button
                         className={`nav-hamburger ${menuOpen ? 'open' : ''}`}
@@ -407,7 +422,10 @@ export default function Machines() {
                     <a href="/about" className="nav-mobile-link" onClick={() => setMenuOpen(false)}>About</a>
                     <a href="/gallery" className="nav-mobile-link" onClick={() => setMenuOpen(false)}>Gallery</a>
                     <a href="/faq" className="nav-mobile-link" onClick={() => setMenuOpen(false)}>FAQ</a>
-                    <Link to="/login" className="nav-mobile-login" onClick={() => setMenuOpen(false)}>Login / Register</Link>
+                    {isLoggedIn
+                        ? <button className="nav-mobile-logout" onClick={() => { setMenuOpen(false); handleLogout(); }}>Logout</button>
+                        : <Link to="/login" className="nav-mobile-login" onClick={() => setMenuOpen(false)}>Login / Register</Link>
+                    }
                 </div>
             </nav>
 

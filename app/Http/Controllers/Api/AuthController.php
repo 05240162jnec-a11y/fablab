@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Notifications\NewUserRegisteredNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
@@ -146,6 +147,12 @@ class AuthController extends Controller
 
             // Send verification email
             event(new Registered($user));
+
+            // Notify admins of new registration
+            $admins = User::where('role', 'admin')->get();
+            foreach ($admins as $admin) {
+                $admin->notify(new NewUserRegisteredNotification($user));
+            }
 
             return response()->json([
                 'message' => 'Registration successful! Please check your email to verify your account.',

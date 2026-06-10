@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 
@@ -8,6 +9,19 @@ export default function Bookings() {
     const [showDropdown, setShowDropdown] = useState(false);
     const dropdownRef = useRef(null);
     const navigate = useNavigate();
+    const location = useLocation();
+    const hlParams = new URLSearchParams(location.search);
+    const [highlightId, setHighlightId] = useState(hlParams.get('highlight') ? Number(hlParams.get('highlight')) : null);
+    const [dismissedDot, setDismissedDot] = useState(null);
+
+    useEffect(() => {
+        if (!highlightId) return;
+        // auto-set correct tab
+        const tab = hlParams.get('tab');
+        if (tab) setActiveTab(tab);
+        const el = document.getElementById(`card-${highlightId}`);
+        if (el) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300);
+    }, []);
 
     // ✅ Fetch admin data from localStorage
     useEffect(() => {
@@ -69,6 +83,8 @@ export default function Bookings() {
     const [showBookingDetailsModal, setShowBookingDetailsModal] = useState(false);
     const [selectedBooking, setSelectedBooking] = useState(null);
     const [terminateLoading, setTerminateLoading] = useState(false);
+    const [showTerminateModal, setShowTerminateModal] = useState(false);
+    const [bookingToTerminate, setBookingToTerminate] = useState(null);
 
     // ✅ LOADING STATES
     const [approveLoading, setApproveLoading] = useState(false);
@@ -79,6 +95,8 @@ export default function Bookings() {
 
     // Dropdown States (simplified)
     const [showOrderStatusDropdown, setShowOrderStatusDropdown] = useState(false);
+    const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+    const [orderToDelete, setOrderToDelete] = useState(null);
 
     // Backend State
     const [bookings, setBookings] = useState([]);
@@ -214,29 +232,28 @@ export default function Bookings() {
         setShowBookingDetailsModal(true);
     };
 
-    // ✅ NEW: Terminate booking (admin action for no-shows)
-    const handleTerminateBooking = async (bookingId) => {
-        if (!window.confirm('⚠️ Terminate this booking?\n\nThe user will be notified via email that they did not show up for their scheduled time.')) {
-            return;
-        }
+    // Open terminate confirm modal
+    const handleTerminateBooking = (bookingId) => {
+        setBookingToTerminate(bookingId);
+        setShowTerminateModal(true);
+    };
 
+    // Actually terminate after confirmation
+    const confirmTerminate = async () => {
+        if (!bookingToTerminate) return;
         setTerminateLoading(true);
         try {
-            const token = localStorage.getItem('admin_token');
+            const token = localStorage.getItem('admin_token') || sessionStorage.getItem('auth_token');
             await axios.post(
-                `http://127.0.0.1:8000/api/admin/bookings/${bookingId}/terminate`,
+                `http://127.0.0.1:8000/api/admin/bookings/${bookingToTerminate}/terminate`,
                 {},
-                {
-                    headers: {
-                        'Accept': 'application/json',
-                        'Authorization': `Bearer ${token}`,
-                    }
-                }
+                { headers: { 'Accept': 'application/json', 'Authorization': `Bearer ${token}` } }
             );
-
             setActionMessage('✅ Booking terminated. User notified via email.');
             fetchData();
+            setShowTerminateModal(false);
             setShowBookingDetailsModal(false);
+            setBookingToTerminate(null);
         } catch (err) {
             console.error('Terminate error:', err);
             alert('❌ Failed to terminate booking: ' + (err.response?.data?.message || err.message));
@@ -360,20 +377,28 @@ export default function Bookings() {
         }
     };
 
-    const handleDeleteOrder = async (order) => {
+    const handleDeleteOrder = (order) => {
         if (actionLoading) return;
-        const confirmed = window.confirm(`Are you sure you want to delete order ${order.order_number}? This action cannot be undone.`);
-        if (!confirmed) return;
+        setOrderToDelete(order);
+        setShowDeleteDialog(true);
+    };
+
+    const confirmDeleteOrder = async () => {
+        if (!orderToDelete) return;
         setActionLoading(true);
         try {
-            const token = localStorage.getItem('admin_token');
-            await axios.delete(`http://127.0.0.1:8000/api/admin/product-orders/${order.id}`, {
+            const token = localStorage.getItem('admin_token') || sessionStorage.getItem('auth_token');
+            await axios.delete(`http://127.0.0.1:8000/api/admin/product-orders/${orderToDelete.id}`, {
                 headers: { 'Accept': 'application/json', 'Authorization': `Bearer ${token}` }
             });
-            setActionMessage(`✅ Order ${order.order_number} deleted!`);
+            setActionMessage(`✅ Order ${orderToDelete.order_number} deleted!`);
+            setShowDeleteDialog(false);
+            setOrderToDelete(null);
             fetchData();
         } catch (err) {
             console.error('Delete error:', err);
+            setShowDeleteDialog(false);
+            setOrderToDelete(null);
             alert('❌ Failed to delete order: ' + (err.response?.data?.message || err.message));
         } finally {
             setActionLoading(false);
@@ -394,6 +419,18 @@ export default function Bookings() {
         setShowBookingDetailsModal(false);
         setSelectedBooking(null);
     };
+
+    // Highlight CSS
+    useEffect(() => {
+        const s = document.createElement('style');
+        s.id = 'hl-style';
+        s.textContent = `
+            @keyframes hlPulse { 0%,100%{box-shadow:0 0 0 0 rgba(37,99,235,.5)} 50%{box-shadow:0 0 0 8px rgba(37,99,235,0)} }
+            .hl-card { border:2px solid #2563eb !important; animation:hlPulse 1.2s ease-in-out infinite; position:relative; }
+            .hl-dot { position:absolute; top:10px; right:10px; width:10px; height:10px; background:#2563eb; border-radius:50%; border:2px solid white; box-shadow:0 0 0 2px #2563eb; cursor:pointer; z-index:10; }
+        `;
+        if (!document.getElementById('hl-style')) document.head.appendChild(s);
+    }, []);
 
     return (
         <div className="flex-1">
@@ -464,9 +501,14 @@ export default function Bookings() {
                                     {filteredBookings.map((booking) => (
                                         <tr
                                             key={booking.id}
-                                            className="hover:bg-gray-50 transition-colors cursor-pointer"
-                                            onClick={() => handleViewBookingDetails(booking)}
+                                            id={`card-${booking.id}`}
+                                            className={`hover:bg-gray-50 transition-colors cursor-pointer relative ${highlightId === booking.id ? 'hl-card' : ''}`}
+                                            onClick={() => { handleViewBookingDetails(booking); setHighlightId(null); }}
                                         >
+                                            {highlightId === booking.id && dismissedDot !== booking.id && (
+                                                <td style={{ position: 'absolute', top: 10, right: 10, width: 10, height: 10, background: '#2563eb', borderRadius: '50%', border: '2px solid white', boxShadow: '0 0 0 2px #2563eb', cursor: 'pointer', zIndex: 10 }}
+                                                    onClick={e => { e.stopPropagation(); setDismissedDot(booking.id); }} />
+                                            )}
                                             <td className="py-4 px-4 text-sm font-medium text-gray-900">{booking.machine?.name}</td>
                                             <td className="py-4 px-4 text-sm text-gray-600">{booking.user?.name}</td>
                                             <td className="py-4 px-4 text-sm text-gray-600">{formatDate(booking.booking_date)}</td>
@@ -526,7 +568,12 @@ export default function Bookings() {
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             {filteredOrders.map((order) => (
-                                <div key={order.id} className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-md transition-shadow flex flex-col">
+                                <div key={order.id} id={`card-${order.id}`}
+                                    className={`bg-white border rounded-xl p-6 hover:shadow-md transition-shadow flex flex-col relative ${highlightId === order.id ? 'hl-card' : 'border-gray-200'}`}
+                                    onClick={() => { if (highlightId === order.id) setHighlightId(null); }}>
+                                    {highlightId === order.id && dismissedDot !== order.id && (
+                                        <div className="hl-dot" onClick={e => { e.stopPropagation(); setDismissedDot(order.id); }} />
+                                    )}
                                     <div className="flex items-start justify-between mb-4">
                                         <div className="flex-1">
                                             <h3 className="text-lg font-bold text-gray-900 mb-1">{getProductName(order)}</h3>
@@ -899,7 +946,7 @@ export default function Bookings() {
                                 <button
                                     onClick={() => handleTerminateBooking(selectedBooking.id)}
                                     disabled={terminateLoading}
-                                    className={`w-full py-3 rounded-lg transition-colors flex items-center justify-center gap-2 font-semibold ${terminateLoading ? 'bg-gray-400 text-gray-200 cursor-not-allowed' : 'bg-orange-600 text-white hover:bg-orange-700'}`}
+                                    className={`w-full py-3 rounded-lg transition-colors flex items-center justify-center gap-2 font-semibold ${terminateLoading ? 'bg-gray-400 text-gray-200 cursor-not-allowed' : 'bg-rose-700 text-white hover:bg-rose-800'}`}
                                 >
                                     {terminateLoading ? (<>
                                         <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
@@ -915,6 +962,139 @@ export default function Bookings() {
                                         selectedBooking.status === 'terminated' ? 'This booking was terminated due to no-show.' : 'No actions available.'}
                                 </div>
                             )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ✅ Terminate Booking Confirmation Modal */}
+            {showTerminateModal && (
+                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[80] p-4"
+                    onClick={() => setShowTerminateModal(false)}>
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+                        onClick={e => e.stopPropagation()}
+                        style={{ animation: 'tbModalIn .2s cubic-bezier(.16,1,.3,1) both' }}>
+                        <style>{`@keyframes tbModalIn { from{opacity:0;transform:scale(.95) translateY(8px)} to{opacity:1;transform:scale(1) translateY(0)} }`}</style>
+
+                        {/* Icon */}
+                        <div className="flex justify-center pt-8 pb-2">
+                            <div className="w-16 h-16 rounded-full bg-rose-100 flex items-center justify-center">
+                                <svg className="w-8 h-8 text-rose-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
+                                        d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                                </svg>
+                            </div>
+                        </div>
+
+                        {/* Content */}
+                        <div className="px-6 pt-3 pb-5 text-center">
+                            <h3 className="text-xl font-bold text-gray-900 mb-2">Terminate Booking?</h3>
+                            <p className="text-sm text-gray-600 leading-relaxed">
+                                The user will be notified via email that they did not show up for their scheduled time.
+                                <br />
+                                <span className="text-rose-600 font-medium">This action cannot be undone.</span>
+                            </p>
+                        </div>
+
+                        {/* Buttons */}
+                        <div className="px-6 pb-6 flex gap-3">
+                            <button
+                                onClick={() => { setShowTerminateModal(false); setBookingToTerminate(null); }}
+                                className="flex-1 py-3 border-2 border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-semibold text-sm"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={confirmTerminate}
+                                disabled={terminateLoading}
+                                className={`flex-1 py-3 rounded-xl transition-colors font-semibold text-sm text-white flex items-center justify-center gap-2
+                                    ${terminateLoading ? 'bg-gray-400 cursor-not-allowed' : 'bg-rose-700 hover:bg-rose-800'}`}
+                            >
+                                {terminateLoading ? (
+                                    <>
+                                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                        </svg>
+                                        Terminating…
+                                    </>
+                                ) : (
+                                    <>
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
+                                                d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                                        </svg>
+                                        Yes, Terminate
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ✅ Custom Delete Order Confirmation Modal */}
+            {showDeleteDialog && orderToDelete && (
+                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[80] p-4"
+                    onClick={() => { setShowDeleteDialog(false); setOrderToDelete(null); }}>
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+                        onClick={e => e.stopPropagation()}
+                        style={{ animation: 'delModalIn .2s cubic-bezier(.16,1,.3,1) both' }}>
+                        <style>{`@keyframes delModalIn { from{opacity:0;transform:scale(.95) translateY(8px)} to{opacity:1;transform:scale(1) translateY(0)} }`}</style>
+
+                        {/* Icon */}
+                        <div className="flex justify-center pt-8 pb-2">
+                            <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center">
+                                <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
+                                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                            </div>
+                        </div>
+
+                        {/* Content */}
+                        <div className="px-6 pt-3 pb-5 text-center">
+                            <h3 className="text-xl font-bold text-gray-900 mb-2">Delete Order?</h3>
+                            <p className="text-sm text-gray-600 leading-relaxed">
+                                Are you sure you want to delete order{' '}
+                                <span className="font-semibold text-gray-900">{orderToDelete.order_number}</span>?
+                                <br />
+                                <span className="text-red-600 font-medium">This action cannot be undone.</span>
+                            </p>
+                        </div>
+
+                        {/* Buttons */}
+                        <div className="px-6 pb-6 flex gap-3">
+                            <button
+                                onClick={() => { setShowDeleteDialog(false); setOrderToDelete(null); }}
+                                className="flex-1 py-3 border-2 border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-semibold text-sm"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={confirmDeleteOrder}
+                                disabled={actionLoading}
+                                className={`flex-1 py-3 rounded-xl transition-colors font-semibold text-sm text-white flex items-center justify-center gap-2
+                                    ${actionLoading ? 'bg-gray-400 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700'}`}
+                            >
+                                {actionLoading ? (
+                                    <>
+                                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                        </svg>
+                                        Deleting…
+                                    </>
+                                ) : (
+                                    <>
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
+                                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                        </svg>
+                                        Yes, Delete
+                                    </>
+                                )}
+                            </button>
                         </div>
                     </div>
                 </div>

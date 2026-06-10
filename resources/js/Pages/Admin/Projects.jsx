@@ -409,9 +409,9 @@ export default function Projects() {
                         {/* Total Projects */}
                         <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
                             <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 bg-blue-50 rounded-lg flex items-center justify-center">
-                                    <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                <div className="w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center">
+                                    <svg className="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                                     </svg>
                                 </div>
                                 <div>
@@ -424,9 +424,9 @@ export default function Projects() {
                         {/* Pending */}
                         <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
                             <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 bg-amber-50 rounded-lg flex items-center justify-center">
-                                    <svg className="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                <div className="w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center">
+                                    <svg className="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                     </svg>
                                 </div>
                                 <div>
@@ -439,9 +439,9 @@ export default function Projects() {
                         {/* Approved */}
                         <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
                             <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 bg-emerald-50 rounded-lg flex items-center justify-center">
-                                    <svg className="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                <div className="w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center">
+                                    <svg className="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                                     </svg>
                                 </div>
                                 <div>
@@ -454,9 +454,9 @@ export default function Projects() {
                         {/* Rejected */}
                         <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
                             <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 bg-rose-50 rounded-lg flex items-center justify-center">
-                                    <svg className="w-6 h-6 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                <div className="w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center">
+                                    <svg className="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
                                     </svg>
                                 </div>
                                 <div>

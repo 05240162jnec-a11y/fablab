@@ -124,7 +124,16 @@ export default function Training() {
     const [selected, setSelected] = useState(null);
     const [menuOpen, setMenuOpen] = useState(false);
 
-    const isLoggedIn = !!localStorage.getItem('token');
+    const isLoggedIn = !!sessionStorage.getItem('auth_token');
+    const handleLogout = () => {
+        sessionStorage.clear();
+        ['auth_token', 'user', 'enrollments', 'courses', 'bookings', 'machines', 'cart_items'].forEach(k => {
+            localStorage.removeItem(k);
+            sessionStorage.removeItem(k);
+        });
+        window.location.href = '/';
+    };
+
     const heroSlides = ['../images/home.jpg', '../images/home2.jpg', '../images/home3.jpg'];
 
     useEffect(() => {
@@ -152,7 +161,7 @@ export default function Training() {
     }, []);
     const handleEnroll = useCallback((course) => {
         if (!isLoggedIn) { showToast('Please login to enroll in this course', 'warn'); return; }
-        navigate(`/dashboard/courses/${course.id}/enroll`);
+        navigate('/user/learning');
     }, [isLoggedIn, navigate, showToast]);
 
     const openCount = courses.filter(c => c.registration_open).length;
@@ -207,6 +216,9 @@ export default function Training() {
                 .nav-login { padding:.45rem 1.1rem; font-size:.8rem; font-weight:600; color:var(--blue); background:var(--blue-lt); border:1.5px solid rgba(26,86,219,.2); border-radius:9999px; text-decoration:none; transition:all .25s; white-space:nowrap; }
                 @media (min-width:1100px) { .nav-login { padding:.5rem 1.4rem; font-size:.875rem; } }
                 .nav-login:hover { background:var(--blue); color:white; border-color:var(--blue); }
+                .nav-logout { padding:.5rem 1.25rem; font-size:.875rem; font-weight:600; color:#dc2626; background:#fef2f2; border:1.5px solid rgba(220,38,38,.2); border-radius:9999px; text-decoration:none; transition:all .25s; cursor:pointer; white-space:nowrap; }
+                .nav-logout:hover { background:#dc2626; color:white; border-color:#dc2626; box-shadow:0 4px 16px rgba(220,38,38,.3); }
+                .nav-mobile-logout { display:block; margin-top:.75rem; padding:.85rem; background:#dc2626; color:white; font-weight:700; font-size:1rem; border-radius:.75rem; text-align:center; cursor:pointer; border:none; width:100%; font-family:inherit; }
                 .nav-hamburger { display:none; flex-direction:column; justify-content:center; gap:5px; width:40px; height:40px; background:none; border:none; cursor:pointer; padding:6px; border-radius:.5rem; transition:background .2s; flex-shrink:0; }
                 .nav-hamburger:hover { background:rgba(0,0,0,.06); }
                 .nav-hamburger span { display:block; width:100%; height:2px; background:var(--ink); border-radius:2px; transition:all .3s; }
@@ -438,7 +450,10 @@ export default function Training() {
                         <a href="/about" className="nav-link">About</a>
                         <a href="/gallery" className="nav-link">Gallery</a>
                         <a href="/faq" className="nav-link">FAQ</a>
-                        <Link to="/login" className="nav-login">Login</Link>
+                        {isLoggedIn
+                            ? <button className="nav-logout" onClick={handleLogout}>Logout</button>
+                            : <Link to="/login" className="nav-login">Login</Link>
+                        }
                     </div>
                     <button className={`nav-hamburger ${menuOpen ? 'open' : ''}`} onClick={() => setMenuOpen(o => !o)} aria-label="Toggle menu" aria-expanded={menuOpen}>
                         <span /><span /><span />
@@ -453,7 +468,10 @@ export default function Training() {
                     <a href="/about" className="nav-mobile-link" onClick={() => setMenuOpen(false)}>About</a>
                     <a href="/gallery" className="nav-mobile-link" onClick={() => setMenuOpen(false)}>Gallery</a>
                     <a href="/faq" className="nav-mobile-link" onClick={() => setMenuOpen(false)}>FAQ</a>
-                    <Link to="/login" className="nav-mobile-login" onClick={() => setMenuOpen(false)}>Login / Register</Link>
+                    {isLoggedIn
+                        ? <button className="nav-mobile-logout" onClick={() => { setMenuOpen(false); handleLogout(); }}>Logout</button>
+                        : <Link to="/login" className="nav-mobile-login" onClick={() => setMenuOpen(false)}>Login / Register</Link>
+                    }
                 </div>
             </nav>
 

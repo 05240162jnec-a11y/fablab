@@ -34,21 +34,14 @@ export default function Courses() {
         fetchUserData();
         fetchUserEnrollments();
 
-        // Auto-refresh courses every 30 seconds to stay in sync with admin changes
-        const interval = setInterval(() => {
-            fetchCourses();
-            fetchUserEnrollments();
-        }, 30000);
-
-        // Cleanup interval on unmount
-        return () => clearInterval(interval);
+        // No auto-refresh — fetch on mount only
     }, []);
 
     const fetchCourses = async () => {
         try {
             setLoading(true);
             setError(null);
-            const authToken = localStorage.getItem('auth_token');
+            const authToken = sessionStorage.getItem('auth_token');
 
             const response = await axios.get('http://127.0.0.1:8000/api/user/courses', {
                 headers: {
@@ -69,7 +62,7 @@ export default function Courses() {
 
     const fetchUserData = async () => {
         try {
-            const authToken = localStorage.getItem('auth_token');
+            const authToken = sessionStorage.getItem('auth_token');
 
             const response = await axios.get('http://127.0.0.1:8000/api/user/profile', {
                 headers: {
@@ -96,7 +89,7 @@ export default function Courses() {
 
     const fetchUserEnrollments = async () => {
         try {
-            const authToken = localStorage.getItem('auth_token');
+            const authToken = sessionStorage.getItem('auth_token');
 
             const response = await axios.get('http://127.0.0.1:8000/api/user/my-courses', {
                 headers: {
@@ -154,7 +147,7 @@ export default function Courses() {
 
 
         try {
-            const authToken = localStorage.getItem('auth_token');
+            const authToken = sessionStorage.getItem('auth_token');
 
             const response = await axios.post(
                 `http://127.0.0.1:8000/api/user/courses/${course.id}/unenroll`,
@@ -200,7 +193,7 @@ export default function Courses() {
         setEnrollMessage('');
 
         try {
-            const authToken = localStorage.getItem('auth_token');
+            const authToken = sessionStorage.getItem('auth_token');
 
             const response = await axios.post(
                 `http://127.0.0.1:8000/api/user/courses/${selectedCourse.id}/enroll`,
@@ -278,12 +271,22 @@ export default function Courses() {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {courses.map((course) => (
                             <div key={course.id} className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-lg transition-shadow overflow-hidden flex flex-col h-full">
-                                {/* Course Image Placeholder - Fixed Height */}
-                                <div className="h-48 bg-gradient-to-br from-blue-50 to-cyan-50 flex items-center justify-center flex-shrink-0">
-                                    <svg className="w-16 h-16 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 14l9-5-9-5-9 5 9 5z" />
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
-                                    </svg>
+                                {/* Course Image */}
+                                <div className="h-48 bg-gradient-to-br from-blue-50 to-cyan-50 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                                    {course.image ? (
+                                        <img
+                                            src={course.image}
+                                            alt={course.title}
+                                            className="w-full h-full object-cover"
+                                            onError={e => { e.currentTarget.style.display = 'none'; e.currentTarget.nextSibling.style.display = 'flex'; }}
+                                        />
+                                    ) : null}
+                                    <div style={{ display: course.image ? 'none' : 'flex' }} className="w-full h-full items-center justify-center bg-gradient-to-br from-blue-50 to-cyan-50">
+                                        <svg className="w-16 h-16 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 14l9-5-9-5-9 5 9 5z" />
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
+                                        </svg>
+                                    </div>
                                 </div>
 
                                 {/* Course Info - Flex to fill height */}

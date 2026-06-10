@@ -3,135 +3,173 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Order Approved - JNEC Fab Lab</title>
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f3f4f6; padding: 24px 16px; color: #111827; }
-        .wrapper { max-width: 560px; margin: 0 auto; background: #ffffff; border-radius: 10px; overflow: hidden; border: 1px solid #e5e7eb; }
-
-        /* Banner */
-        .banner { background-color: #15803d; padding: 32px 24px; text-align: center; }
-        .banner-logo { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; display: block; margin: 0 auto 14px; background: #fff; }
-        .banner h1 { color: #ffffff; font-size: 22px; font-weight: 700; margin-bottom: 4px; }
-        .banner p { color: rgba(255,255,255,0.8); font-size: 12px; text-transform: uppercase; letter-spacing: 1.2px; }
-
-        /* Content */
-        .content { padding: 28px 28px 24px; }
-        p.greeting { font-size: 15px; color: #111827; margin-bottom: 8px; }
-        p.intro { font-size: 14px; color: #6b7280; line-height: 1.65; margin-bottom: 22px; }
-
-        /* Order details */
-        .section-label { font-size: 10px; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
-        .details-box { border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; margin-bottom: 18px; }
-        .details-row { display: flex; padding: 10px 14px; font-size: 13px; border-bottom: 1px solid #f3f4f6; }
-        .details-row:last-child { border-bottom: none; }
-        .details-row .key { color: #6b7280; width: 130px; flex-shrink: 0; }
-        .details-row .val { color: #111827; font-weight: 600; }
-
-        /* Pickup box */
-        .pickup-box { border: 1px solid #bbf7d0; border-radius: 8px; overflow: hidden; margin-bottom: 18px; }
-        .pickup-header { background: #f0fdf4; padding: 10px 14px; font-size: 10px; font-weight: 700; color: #15803d; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #bbf7d0; }
-        .pickup-row { display: flex; padding: 10px 14px; font-size: 13px; border-bottom: 1px solid #f0fdf4; align-items: flex-start; gap: 10px; }
-        .pickup-row:last-child { border-bottom: none; }
-        .pickup-row .key { color: #6b7280; width: 130px; flex-shrink: 0; }
-        .pickup-row .val { color: #111827; font-weight: 600; line-height: 1.5; }
-        .order-pill { display: inline-block; background: #dcfce7; color: #15803d; font-size: 12px; font-weight: 700; padding: 3px 12px; border-radius: 20px; margin-top: 4px; }
-
-        /* Delivery box */
-        .delivery-box { border: 1px solid #e9d5ff; border-radius: 8px; overflow: hidden; margin-bottom: 18px; }
-        .delivery-header { background: #faf5ff; padding: 10px 14px; font-size: 10px; font-weight: 700; color: #7c3aed; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #e9d5ff; }
-        .delivery-row { display: flex; padding: 10px 14px; font-size: 13px; border-bottom: 1px solid #faf5ff; align-items: flex-start; gap: 10px; }
-        .delivery-row:last-child { border-bottom: none; }
-        .delivery-row .key { color: #6b7280; width: 130px; flex-shrink: 0; }
-        .delivery-row .val { color: #111827; font-weight: 600; }
-        .delivery-note { background: #faf5ff; padding: 10px 14px; font-size: 12px; color: #7c3aed; line-height: 1.6; border-top: 1px solid #e9d5ff; }
-
-        /* Contact */
-        .contact-row { display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 20px; }
-        .contact-item { font-size: 13px; font-weight: 600; color: #374151; }
-
-        /* Footer */
-        .footer { border-top: 1px solid #f3f4f6; padding-top: 16px; font-size: 13px; color: #9ca3af; line-height: 1.7; }
-        .footer strong { color: #374151; }
-    </style>
+    <title>Order Approved</title>
 </head>
-<body>
-<div class="wrapper">
+<body style="margin:0;padding:0;background-color:#f1f5f9;font-family:'Segoe UI',Arial,sans-serif;">
 
-    <div class="banner">
-        <img src="../JNEC-Logo.png" alt="JNEC Fab Lab" class="banner-logo">
-        <h1>Order Approved</h1>
-        <p>JNEC Fab Lab</p>
-    </div>
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f1f5f9;padding:40px 0;">
+        <tr>
+            <td align="center">
+                <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
 
-    <div class="content">
+                    <!-- Logo Header -->
+                    <tr>
+                        <td align="center" style="padding-bottom:24px;">
+                            <img src="{{ asset('images/logo.png') }}" alt="JNEC Fab Lab" width="72" height="72"
+                                style="border-radius:50%;display:block;margin:0 auto;" />
+                            <div style="margin-top:12px;font-size:18px;font-weight:700;color:#0f172a;letter-spacing:-0.3px;">
+                                JNEC Fab Lab
+                            </div>
+                            <div style="font-size:12px;color:#64748b;margin-top:2px;letter-spacing:0.5px;text-transform:uppercase;">
+                                Fabrication Laboratory
+                            </div>
+                        </td>
+                    </tr>
 
-        <p class="greeting">Dear <strong>{{ $order->user->name ?? 'Valued Customer' }}</strong>,</p>
-        <p class="intro">Great news! Your payment has been verified and your order is now approved. Please review your order details and delivery information below.</p>
+                    <!-- Card -->
+                    <tr>
+                        <td style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
 
-        <div class="section-label">Order details</div>
-        <div class="details-box">
-            <div class="details-row">
-                <span class="key">Order number</span>
-                <span class="val">{{ $order->order_number }}</span>
-            </div>
-            <div class="details-row">
-                <span class="key">Product</span>
-                <span class="val">{{ $productName }}</span>
-            </div>
-            <div class="details-row">
-                <span class="key">Total amount</span>
-                <span class="val">Nu. {{ number_format($order->total_amount, 2) }}</span>
-            </div>
-        </div>
+                            <div style="height:4px;background:#1e40af;"></div>
 
+                            <table width="100%" cellpadding="0" cellspacing="0">
+                                <tr>
+                                    <td style="padding:40px 40px 32px;">
 
-        <div class="pickup-box">
-            <div class="pickup-header">🏪 Self pickup</div>
-            <div class="pickup-row">
-                <span class="key">Location</span>
-                <span class="val">JNEC Fab Lab, Jigme Namgyel Engineering College</span>
-            </div>
-            <div class="pickup-row">
-                <span class="key">Opening hours</span>
-                <span class="val">9:00 AM – 5:00 PM &nbsp;·&nbsp; Monday to Saturday</span>
-            </div>
-            <div class="pickup-row">
-                <span class="key">Order number</span>
-                <span class="val">
-                    Please present this when you arrive.<br>
-                    <span class="order-pill">{{ $order->order_number }}</span>
-                </span>
-            </div>
-        </div>
-        <div class="delivery-box">
-            <div class="delivery-header">📦 Delivery</div>
-            <div class="delivery-row">
-                <span class="key">Delivery address</span>
-                <span class="val">{{ $order->shipping_address }}</span>
-            </div>
-            <div class="delivery-row">
-                <span class="key">Delivery cost</span>
-                <span class="val">To be negotiated</span>
-            </div>
-        </div>
+                                        <h1 style="margin:0 0 24px;font-size:20px;font-weight:700;color:#0f172a;letter-spacing:-0.3px;">
+                                            Order Approved
+                                        </h1>
 
-        <p style="font-size: 13px; color: #6b7280; margin-bottom: 8px;">Have questions? Reach out to us:</p>
-        <div class="contact-row">
-            <span class="contact-item">📞 +975-17789864</span>
-            <span class="contact-item">✉ Reply to this email</span>
-        </div>
+                                        <p style="margin:0 0 16px;font-size:15px;color:#374151;line-height:1.7;">
+                                            Dear <strong>{{ $order->user->name ?? 'Valued Customer' }}</strong>,
+                                        </p>
 
-        <p style="font-size: 14px; color: #6b7280; margin-bottom: 20px; line-height: 1.6;">
-            Thank you for choosing <strong style="color: #111827;">JNEC Fab Lab</strong>. We look forward to serving you!
-        </p>
+                                        <p style="margin:0 0 28px;font-size:15px;color:#374151;line-height:1.7;">
+                                            Your payment has been verified and your order is now approved.
+                                            Please review your order details and delivery information below.
+                                        </p>
 
-        <div class="footer">
-            <strong>The JNEC Fab Lab Team</strong><br>
-            Jigme Namgyel Engineering College
-        </div>
+                                        <!-- Order details -->
+                                        <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:20px;">
+                                            <tr>
+                                                <td style="background:#f8fafc;border:1px solid #e2e8f0;border-left:3px solid #1e40af;border-radius:6px;padding:20px 24px;">
+                                                    <p style="margin:0 0 14px;font-size:13px;font-weight:700;color:#0f172a;text-transform:uppercase;letter-spacing:0.5px;">
+                                                        Order Details
+                                                    </p>
+                                                    <table width="100%" cellpadding="0" cellspacing="0">
+                                                        <tr>
+                                                            <td style="font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:0.4px;width:130px;padding-bottom:10px;">Order Number</td>
+                                                            <td style="font-size:14px;color:#0f172a;font-weight:600;padding-bottom:10px;">{{ $order->order_number }}</td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td style="font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:0.4px;width:130px;padding-bottom:10px;">Product</td>
+                                                            <td style="font-size:14px;color:#0f172a;font-weight:600;padding-bottom:10px;">{{ $productName }}</td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td style="font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:0.4px;width:130px;">Total Amount</td>
+                                                            <td style="font-size:14px;color:#0f172a;font-weight:600;">Nu. {{ number_format($order->total_amount, 2) }}</td>
+                                                        </tr>
+                                                    </table>
+                                                </td>
+                                            </tr>
+                                        </table>
 
-    </div>
-</div>
+                                        @if($deliveryOption === 'pickup')
+                                        <!-- Pickup details -->
+                                        <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:20px;">
+                                            <tr>
+                                                <td style="background:#f8fafc;border:1px solid #e2e8f0;border-left:3px solid #1e40af;border-radius:6px;padding:20px 24px;">
+                                                    <p style="margin:0 0 14px;font-size:13px;font-weight:700;color:#0f172a;text-transform:uppercase;letter-spacing:0.5px;">
+                                                        Self Pickup
+                                                    </p>
+                                                    <table width="100%" cellpadding="0" cellspacing="0">
+                                                        <tr>
+                                                            <td style="font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:0.4px;width:130px;padding-bottom:10px;">Location</td>
+                                                            <td style="font-size:14px;color:#0f172a;font-weight:600;padding-bottom:10px;">JNEC Fab Lab, Jigme Namgyel Engineering College</td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td style="font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:0.4px;width:130px;padding-bottom:10px;">Opening Hours</td>
+                                                            <td style="font-size:14px;color:#0f172a;font-weight:600;padding-bottom:10px;">9:00 AM – 5:00 PM &nbsp;·&nbsp; Monday to Saturday</td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td style="font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:0.4px;width:130px;">Reference</td>
+                                                            <td style="font-size:14px;color:#0f172a;font-weight:600;">
+                                                                Please present your order number upon arrival.<br>
+                                                                <span style="display:inline-block;margin-top:6px;background:#dbeafe;color:#1e40af;font-size:13px;font-weight:700;padding:3px 14px;border-radius:20px;">
+                                                                    {{ $order->order_number }}
+                                                                </span>
+                                                            </td>
+                                                        </tr>
+                                                    </table>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                        @else
+                                        <!-- Delivery details -->
+                                        <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:20px;">
+                                            <tr>
+                                                <td style="background:#f8fafc;border:1px solid #e2e8f0;border-left:3px solid #1e40af;border-radius:6px;padding:20px 24px;">
+                                                    <p style="margin:0 0 14px;font-size:13px;font-weight:700;color:#0f172a;text-transform:uppercase;letter-spacing:0.5px;">
+                                                        Delivery
+                                                    </p>
+                                                    <table width="100%" cellpadding="0" cellspacing="0">
+                                                        <tr>
+                                                            <td style="font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:0.4px;width:130px;padding-bottom:10px;">Delivery Address</td>
+                                                            <td style="font-size:14px;color:#0f172a;font-weight:600;padding-bottom:10px;">{{ $order->shipping_address }}</td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td style="font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:0.4px;width:130px;">Delivery Cost</td>
+                                                            <td style="font-size:14px;color:#0f172a;font-weight:600;">To be negotiated</td>
+                                                        </tr>
+                                                    </table>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                        @endif
+
+                                        <p style="margin:0 0 24px;font-size:14px;color:#475569;line-height:1.7;">
+                                            If you have any questions, please contact us at
+                                            <a href="mailto:fablab.jnec@rub.edu.bt" style="color:#1e40af;text-decoration:none;font-weight:600;">fablab.jnec@rub.edu.bt</a>
+                                            or call <strong style="color:#0f172a;">+975-77653429</strong>.
+                                        </p>
+
+                                        <p style="margin:0 0 8px;font-size:14px;color:#475569;line-height:1.7;">
+                                            Thank you for choosing JNEC Fab Lab. We look forward to serving you!
+                                        </p>
+
+                                        <!-- Sign off -->
+                                        <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:32px;padding-top:24px;border-top:1px solid #f1f5f9;">
+                                            <tr>
+                                                <td>
+                                                    <p style="margin:0;font-size:14px;color:#374151;font-weight:600;">JNEC Fab Lab Team</p>
+                                                    <p style="margin:4px 0 0;font-size:13px;color:#64748b;">Jigme Namgyel Engineering College</p>
+                                                    <p style="margin:2px 0 0;font-size:13px;color:#64748b;">Dewathang, Samdrupjongkhar, Bhutan</p>
+                                                </td>
+                                            </tr>
+                                        </table>
+
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                        <td align="center" style="padding:24px 0 8px;">
+                            <p style="margin:0 0 4px;font-size:12px;color:#94a3b8;">
+                                This is an automated message. Please do not reply to this email.
+                            </p>
+                            <p style="margin:0;font-size:12px;color:#94a3b8;">
+                                &copy; {{ date('Y') }} JNEC Fab Lab, Jigme Namgyel Engineering College. All rights reserved.
+                            </p>
+                        </td>
+                    </tr>
+
+                </table>
+            </td>
+        </tr>
+    </table>
+
 </body>
 </html>

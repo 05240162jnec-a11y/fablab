@@ -135,7 +135,16 @@ export default function Shop() {
     const [heroIdx, setHeroIdx] = useState(0);
     const [cart, setCart] = useState([]);
 
-    const isLoggedIn = !!localStorage.getItem('token');
+    const isLoggedIn = !!sessionStorage.getItem('auth_token');
+    const handleLogout = () => {
+        sessionStorage.clear();
+        ['auth_token', 'user', 'enrollments', 'courses', 'bookings', 'machines', 'cart_items'].forEach(k => {
+            localStorage.removeItem(k);
+            sessionStorage.removeItem(k);
+        });
+        window.location.href = '/';
+    };
+
     const heroSlides = ['../images/home.jpg', '../images/home2.jpg', '../images/home3.jpg'];
 
     useEffect(() => {
@@ -155,7 +164,7 @@ export default function Shop() {
     useEffect(() => {
         (async () => {
             try {
-                const token = localStorage.getItem('token');
+                const token = sessionStorage.getItem('auth_token');
                 let res = await fetch(`${API_BASE}/home/products`, { headers: { 'Accept': 'application/json' } });
                 if (res.status === 401 && token) {
                     res = await fetch(`${API_BASE}/user/products`, { headers: { 'Accept': 'application/json', 'Authorization': `Bearer ${token}` } });
@@ -186,7 +195,7 @@ export default function Shop() {
 
     const handleBuyNow = useCallback((product, qty = 1) => {
         if (!isLoggedIn) { showToast('Please login to place an order', 'warn'); return; }
-        navigate('/dashboard/product-orders', { state: { product, qty } });
+        navigate('/user/shop-orders', { state: { product, qty } });
     }, [isLoggedIn, navigate, showToast]);
 
     let displayed = products.filter(p =>
@@ -249,6 +258,9 @@ export default function Shop() {
                 .nav-login { padding:.45rem 1.1rem; font-size:.8rem; font-weight:600; color:var(--blue); background:var(--blue-lt); border:1.5px solid rgba(26,86,219,.2); border-radius:9999px; text-decoration:none; transition:all .25s; white-space:nowrap; }
                 @media (min-width:1100px) { .nav-login { padding:.5rem 1.4rem; font-size:.875rem; } }
                 .nav-login:hover { background:var(--blue); color:white; border-color:var(--blue); }
+                .nav-logout { padding:.5rem 1.25rem; font-size:.875rem; font-weight:600; color:#dc2626; background:#fef2f2; border:1.5px solid rgba(220,38,38,.2); border-radius:9999px; text-decoration:none; transition:all .25s; cursor:pointer; white-space:nowrap; }
+                .nav-logout:hover { background:#dc2626; color:white; border-color:#dc2626; box-shadow:0 4px 16px rgba(220,38,38,.3); }
+                .nav-mobile-logout { display:block; margin-top:.75rem; padding:.85rem; background:#dc2626; color:white; font-weight:700; font-size:1rem; border-radius:.75rem; text-align:center; cursor:pointer; border:none; width:100%; font-family:inherit; }
                 .nav-cart { position:relative; display:flex; align-items:center; cursor:pointer; flex-shrink:0; }
                 .nav-cart-count { position:absolute; top:-7px; right:-8px; width:18px; height:18px; border-radius:50%; background:var(--red); color:white; font-size:.6rem; font-weight:800; display:flex; align-items:center; justify-content:center; }
                 /* hamburger */
@@ -503,13 +515,16 @@ export default function Shop() {
                         <a href="/about" className="nav-link">About</a>
                         <a href="/gallery" className="nav-link">Gallery</a>
                         <a href="/faq" className="nav-link">FAQ</a>
-                        <div className="nav-cart" onClick={() => isLoggedIn ? navigate('/dashboard/cart') : showToast('Please login to view your cart', 'warn')}>
+                        <div className="nav-cart" onClick={() => isLoggedIn ? navigate('/user/shop-orders') : showToast('Please login to view your cart', 'warn')}>
                             <svg width="22" height="22" fill="none" stroke="#1e2a3a" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
                             </svg>
                             {cartCount > 0 && <span className="nav-cart-count">{cartCount}</span>}
                         </div>
-                        <Link to="/login" className="nav-login">Login</Link>
+                        {isLoggedIn
+                            ? <button className="nav-logout" onClick={handleLogout}>Logout</button>
+                            : <Link to="/login" className="nav-login">Login</Link>
+                        }
                     </div>
                     <button className={`nav-hamburger ${menuOpen ? 'open' : ''}`} onClick={() => setMenuOpen(o => !o)} aria-label="Toggle menu" aria-expanded={menuOpen}>
                         <span /><span /><span />
@@ -524,7 +539,10 @@ export default function Shop() {
                     <a href="/about" className="nav-mobile-link" onClick={() => setMenuOpen(false)}>About</a>
                     <a href="/gallery" className="nav-mobile-link" onClick={() => setMenuOpen(false)}>Gallery</a>
                     <a href="/faq" className="nav-mobile-link" onClick={() => setMenuOpen(false)}>FAQ</a>
-                    <Link to="/login" className="nav-mobile-login" onClick={() => setMenuOpen(false)}>Login / Register</Link>
+                    {isLoggedIn
+                        ? <button className="nav-mobile-logout" onClick={() => { setMenuOpen(false); handleLogout(); }}>Logout</button>
+                        : <Link to="/login" className="nav-mobile-login" onClick={() => setMenuOpen(false)}>Login / Register</Link>
+                    }
                 </div>
             </nav>
 

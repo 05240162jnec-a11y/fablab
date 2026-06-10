@@ -57,7 +57,7 @@ function MachineModal({ machine, onClose, isLoggedIn }) {
     if (!machine) return null;
     const imgSrc = getImageUrl(machine.image) || FALLBACK_MACHINE;
     const isAvail = machine.status === 'available';
-    const handleBook = () => { onClose(); navigate(isLoggedIn ? '/dashboard/bookings' : '/login'); };
+    const handleBook = () => { onClose(); navigate(isLoggedIn ? '/user/machines' : '/login'); };
     return (
         <div className="modal-backdrop" onClick={onClose}>
             <div className="modal-box" onClick={e => e.stopPropagation()}>
@@ -103,7 +103,16 @@ export default function Home() {
     const [selectedMachine, setSelectedMachine] = useState(null);
     const [isPaused, setIsPaused] = useState(false);
 
-    const isLoggedIn = !!localStorage.getItem('token');
+    const isLoggedIn = !!sessionStorage.getItem('auth_token');
+    const handleLogout = () => {
+        sessionStorage.clear();
+        ['auth_token', 'user', 'enrollments', 'courses', 'bookings', 'machines', 'cart_items'].forEach(k => {
+            localStorage.removeItem(k);
+            sessionStorage.removeItem(k);
+        });
+        window.location.href = '/';
+    };
+
     const [menuOpen, setMenuOpen] = useState(false);
 
     const heroSlides = [
@@ -152,8 +161,8 @@ export default function Home() {
     }, []);
 
     const totalUsers = users.length || 200;
-    const handleBookClick = useCallback(() => navigate(isLoggedIn ? '/dashboard/bookings' : '/login'), [isLoggedIn, navigate]);
-    const handleEnrollClick = useCallback(() => navigate(isLoggedIn ? '/dashboard/courses' : '/login'), [isLoggedIn, navigate]);
+    const handleBookClick = useCallback(() => navigate(isLoggedIn ? '/user/machines' : '/login'), [isLoggedIn, navigate]);
+    const handleEnrollClick = useCallback(() => navigate(isLoggedIn ? '/user/learning' : '/login'), [isLoggedIn, navigate]);
 
     /* duplicate machines for infinite scroll illusion */
     const displayMachines = [...machines, ...machines];
@@ -212,6 +221,9 @@ export default function Home() {
                 .nav-link.active::after { width:100%; }
                 .nav-login { padding:.5rem 1.25rem; font-size:.875rem; font-weight:600; color:var(--blue); background:var(--blue-lt); border:1.5px solid rgba(26,86,219,.2); border-radius:9999px; text-decoration:none; transition:all .25s; }
                 .nav-login:hover { background:var(--blue); color:white; border-color:var(--blue); box-shadow:0 4px 16px rgba(26,86,219,.3); }
+                .nav-logout { padding:.5rem 1.25rem; font-size:.875rem; font-weight:600; color:#dc2626; background:#fef2f2; border:1.5px solid rgba(220,38,38,.2); border-radius:9999px; text-decoration:none; transition:all .25s; cursor:pointer; white-space:nowrap; }
+                .nav-logout:hover { background:#dc2626; color:white; border-color:#dc2626; box-shadow:0 4px 16px rgba(220,38,38,.3); }
+                .nav-mobile-logout { display:block; margin-top:.75rem; padding:.85rem; background:#dc2626; color:white; font-weight:700; font-size:1rem; border-radius:.75rem; text-align:center; cursor:pointer; border:none; width:100%; font-family:inherit; }
                 /* hamburger */
                 .nav-hamburger { display:none; flex-direction:column; justify-content:center; gap:5px; width:40px; height:40px; background:none; border:none; cursor:pointer; padding:6px; border-radius:.5rem; transition:background .2s; flex-shrink:0; }
                 .nav-hamburger:hover { background:rgba(0,0,0,.06); }
@@ -578,7 +590,10 @@ export default function Home() {
                         <a href="/about" className="nav-link">About</a>
                         <a href="/gallery" className="nav-link">Gallery</a>
                         <a href="/faq" className="nav-link">FAQ</a>
-                        <Link to="/login" className="nav-login">Login</Link>
+                        {isLoggedIn
+                            ? <button className="nav-logout" onClick={handleLogout}>Logout</button>
+                            : <Link to="/login" className="nav-login">Login</Link>
+                        }
                     </div>
                     {/* Hamburger */}
                     <button
@@ -600,7 +615,10 @@ export default function Home() {
                     <a href="/about" className="nav-mobile-link" onClick={() => setMenuOpen(false)}>About</a>
                     <a href="/gallery" className="nav-mobile-link" onClick={() => setMenuOpen(false)}>Gallery</a>
                     <a href="/faq" className="nav-mobile-link" onClick={() => setMenuOpen(false)}>FAQ</a>
-                    <Link to="/login" className="nav-mobile-login" onClick={() => setMenuOpen(false)}>Login / Register</Link>
+                    {isLoggedIn
+                        ? <button className="nav-mobile-logout" onClick={() => { setMenuOpen(false); handleLogout(); }}>Logout</button>
+                        : <Link to="/login" className="nav-mobile-login" onClick={() => setMenuOpen(false)}>Login / Register</Link>
+                    }
                 </div>
             </nav>
 
@@ -857,7 +875,7 @@ export default function Home() {
                         {[
                             { img: '../images/custom.jpg', title: 'Machine Booking', desc: 'Reserve industry-grade fabrication equipment — 3D printers, CNC routers, laser cutters and more — on your schedule.', link: '/machines' },
                             { img: '../images/workshop.jpg', title: 'Workshops & Training', desc: 'Expert-led, hands-on sessions covering CNC, laser cutting, 3D printing, electronics, and more.', link: '/training' },
-                            { img: '../images/collaborative.jpg', title: 'Custom Fabrication Orders', desc: 'Submit a design brief and our production team turns your concept into a precision-fabricated physical product.', link: '/login' },
+                            { img: '../images/collaborative.jpg', title: 'Custom Fabrication Orders', desc: 'Submit a design brief and our production team turns your concept into a precision-fabricated physical product.', link: isLoggedIn ? '/user/shop-orders?tab=custom' : '/login' },
                         ].map((s, i) => (
                             <Reveal key={i} delay={i * 0.1}>
                                 <a href={s.link} className="service-card">

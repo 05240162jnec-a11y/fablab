@@ -10,6 +10,9 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
+use App\Models\User;
+use App\Notifications\NewProductOrderNotification;
+use App\Notifications\ProductOrderPaymentUploadedNotification;
 
 class ProductOrderController extends Controller
 {
@@ -139,6 +142,10 @@ class ProductOrderController extends Controller
             }
 
             DB::commit();
+
+            // Notify admin
+            $admin = User::where('role', 'admin')->first();
+            if ($admin) $admin->notify(new NewProductOrderNotification($order->load('user')));
 
             return response()->json([
                 'success' => true,
@@ -272,6 +279,17 @@ class ProductOrderController extends Controller
                 ]);
             }
             
+            // Notify admin
+            $adminUser = User::where('role', 'admin')->first();
+            if ($adminUser) $adminUser->notify(new ProductOrderPaymentUploadedNotification($order->load('user')));
+
+            // Notify admin of re-upload
+            $admins = User::where('role', 'admin')->get();
+            $order->load('user');
+            foreach ($admins as $admin) {
+                $admin->notify(new ProductOrderPaymentUploadedNotification($order));
+            }
+
             return response()->json([
                 'success' => true,
                 'message' => 'Payment screenshot uploaded successfully. We will verify it shortly.',

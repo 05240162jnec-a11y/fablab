@@ -4,115 +4,157 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Account Disabled</title>
-    <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            max-width: 600px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #f4f4f4;
-        }
-        .container {
-            background-color: #ffffff;
-            border-radius: 8px;
-            padding: 40px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .header {
-            text-align: center;
-            margin-bottom: 30px;
-            padding-bottom: 20px;
-            border-bottom: 2px solid #e0e0e0;
-        }
-        .header h1 {
-            color: #dc3545;
-            margin: 0;
-            font-size: 24px;
-        }
-        .icon {
-            font-size: 48px;
-            margin-bottom: 10px;
-        }
-        .content {
-            margin-bottom: 30px;
-        }
-        .content p {
-            margin-bottom: 15px;
-            color: #555;
-        }
-        .alert-box {
-            background-color: #fff3cd;
-            border-left: 4px solid #ffc107;
-            padding: 15px;
-            margin: 20px 0;
-            border-radius: 4px;
-        }
-        .alert-box strong {
-            color: #856404;
-        }
-        .footer {
-            text-align: center;
-            padding-top: 20px;
-            border-top: 1px solid #e0e0e0;
-            color: #888;
-            font-size: 12px;
-        }
-        .button {
-            display: inline-block;
-            padding: 12px 30px;
-            background-color: #007bff;
-            color: #ffffff;
-            text-decoration: none;
-            border-radius: 5px;
-            margin: 20px 0;
-            font-weight: 600;
-        }
-        .button:hover {
-            background-color: #0056b3;
-        }
-    </style>
 </head>
-<body>
-    <div class="container">
-        <div class="header">
-            <div class="icon">⚠️</div>
-            <h1>Account Disabled</h1>
-        </div>
+<body style="margin:0;padding:0;background-color:#f1f5f9;font-family:'Segoe UI',Arial,sans-serif;">
 
-        <div class="content">
-            <p>Dear {{ $user->name }},</p>
+    <!-- Wrapper -->
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f1f5f9;padding:40px 0;">
+        <tr>
+            <td align="center">
+                <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
 
-            <p>We are writing to inform you that your account has been <strong>disabled</strong> by the system administrator.</p>
+                    <!-- Logo Header -->
+                    <tr>
+                        <td align="center" style="padding-bottom:24px;">
+                            <img src="{{ asset('images/logo.png') }}" alt="JNEC Fab Lab" width="72" height="72"
+                                style="border-radius:50%;display:block;margin:0 auto;" />
+                            <div style="margin-top:12px;font-size:18px;font-weight:700;color:#0f172a;letter-spacing:-0.3px;">
+                                JNEC Fab Lab
+                            </div>
+                            <div style="font-size:12px;color:#64748b;margin-top:2px;letter-spacing:0.5px;text-transform:uppercase;">
+                                Fabrication Laboratory
+                            </div>
+                        </td>
+                    </tr>
 
-            <div class="alert-box">
-                <strong>What does this mean?</strong><br>
-                You will no longer be able to log in to your account or access any services until your account is reactivated by an administrator.
-            </div>
+                    <!-- Card -->
+                    <tr>
+                        <td style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
 
-            <p><strong>What should you do?</strong></p>
-            <ul>
-                <li>If you believe this was done in error, please contact the administrator immediately.</li>
-                <li>If you have any pending activities or bookings, please reach out to resolve them.</li>
-            </ul>
+                            <!-- Top accent bar -->
+                            <div style="height:4px;background:#1e40af;"></div>
 
-            <p style="text-align: center;">
-                <a href="mailto:admin@fablab.com" class="button">Contact Administrator</a>
-            </p>
+                            <!-- Body -->
+                            <table width="100%" cellpadding="0" cellspacing="0">
+                                <tr>
+                                    <td style="padding:40px 40px 32px;">
 
-            <p>If you have any questions or need assistance, please don't hesitate to reach out to our support team.</p>
+                                        <!-- Title -->
+                                        <h1 style="margin:0 0 24px;font-size:20px;font-weight:700;color:#0f172a;letter-spacing:-0.3px;">
+                                            Account Disabled
+                                        </h1>
 
-            <p>Thank you for your understanding.</p>
+                                        <!-- Greeting -->
+                                        <p style="margin:0 0 16px;font-size:15px;color:#374151;line-height:1.7;">
+                                            Dear <strong>{{ $user->name }}</strong>,
+                                        </p>
 
-            <p>Best regards,<br>
-            <strong>The Admin Team</strong></p>
-        </div>
+                                        <p style="margin:0 0 24px;font-size:15px;color:#374151;line-height:1.7;">
+                                            We are writing to inform you that your JNEC Fab Lab account has been
+                                            <strong style="color:#0f172a;">disabled</strong> by the system administrator.
+                                        </p>
 
-        <div class="footer">
-            <p>This is an automated message. Please do not reply to this email.</p>
-            <p>&copy; {{ date('Y') }} Fab Lab Management System. All rights reserved.</p>
-        </div>
-    </div>
+                                        <!-- Info box -->
+                                        <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+                                            <tr>
+                                                <td style="background:#f8fafc;border:1px solid #e2e8f0;border-left:3px solid #1e40af;border-radius:6px;padding:16px 20px;">
+                                                    <p style="margin:0 0 6px;font-size:13px;font-weight:700;color:#0f172a;text-transform:uppercase;letter-spacing:0.5px;">
+                                                        What this means
+                                                    </p>
+                                                    <p style="margin:0;font-size:14px;color:#475569;line-height:1.6;">
+                                                        You will not be able to log in or access any services until your account is reactivated by an administrator.
+                                                    </p>
+                                                </td>
+                                            </tr>
+                                        </table>
+
+                                        <!-- Steps -->
+                                        <p style="margin:0 0 12px;font-size:15px;font-weight:600;color:#0f172a;">
+                                            What should you do?
+                                        </p>
+                                        <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:28px;">
+                                            <tr>
+                                                <td style="padding:6px 0;">
+                                                    <table cellpadding="0" cellspacing="0">
+                                                        <tr>
+                                                            <td style="width:20px;vertical-align:top;padding-top:2px;">
+                                                                <div style="width:6px;height:6px;background:#1e40af;border-radius:50%;margin-top:6px;"></div>
+                                                            </td>
+                                                            <td style="font-size:14px;color:#475569;line-height:1.6;padding-left:10px;">
+                                                                If you believe this was done in error, please contact the administrator immediately.
+                                                            </td>
+                                                        </tr>
+                                                    </table>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding:6px 0;">
+                                                    <table cellpadding="0" cellspacing="0">
+                                                        <tr>
+                                                            <td style="width:20px;vertical-align:top;padding-top:2px;">
+                                                                <div style="width:6px;height:6px;background:#1e40af;border-radius:50%;margin-top:6px;"></div>
+                                                            </td>
+                                                            <td style="font-size:14px;color:#475569;line-height:1.6;padding-left:10px;">
+                                                                If you have any pending activities or bookings, please reach out to resolve them.
+                                                            </td>
+                                                        </tr>
+                                                    </table>
+                                                </td>
+                                            </tr>
+                                        </table>
+
+                                        <!-- CTA Button -->
+                                        <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:28px;">
+                                            <tr>
+                                                <td align="center">
+                                                    <a href="mailto:fablab.jnec@rub.edu.bt"
+                                                        style="display:inline-block;padding:12px 32px;background:#1e40af;color:#ffffff;text-decoration:none;border-radius:6px;font-size:14px;font-weight:600;letter-spacing:0.2px;">
+                                                        Contact Administrator
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                        </table>
+
+                                        <p style="margin:0 0 8px;font-size:14px;color:#475569;line-height:1.7;">
+                                            If you have any questions, please do not hesitate to reach out to our support team.
+                                        </p>
+                                        <p style="margin:0 0 4px;font-size:14px;color:#475569;">
+                                            Thank you for your understanding.
+                                        </p>
+
+                                        <!-- Sign off -->
+                                        <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:32px;padding-top:24px;border-top:1px solid #f1f5f9;">
+                                            <tr>
+                                                <td>
+                                                    <p style="margin:0;font-size:14px;color:#374151;font-weight:600;">JNEC Fab Lab Team</p>
+                                                    <p style="margin:4px 0 0;font-size:13px;color:#64748b;">Jigme Namgyel Engineering College</p>
+                                                    <p style="margin:2px 0 0;font-size:13px;color:#64748b;">Dewathang, Samdrupjongkhar, Bhutan</p>
+                                                </td>
+                                            </tr>
+                                        </table>
+
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                        <td align="center" style="padding:24px 0 8px;">
+                            <p style="margin:0 0 4px;font-size:12px;color:#94a3b8;">
+                                This is an automated message. Please do not reply to this email.
+                            </p>
+                            <p style="margin:0;font-size:12px;color:#94a3b8;">
+                                &copy; {{ date('Y') }} JNEC Fab Lab, Jigme Namgyel Engineering College. All rights reserved.
+                            </p>
+                        </td>
+                    </tr>
+
+                </table>
+            </td>
+        </tr>
+    </table>
+
 </body>
 </html>

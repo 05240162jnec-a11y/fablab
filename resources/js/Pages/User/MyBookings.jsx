@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
 
@@ -13,6 +14,30 @@ export default function MyBookings() {
 
     // ✅ NEW: Toast Notification State
     const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
+
+    // Highlight state (from notification click)
+    const location = useLocation();
+    const hlParams = new URLSearchParams(location.search);
+    const [highlightId, setHighlightId] = useState(hlParams.get('highlight') ? Number(hlParams.get('highlight')) : null);
+    const [dismissedDot, setDismissedDot] = useState(null);
+
+    useEffect(() => {
+        if (!highlightId) return;
+        setFilterStatus('booked');
+        const el = document.getElementById(`card-${highlightId}`);
+        if (el) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'center' }), 400);
+    }, []);
+
+    // Inject highlight CSS
+    useEffect(() => {
+        const s = document.createElement('style');
+        s.id = 'hl-style-bk';
+        s.textContent = `
+            @keyframes hlPulse { 0%,100%{box-shadow:0 0 0 0 rgba(37,99,235,.5)} 50%{box-shadow:0 0 0 8px rgba(37,99,235,0)} }
+            .hl-card { border:2px solid #2563eb !important; animation:hlPulse 1.2s ease-in-out infinite; }
+        `;
+        if (!document.getElementById('hl-style-bk')) document.head.appendChild(s);
+    }, []);
 
     // Filter & Search States
     const [filterStatus, setFilterStatus] = useState('booked');
@@ -219,14 +244,20 @@ export default function MyBookings() {
                             </div>
                             <p className="text-gray-500 text-lg font-medium">{filterStatus === 'booked' ? 'No booked machines' : 'No cancelled bookings'}</p>
                             <p className="text-gray-400 text-sm mt-1">{filterStatus === 'booked' ? 'Book a machine to see your bookings here' : 'Cancelled bookings will appear here'}</p>
-                                {filterStatus === 'booked' && (
-                                    <Link to="/user/machines?tab=book" className="inline-block mt-4 px-6 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all shadow-md hover:shadow-lg font-medium">Book a Machine</Link>
-                                )}
+                            {filterStatus === 'booked' && (
+                                <Link to="/user/machines?tab=book" className="inline-block mt-4 px-6 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all shadow-md hover:shadow-lg font-medium">Book a Machine</Link>
+                            )}
                         </div>
                     ) : (
                         <div className="space-y-4">
                             {filteredBookings.map((booking) => (
-                                <div key={booking.id} onClick={() => handleViewDetails(booking)} className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer hover:-translate-y-0.5">
+                                <div key={booking.id} id={`card-${booking.id}`}
+                                    onClick={() => { handleViewDetails(booking); setHighlightId(null); }}
+                                    className={`bg-white rounded-2xl border shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer hover:-translate-y-0.5 relative ${highlightId === booking.id ? 'hl-card' : 'border-gray-100'}`}>
+                                    {highlightId === booking.id && dismissedDot !== booking.id && (
+                                        <div onClick={e => { e.stopPropagation(); setDismissedDot(booking.id); }}
+                                            style={{ position: 'absolute', top: 12, right: 12, width: 10, height: 10, background: '#2563eb', borderRadius: '50%', border: '2px solid white', boxShadow: '0 0 0 2px #2563eb', cursor: 'pointer', zIndex: 10 }} />
+                                    )}
                                     <div className="p-6">
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-start gap-4">

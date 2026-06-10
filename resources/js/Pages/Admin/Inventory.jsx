@@ -1,21 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 
-const INITIAL_MATERIALS = [
-    "Arduino Mega", "Raspberry Pi", "Buzzer", "Big Buzzer", "Switch", "Push Button",
-    "WiFi Module", "DC Motor", "LCD", "Transistor", "LED", "Electrolytic Capacitor",
-    "Terminal Assortment", "Diode", "IC Holder", "Breadboard Small", "PCB Resistor",
-    "Relay", "PLA Filament (White)", "PLA Filament (Black)", "PLA Filament (Red)",
-    "PLA Filament (Blue)", "PLA Filament (Yellow)", "Plywood 4mm", "Birch Ply 3mm",
-    "Birch Ply 4mm", "Acrylic Sheet 2mm (Red)", "Acrylic Sheet 2mm (Blue)",
-    "Acrylic Sheet 2mm (Green)", "Acrylic Sheet 2mm (Yellow)", "Acrylic Sheet 2mm (Black)",
-    "Acrylic Sheet 2mm (White)", "Acrylic Sheet 2mm (Transparent)", "Acrylic Sheet 3mm",
-    "Vinyl Sticker (Black)", "Vinyl Sticker (White)", "Vinyl Sticker (Red)",
-    "Vinyl Sticker (Green)", "Vinyl Sticker (Blue)", "Copper Clad", "Laser Lens",
-    "Laser Mirror", "Rubber Wood", "CNC End Mill Bit", "CNC Router V Bit",
-    "Fabric Cloth", "Matty Cloth", "Micro Fiber Cloth", "PVC Sheet", "Glue Stick",
-    "Led Light (Warm White)"
-];
+// Materials loaded dynamically from API
+const INITIAL_MATERIALS = [];
 
 const EMPTY_ADD_FORM = {
     itemName: '',
@@ -79,12 +66,12 @@ function SearchableDropdown({ value, onChange, options, placeholder, allowNew = 
                     }}
                     placeholder={placeholder}
                     autoComplete="off"
-                    className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm bg-white pr-12 transition-all"
+                    className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-white pr-12 transition-all"
                 />
                 <button
                     type="button"
                     onClick={() => setOpen(o => !o)}
-                    className="absolute right-4 top-3 text-slate-400 hover:text-indigo-600 transition-colors"
+                    className="absolute right-4 top-3 text-slate-400 hover:text-blue-600 transition-colors"
                 >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
@@ -101,7 +88,7 @@ function SearchableDropdown({ value, onChange, options, placeholder, allowNew = 
                             onChange={e => setSearch(e.target.value)}
                             placeholder="Search..."
                             autoFocus
-                            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                         />
                     </div>
                     <div className="overflow-y-auto flex-1">
@@ -113,7 +100,7 @@ function SearchableDropdown({ value, onChange, options, placeholder, allowNew = 
                                 key={i}
                                 type="button"
                                 onMouseDown={() => select(item)}
-                                className="w-full px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 transition-colors font-medium"
+                                className="w-full px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-blue-50 hover:text-blue-600 transition-colors font-medium"
                             >
                                 {item}
                             </button>
@@ -133,59 +120,71 @@ function SearchableDropdown({ value, onChange, options, placeholder, allowNew = 
 /* ─────────────────────────────────────────────
    Custom Dialog/Modal Component
 ───────────────────────────────────────────── */
-function CustomDialog({ title, message, type = 'info', onConfirm, onCancel, visible }) {
+function CustomDialog({ title, message, type = 'info', onConfirm, onCancel, visible, isConfirmation = false }) {
     if (!visible) return null;
+
+    // Show only OK button for info/error/success alerts (no real cancel needed)
+    // Show Cancel + Confirm only for warning confirmations (delete, etc.)
+    const isConfirmAction = type === 'warning' && typeof onConfirm === 'function';
 
     const icons = {
         info: (
-            <svg className="w-16 h-16 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            <svg className="w-14 h-14 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
         ),
         success: (
-            <svg className="w-16 h-16 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            <svg className="w-14 h-14 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
         ),
         warning: (
-            <svg className="w-16 h-16 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            <svg className="w-14 h-14 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
         ),
         error: (
-            <svg className="w-16 h-16 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            <svg className="w-14 h-14 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
         ),
     };
 
     return (
         <div className="fixed inset-0 z-[300] flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onCancel} />
-            <div className="relative bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md z-10 border border-slate-200">
-                <div className="flex flex-col items-center text-center">
-                    <div className="mb-6">
-                        {icons[type]}
-                    </div>
-                    <h3 className="text-xl font-bold text-slate-900 mb-3">{title}</h3>
-                    <p className="text-slate-600 mb-8">{message}</p>
-                    <div className="flex gap-3 w-full">
-                        {onCancel && (
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={isConfirmAction ? onCancel : (onConfirm || onCancel)} />
+            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md z-10 overflow-hidden"
+                style={{ animation: 'dialogIn .2s cubic-bezier(.16,1,.3,1) both' }}>
+                <style>{`@keyframes dialogIn { from{opacity:0;transform:scale(.95) translateY(8px)} to{opacity:1;transform:scale(1) translateY(0)} }`}</style>
+                <div className="px-8 pt-8 pb-6 flex flex-col items-center text-center">
+                    <div className="mb-5">{icons[type]}</div>
+                    <h3 className="text-lg font-bold text-gray-900 mb-2">{title}</h3>
+                    <p className="text-sm text-gray-600 leading-relaxed">{message}</p>
+                </div>
+                <div className="px-8 pb-8 flex gap-3">
+                    {isConfirmAction ? (
+                        <>
                             <button
                                 onClick={onCancel}
-                                className="flex-1 px-6 py-3 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-all"
+                                className="flex-1 py-3 border-2 border-gray-200 text-gray-700 text-sm font-semibold rounded-xl hover:bg-gray-50 transition-colors"
                             >
                                 Cancel
                             </button>
-                        )}
+                            <button
+                                onClick={onConfirm}
+                                className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-xl transition-colors"
+                            >
+                                Confirm
+                            </button>
+                        </>
+                    ) : (
                         <button
-                            onClick={onConfirm}
-                            className={`flex-1 px-6 py-3 text-sm font-semibold text-white rounded-xl transition-all ${type === 'error' ? 'bg-red-600 hover:bg-red-700' : type === 'warning' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-indigo-600 hover:bg-indigo-700'
-                                }`}
+                            onClick={onConfirm || onCancel}
+                            className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-colors"
                         >
-                            {onCancel ? 'Confirm' : 'OK'}
+                            OK
                         </button>
-                    </div>
+                    )}
                 </div>
             </div>
         </div>
@@ -293,7 +292,7 @@ export default function AdminInventory() {
     const [issueForm, setIssueForm] = useState(EMPTY_ISSUE_FORM);
     const [materialForm, setMaterialForm] = useState({ name: '' });
 
-    const [materials, setMaterials] = useState(INITIAL_MATERIALS);
+    const [materials, setMaterials] = useState([]);
     const [receivedRecords, setReceivedRecords] = useState([]);
     const [issuedRecords, setIssuedRecords] = useState([]);
     const [stockData, setStockData] = useState([]);
@@ -342,6 +341,7 @@ export default function AdminInventory() {
             message,
             type,
             onConfirm,
+            isConfirmation: onConfirm !== null,
         });
     };
 
@@ -361,10 +361,7 @@ export default function AdminInventory() {
                 const data = response.data.data;
 
                 const fetchedMaterialNames = data.materials.map(m => m.name);
-                setMaterials(prev => {
-                    const merged = [...new Set([...prev, ...fetchedMaterialNames])];
-                    return merged.sort((a, b) => a.localeCompare(b));
-                });
+                setMaterials(fetchedMaterialNames.sort((a, b) => a.localeCompare(b)));
 
                 setReceivedRecords(data.received.map((record, index) => ({
                     id: record.id,
@@ -992,7 +989,7 @@ export default function AdminInventory() {
 
     const tabBtn = (id) =>
         `whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === id
-            ? 'border-indigo-500 text-indigo-600'
+            ? 'border-blue-500 text-blue-600'
             : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
         }`;
 
@@ -1011,7 +1008,7 @@ export default function AdminInventory() {
             <div className="px-6 pb-6 space-y-6">
                 {loading && (
                     <div className="flex items-center justify-center py-20">
-                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600" />
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600" />
                     </div>
                 )}
 
@@ -1047,7 +1044,7 @@ export default function AdminInventory() {
                                     placeholder="Search materials..."
                                     value={searchMaterials}
                                     onChange={(e) => setSearchMaterials(e.target.value)}
-                                    className="px-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 w-48"
+                                    className="px-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-48"
                                 />
                                 <button
                                     onClick={exportMaterials}
@@ -1060,7 +1057,7 @@ export default function AdminInventory() {
                                 </button>
                                 <button
                                     onClick={() => setShowMaterialModal(true)}
-                                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 transition-all shadow-sm hover:shadow-md"
+                                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition-all shadow-sm hover:shadow-md"
                                 >
                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
@@ -1120,7 +1117,7 @@ export default function AdminInventory() {
                                     placeholder="Search records..."
                                     value={searchReceived}
                                     onChange={(e) => setSearchReceived(e.target.value)}
-                                    className="px-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 w-48"
+                                    className="px-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-48"
                                 />
                                 {selectedReceived.size > 0 && (
                                     <button
@@ -1144,7 +1141,7 @@ export default function AdminInventory() {
                                 </button>
                                 <button
                                     onClick={() => { setShowAddModal(true); setAddForm({ ...EMPTY_ADD_FORM, itemDate: new Date().toISOString().split('T')[0] }); }}
-                                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 transition-all shadow-sm hover:shadow-md"
+                                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition-all shadow-sm hover:shadow-md"
                                 >
                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
@@ -1171,7 +1168,7 @@ export default function AdminInventory() {
                                             <th className="px-6 py-4 w-10">
                                                 <input
                                                     type="checkbox"
-                                                    className="w-4 h-4 accent-indigo-600 cursor-pointer"
+                                                    className="w-4 h-4 accent-blue-600 cursor-pointer"
                                                     checked={selectedReceived.size === receivedRecords.length && receivedRecords.length > 0}
                                                     onChange={e => toggleSelectAllReceived(e.target.checked)}
                                                 />
@@ -1187,7 +1184,7 @@ export default function AdminInventory() {
                                                 <td className="px-6 py-5">
                                                     <input
                                                         type="checkbox"
-                                                        className="w-4 h-4 accent-indigo-600 cursor-pointer"
+                                                        className="w-4 h-4 accent-blue-600 cursor-pointer"
                                                         checked={selectedReceived.has(record.id)}
                                                         onChange={() => toggleSelectReceived(record.id)}
                                                     />
@@ -1224,7 +1221,7 @@ export default function AdminInventory() {
                                     placeholder="Search stock..."
                                     value={searchStock}
                                     onChange={(e) => setSearchStock(e.target.value)}
-                                    className="px-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 w-48"
+                                    className="px-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-48"
                                 />
                                 <div className="flex items-center gap-2">
                                     <label className="text-sm font-medium text-slate-700 whitespace-nowrap">Stock Alert Threshold:</label>
@@ -1245,11 +1242,11 @@ export default function AdminInventory() {
                                                 }
                                             }}
                                             disabled={thresholdLoading}
-                                            className="w-20 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                            className="w-20 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                         />
                                     </div>
                                     {thresholdLoading && (
-                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600" />
+                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600" />
                                     )}
                                 </div>
                                 <button
@@ -1326,7 +1323,7 @@ export default function AdminInventory() {
                                     placeholder="Search issued..."
                                     value={searchIssued}
                                     onChange={(e) => setSearchIssued(e.target.value)}
-                                    className="px-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 w-48"
+                                    className="px-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-48"
                                 />
                                 {selectedIssued.size > 0 && (
                                     <button
@@ -1350,7 +1347,7 @@ export default function AdminInventory() {
                                 </button>
                                 <button
                                     onClick={() => { setShowIssueModal(true); setIssueForm({ ...EMPTY_ISSUE_FORM, issueDate: new Date().toISOString().split('T')[0] }); }}
-                                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 transition-all shadow-sm hover:shadow-md"
+                                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition-all shadow-sm hover:shadow-md"
                                 >
                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
@@ -1377,7 +1374,7 @@ export default function AdminInventory() {
                                             <th className="px-6 py-4 w-10">
                                                 <input
                                                     type="checkbox"
-                                                    className="w-4 h-4 accent-indigo-600 cursor-pointer"
+                                                    className="w-4 h-4 accent-blue-600 cursor-pointer"
                                                     checked={selectedIssued.size === issuedRecords.length && issuedRecords.length > 0}
                                                     onChange={e => toggleSelectAllIssued(e.target.checked)}
                                                 />
@@ -1398,7 +1395,7 @@ export default function AdminInventory() {
                                                 <td className="px-6 py-5">
                                                     <input
                                                         type="checkbox"
-                                                        className="w-4 h-4 accent-indigo-600 cursor-pointer"
+                                                        className="w-4 h-4 accent-blue-600 cursor-pointer"
                                                         checked={selectedIssued.has(record.id)}
                                                         onChange={() => toggleSelectIssued(record.id)}
                                                     />
@@ -1417,7 +1414,7 @@ export default function AdminInventory() {
                                                     {record.reason ? (
                                                         <div className="group relative">
                                                             <div
-                                                                className="truncate cursor-help border-b border-dotted border-slate-400 hover:border-indigo-500 hover:text-indigo-600 transition-colors"
+                                                                className="truncate cursor-help border-b border-dotted border-slate-400 hover:border-blue-500 hover:text-blue-600 transition-colors"
                                                             >
                                                                 {record.reason}
                                                             </div>
@@ -1469,14 +1466,14 @@ export default function AdminInventory() {
                                     value={materialForm.name}
                                     onChange={e => setMaterialForm(p => ({ ...p, name: e.target.value }))}
                                     placeholder="e.g., Arduino Mega, Acrylic Sheet 3mm"
-                                    className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm transition-all"
+                                    className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-all"
                                     autoFocus
                                 />
                             </div>
 
                             <div className="flex justify-end gap-3 pt-6 border-t border-slate-100">
-                                <button type="button" onClick={() => setShowMaterialModal(false)} className="px-6 py-3 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-all">Cancel</button>
-                                <button type="submit" className="px-8 py-3 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 transition-all shadow-lg hover:shadow-xl">Add Material</button>
+                                <button type="button" onClick={() => setShowMaterialModal(false)} className="px-6 py-3 text-sm font-semibold text-gray-700 border-2 border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">Cancel</button>
+                                <button type="submit" className="px-8 py-3 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition-all shadow-lg hover:shadow-xl">Add Material</button>
                             </div>
                         </form>
                     </div>
@@ -1516,7 +1513,7 @@ export default function AdminInventory() {
                                     value={addForm.itemDesc}
                                     onChange={e => setAddForm(p => ({ ...p, itemDesc: e.target.value }))}
                                     placeholder="e.g., 4x8ft sheet, White color"
-                                    className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm transition-all"
+                                    className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-all"
                                 />
                             </div>
 
@@ -1532,7 +1529,7 @@ export default function AdminInventory() {
                                     min="0"
                                     onWheel={e => e.target.blur()}
                                     placeholder="0"
-                                    className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                    className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                 />
                             </div>
 
@@ -1549,7 +1546,7 @@ export default function AdminInventory() {
                                     step="0.01"
                                     onWheel={e => e.target.blur()}
                                     placeholder="0.00"
-                                    className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                    className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                 />
                             </div>
 
@@ -1559,7 +1556,7 @@ export default function AdminInventory() {
                                     type="date"
                                     value={addForm.itemDate}
                                     onChange={e => setAddForm(p => ({ ...p, itemDate: e.target.value }))}
-                                    className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm transition-all"
+                                    className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-all"
                                 />
                             </div>
 
@@ -1584,8 +1581,8 @@ export default function AdminInventory() {
                             </div>
 
                             <div className="md:col-span-2 flex justify-end gap-3 pt-6 border-t border-slate-100">
-                                <button type="button" onClick={() => setShowAddModal(false)} className="px-6 py-3 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-all">Cancel</button>
-                                <button type="submit" className="px-8 py-3 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 transition-all shadow-lg hover:shadow-xl">Save Record</button>
+                                <button type="button" onClick={() => setShowAddModal(false)} className="px-6 py-3 text-sm font-semibold text-gray-700 border-2 border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">Cancel</button>
+                                <button type="submit" className="px-8 py-3 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition-all shadow-lg hover:shadow-xl">Save Record</button>
                             </div>
                         </form>
                     </div>
@@ -1630,7 +1627,7 @@ export default function AdminInventory() {
                                         min="0"
                                         onWheel={e => e.target.blur()}
                                         placeholder="0"
-                                        className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                        className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                     />
                                 </div>
 
@@ -1641,7 +1638,7 @@ export default function AdminInventory() {
                                         value={issueForm.issueDate}
                                         onChange={e => setIssueForm(p => ({ ...p, issueDate: e.target.value }))}
                                         min={new Date().toISOString().split('T')[0]}
-                                        className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm transition-all"
+                                        className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-all"
                                     />
                                 </div>
                             </div>
@@ -1655,7 +1652,7 @@ export default function AdminInventory() {
                                             value="user"
                                             checked={issueType === 'user'}
                                             onChange={e => handleIssueTypeChange(e.target.value)}
-                                            className="w-4 h-4 text-indigo-600 border-slate-300 focus:ring-indigo-500"
+                                            className="w-4 h-4 text-blue-600 border-slate-300 focus:ring-blue-500"
                                         />
                                         <span className="ml-2 text-sm font-medium text-slate-700">User</span>
                                     </label>
@@ -1665,7 +1662,7 @@ export default function AdminInventory() {
                                             value="production_team"
                                             checked={issueType === 'production_team'}
                                             onChange={e => handleIssueTypeChange(e.target.value)}
-                                            className="w-4 h-4 text-indigo-600 border-slate-300 focus:ring-indigo-500"
+                                            className="w-4 h-4 text-blue-600 border-slate-300 focus:ring-blue-500"
                                         />
                                         <span className="ml-2 text-sm font-medium text-slate-700">Production Team</span>
                                     </label>
@@ -1679,7 +1676,7 @@ export default function AdminInventory() {
                                         <select
                                             value={issueForm.issuedToDepartment}
                                             onChange={e => handleDepartmentChange(e.target.value)}
-                                            className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm transition-all"
+                                            className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-all"
                                         >
                                             <option value="">Select Department</option>
                                             {departments.map((dept, index) => (
@@ -1694,7 +1691,7 @@ export default function AdminInventory() {
                                             value={issueForm.issuedTo && issueForm.issuedToEmail ? `${issueForm.issuedTo} - ${issueForm.issuedToEmail}` : ''}
                                             onChange={e => handleUserSelect(e.target.value)}
                                             disabled={!issueForm.issuedToDepartment}
-                                            className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm transition-all disabled:bg-slate-100 disabled:cursor-not-allowed"
+                                            className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-all disabled:bg-slate-100 disabled:cursor-not-allowed"
                                         >
                                             <option value="">{issueForm.issuedToDepartment ? 'Select User' : 'Select Department First'}</option>
                                             {usersByDepartment.map((user, index) => (
@@ -1709,7 +1706,7 @@ export default function AdminInventory() {
                                     <select
                                         value={issueForm.issuedTo || ''}
                                         onChange={e => handleProductionTeamSelect(e.target.value)}
-                                        className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm transition-all"
+                                        className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-all"
                                     >
                                         <option value="">Select Production Team Member</option>
                                         {productionTeamMembers.map((member, index) => (
@@ -1733,7 +1730,7 @@ export default function AdminInventory() {
                                     value={issueForm.issueReason}
                                     onChange={e => setIssueForm(p => ({ ...p, issueReason: e.target.value }))}
                                     placeholder="e.g., Project Alpha, Replacement, Maintenance"
-                                    className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm transition-all"
+                                    className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-all"
                                 />
                             </div>
 
@@ -1751,8 +1748,8 @@ export default function AdminInventory() {
                             </div>
 
                             <div className="flex justify-end gap-3 pt-6 border-t border-slate-100">
-                                <button type="button" onClick={() => setShowIssueModal(false)} className="px-6 py-3 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-all">Cancel</button>
-                                <button type="submit" className="px-8 py-3 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 transition-all shadow-lg hover:shadow-xl">Issue Material</button>
+                                <button type="button" onClick={() => setShowIssueModal(false)} className="px-6 py-3 text-sm font-semibold text-gray-700 border-2 border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">Cancel</button>
+                                <button type="submit" className="px-8 py-3 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition-all shadow-lg hover:shadow-xl">Issue Material</button>
                             </div>
                         </form>
                     </div>
@@ -1764,8 +1761,9 @@ export default function AdminInventory() {
                 title={dialog.title}
                 message={dialog.message}
                 type={dialog.type}
-                onConfirm={dialog.onConfirm}
-                onCancel={dialog.onCancel || closeDialog}
+                onConfirm={dialog.onConfirm || closeDialog}
+                onCancel={closeDialog}
+                isConfirmation={dialog.isConfirmation}
                 visible={dialog.visible}
             />
 

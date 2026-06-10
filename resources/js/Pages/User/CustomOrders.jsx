@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import axios from 'axios';
 
 export default function CustomOrders() {
@@ -93,6 +94,26 @@ export default function CustomOrders() {
             setLoading(false);
         }
     };
+
+    // Highlight (from notification click)
+    const location = useLocation();
+    const hlParams = new URLSearchParams(location.search);
+    const [highlightId, setHighlightId] = useState(hlParams.get('highlight') ? Number(hlParams.get('highlight')) : null);
+    const [dismissedDot, setDismissedDot] = useState(null);
+
+    useEffect(() => {
+        const s = document.createElement('style');
+        s.id = 'hl-style-uco';
+        s.textContent = `
+            @keyframes hlPulse { 0%,100%{box-shadow:0 0 0 0 rgba(37,99,235,.5)} 50%{box-shadow:0 0 0 8px rgba(37,99,235,0)} }
+            .hl-card { border:2px solid #2563eb !important; animation:hlPulse 1.2s ease-in-out infinite; }
+        `;
+        if (!document.getElementById('hl-style-uco')) document.head.appendChild(s);
+        if (highlightId) {
+            const el = document.getElementById(`card-${highlightId}`);
+            if (el) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'center' }), 500);
+        }
+    }, []);
 
     // ✅ NEW: Update current time every minute for countdown
     useEffect(() => {
@@ -575,7 +596,12 @@ export default function CustomOrders() {
 
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                 {filteredOrders.map((order) => (
-                                    <div key={order.id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-all duration-200 group relative">
+                                    <div key={order.id} id={`card-${order.id}`}
+                                        className={`bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-all duration-200 group relative ${highlightId === order.id ? 'hl-card' : 'border border-gray-100'}`}>
+                                        {highlightId === order.id && dismissedDot !== order.id && (
+                                            <div onClick={e => { e.stopPropagation(); setDismissedDot(order.id); }}
+                                                style={{ position: 'absolute', top: 10, right: 10, width: 10, height: 10, background: '#2563eb', borderRadius: '50%', border: '2px solid white', boxShadow: '0 0 0 2px #2563eb', cursor: 'pointer', zIndex: 20 }} />
+                                        )}
                                         {/* ✅ NEW: Checkbox */}
                                         <div className="absolute top-3 left-3 z-10">
                                             <input

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import axios from 'axios';
 
 export default function AssignedOrders() {
@@ -11,6 +12,26 @@ export default function AssignedOrders() {
     const [showImageModal, setShowImageModal] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState(null);
     const [orderToComplete, setOrderToComplete] = useState(null);
+
+    // Highlight (from notification click)
+    const location = useLocation();
+    const hlParams = new URLSearchParams(location.search);
+    const [highlightId, setHighlightId] = useState(hlParams.get('highlight') ? Number(hlParams.get('highlight')) : null);
+    const [dismissedDot, setDismissedDot] = useState(null);
+
+    useEffect(() => {
+        const s = document.createElement('style');
+        s.id = 'hl-style-pt';
+        s.textContent = `
+            @keyframes hlPulse { 0%,100%{box-shadow:0 0 0 0 rgba(37,99,235,.5)} 50%{box-shadow:0 0 0 8px rgba(37,99,235,0)} }
+            .hl-card { border:2px solid #2563eb !important; animation:hlPulse 1.2s ease-in-out infinite; }
+        `;
+        if (!document.getElementById('hl-style-pt')) document.head.appendChild(s);
+        if (highlightId) {
+            const el = document.getElementById(`card-${highlightId}`);
+            if (el) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'center' }), 400);
+        }
+    }, []);
 
     useEffect(() => {
         const fetchOrders = async () => {
@@ -191,9 +212,14 @@ export default function AssignedOrders() {
                             {orders.map(order => (
                                 <tr
                                     key={order.id}
-                                    className="hover:bg-gray-50 transition cursor-pointer"
-                                    onClick={() => handleViewImages(order)}
+                                    id={`card-${order.id}`}
+                                    className={`hover:bg-gray-50 transition cursor-pointer relative ${highlightId === order.id ? 'hl-card' : ''}`}
+                                    onClick={() => { handleViewImages(order); setHighlightId(null); }}
                                 >
+                                    {highlightId === order.id && dismissedDot !== order.id && (
+                                        <div onClick={e => { e.stopPropagation(); setDismissedDot(order.id); }}
+                                            style={{ position: 'absolute', top: 10, right: 10, width: 10, height: 10, background: '#2563eb', borderRadius: '50%', border: '2px solid white', boxShadow: '0 0 0 2px #2563eb', cursor: 'pointer', zIndex: 10 }} />
+                                    )}
                                     <td className="py-4 px-6 text-sm font-medium text-gray-900">#{String(order.id).padStart(3, '0')}</td>
                                     <td className="py-4 px-6 text-sm text-gray-700">{order.user_name}</td>
                                     <td className="py-4 px-6 text-sm text-gray-700 max-w-xs truncate" title={order.description}>

@@ -136,6 +136,13 @@ export default function Shop() {
     const [cart, setCart] = useState([]);
 
     const isLoggedIn = !!sessionStorage.getItem('auth_token');
+    const userRole = (() => { try { return JSON.parse(sessionStorage.getItem('user') || '{}')?.role; } catch { return null; } })();
+    const isRegularUser = !userRole || userRole === 'user';
+    const restrictUser = (cb) => {
+        if (!isLoggedIn) { navigate('/login'); return; }
+        if (!isRegularUser) { showToast('This feature is only available for regular users.', 'warn'); return; }
+        cb();
+    };
     const handleLogout = () => {
         sessionStorage.clear();
         ['auth_token', 'user', 'enrollments', 'courses', 'bookings', 'machines', 'cart_items'].forEach(k => {
@@ -185,6 +192,7 @@ export default function Shop() {
 
     const handleAddToCart = useCallback((product, qty = 1) => {
         if (!isLoggedIn) { showToast('Please login to add to cart', 'warn'); return; }
+        if (!isRegularUser) { showToast('This feature is only available for regular users.', 'warn'); return; }
         setCart(prev => {
             const existing = prev.find(i => i.id === product.id);
             if (existing) return prev.map(i => i.id === product.id ? { ...i, qty: i.qty + qty } : i);
@@ -195,8 +203,9 @@ export default function Shop() {
 
     const handleBuyNow = useCallback((product, qty = 1) => {
         if (!isLoggedIn) { showToast('Please login to place an order', 'warn'); return; }
+        if (!isRegularUser) { showToast('This feature is only available for regular users.', 'warn'); return; }
         navigate('/user/shop-orders', { state: { product, qty } });
-    }, [isLoggedIn, navigate, showToast]);
+    }, [isLoggedIn, isRegularUser, navigate, showToast]);
 
     let displayed = products.filter(p =>
         p.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -515,7 +524,7 @@ export default function Shop() {
                         <a href="/about" className="nav-link">About</a>
                         <a href="/gallery" className="nav-link">Gallery</a>
                         <a href="/faq" className="nav-link">FAQ</a>
-                        <div className="nav-cart" onClick={() => isLoggedIn ? navigate('/user/shop-orders') : showToast('Please login to view your cart', 'warn')}>
+                        <div className="nav-cart" onClick={() => { if (!isLoggedIn) { showToast('Please login to view your cart', 'warn'); return; } if (!isRegularUser) { showToast('This feature is only available for regular users.', 'warn'); return; } navigate('/user/shop-orders'); }}>
                             <svg width="22" height="22" fill="none" stroke="#1e2a3a" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
                             </svg>

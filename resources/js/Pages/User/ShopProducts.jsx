@@ -1322,11 +1322,11 @@ export default function ShopProducts({
                                             </div>
                                             <div className="flex justify-between">
                                                 <span className="text-gray-600">Account Name:</span>
-                                                <span className="font-semibold text-gray-900">JNEC Fab Lab</span>
+                                                <span className="font-semibold text-gray-900">JNEC FABLAB CENTRE</span>
                                             </div>
                                             <div className="flex justify-between">
                                                 <span className="text-gray-600">Account Number:</span>
-                                                <span className="font-semibold text-gray-900">200123456789</span>
+                                                <span className="font-semibold text-gray-900">227101886</span>
                                             </div>
                                         </div>
                                     </div>

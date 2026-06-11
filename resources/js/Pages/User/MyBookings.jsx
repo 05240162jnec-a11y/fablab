@@ -18,8 +18,41 @@ export default function MyBookings() {
     // Highlight state (from notification click)
     const location = useLocation();
     const hlParams = new URLSearchParams(location.search);
-    const [highlightId, setHighlightId] = useState(hlParams.get('highlight') ? Number(hlParams.get('highlight')) : null);
-    const [dismissedDot, setDismissedDot] = useState(null);
+
+    // ✅ Check localStorage "seen" list before activating animation
+    const [highlightId, setHighlightId] = useState(() => {
+        const id = hlParams.get('highlight') ? Number(hlParams.get('highlight')) : null;
+        if (!id) return null;
+        try {
+            const seen = JSON.parse(localStorage.getItem('hl_seen_mybookings') || '[]');
+            if (seen.includes(id)) return null;
+        } catch { }
+        return id;
+    });
+
+    // ✅ Persist dismissed dots in localStorage so they survive refresh
+    const [dismissedDots, setDismissedDots] = useState(() => {
+        try { return JSON.parse(localStorage.getItem('hl_dismissed_mybookings') || '[]'); }
+        catch { return []; }
+    });
+
+    const dismissDot = (id) => {
+        const updated = [...dismissedDots, id];
+        setDismissedDots(updated);
+        localStorage.setItem('hl_dismissed_mybookings', JSON.stringify(updated));
+        // Also mark as seen so border animation doesn't return on refresh
+        try {
+            const seen = JSON.parse(localStorage.getItem('hl_seen_mybookings') || '[]');
+            if (!seen.includes(id)) localStorage.setItem('hl_seen_mybookings', JSON.stringify([...seen, id]));
+        } catch { }
+    };
+
+    const markSeen = (id) => {
+        try {
+            const seen = JSON.parse(localStorage.getItem('hl_seen_mybookings') || '[]');
+            if (!seen.includes(id)) localStorage.setItem('hl_seen_mybookings', JSON.stringify([...seen, id]));
+        } catch { }
+    };
 
     useEffect(() => {
         if (!highlightId) return;
@@ -197,8 +230,7 @@ export default function MyBookings() {
             {/* ✅ Toast Notification */}
             {toast.show && (
                 <div className="fixed top-6 right-6 z-[100] animate-slide-in-right">
-                    <div className={`flex items-center gap-3 px-5 py-4 rounded-xl shadow-2xl border-2 min-w-[320px] max-w-[500px] ${toast.type === 'success' ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'
-                        }`}>
+                    <div className={`flex items-center gap-3 px-5 py-4 rounded-xl shadow-2xl border-2 min-w-[320px] max-w-[500px] ${toast.type === 'success' ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'}`}>
                         <div className="flex-shrink-0">
                             {toast.type === 'success' ? (
                                 <svg className="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
@@ -252,10 +284,16 @@ export default function MyBookings() {
                         <div className="space-y-4">
                             {filteredBookings.map((booking) => (
                                 <div key={booking.id} id={`card-${booking.id}`}
-                                    onClick={() => { handleViewDetails(booking); setHighlightId(null); }}
+                                    onClick={() => {
+                                        handleViewDetails(booking);
+                                        if (highlightId === booking.id) {
+                                            setHighlightId(null);
+                                            markSeen(booking.id);
+                                        }
+                                    }}
                                     className={`bg-white rounded-2xl border shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer hover:-translate-y-0.5 relative ${highlightId === booking.id ? 'hl-card' : 'border-gray-100'}`}>
-                                    {highlightId === booking.id && dismissedDot !== booking.id && (
-                                        <div onClick={e => { e.stopPropagation(); setDismissedDot(booking.id); }}
+                                    {highlightId === booking.id && !dismissedDots.includes(booking.id) && (
+                                        <div onClick={e => { e.stopPropagation(); dismissDot(booking.id); }}
                                             style={{ position: 'absolute', top: 12, right: 12, width: 10, height: 10, background: '#2563eb', borderRadius: '50%', border: '2px solid white', boxShadow: '0 0 0 2px #2563eb', cursor: 'pointer', zIndex: 10 }} />
                                     )}
                                     <div className="p-6">

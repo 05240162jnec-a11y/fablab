@@ -125,6 +125,13 @@ export default function Training() {
     const [menuOpen, setMenuOpen] = useState(false);
 
     const isLoggedIn = !!sessionStorage.getItem('auth_token');
+    const userRole = (() => { try { return JSON.parse(sessionStorage.getItem('user') || '{}')?.role; } catch { return null; } })();
+    const isRegularUser = !userRole || userRole === 'user';
+    const restrictUser = (cb) => {
+        if (!isLoggedIn) { navigate('/login'); return; }
+        if (!isRegularUser) { showToast('This feature is only available for regular users.', 'warn'); return; }
+        cb();
+    };
     const handleLogout = () => {
         sessionStorage.clear();
         ['auth_token', 'user', 'enrollments', 'courses', 'bookings', 'machines', 'cart_items'].forEach(k => {
@@ -161,8 +168,9 @@ export default function Training() {
     }, []);
     const handleEnroll = useCallback((course) => {
         if (!isLoggedIn) { showToast('Please login to enroll in this course', 'warn'); return; }
+        if (!isRegularUser) { showToast('This feature is only available for regular users.', 'warn'); return; }
         navigate('/user/learning');
-    }, [isLoggedIn, navigate, showToast]);
+    }, [isLoggedIn, isRegularUser, navigate, showToast]);
 
     const openCount = courses.filter(c => c.registration_open).length;
 

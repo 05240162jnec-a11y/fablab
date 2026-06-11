@@ -11,12 +11,39 @@ export default function Bookings() {
     const navigate = useNavigate();
     const location = useLocation();
     const hlParams = new URLSearchParams(location.search);
-    const [highlightId, setHighlightId] = useState(hlParams.get('highlight') ? Number(hlParams.get('highlight')) : null);
-    const [dismissedDot, setDismissedDot] = useState(null);
+    const [highlightId, setHighlightId] = useState(() => {
+        const id = hlParams.get('highlight') ? Number(hlParams.get('highlight')) : null;
+        if (!id) return null;
+        // ✅ If already seen/dismissed, don't show animation again on refresh
+        try {
+            const seen = JSON.parse(localStorage.getItem('hl_seen_bookings') || '[]');
+            if (seen.includes(id)) return null;
+        } catch { }
+        return id;
+    });
+
+    // ✅ Persist dismissed dots in localStorage so they survive refresh
+    const [dismissedDots, setDismissedDots] = useState(() => {
+        try {
+            return JSON.parse(localStorage.getItem('hl_dismissed_bookings') || '[]');
+        } catch { return []; }
+    });
+
+    const dismissDot = (id) => {
+        const updated = [...dismissedDots, id];
+        setDismissedDots(updated);
+        localStorage.setItem('hl_dismissed_bookings', JSON.stringify(updated));
+        // ✅ Also mark as seen so border animation doesn't return on refresh
+        try {
+            const seen = JSON.parse(localStorage.getItem('hl_seen_bookings') || '[]');
+            if (!seen.includes(id)) {
+                localStorage.setItem('hl_seen_bookings', JSON.stringify([...seen, id]));
+            }
+        } catch { }
+    };
 
     useEffect(() => {
         if (!highlightId) return;
-        // auto-set correct tab
         const tab = hlParams.get('tab');
         if (tab) setActiveTab(tab);
         const el = document.getElementById(`card-${highlightId}`);
@@ -503,11 +530,20 @@ export default function Bookings() {
                                             key={booking.id}
                                             id={`card-${booking.id}`}
                                             className={`hover:bg-gray-50 transition-colors cursor-pointer relative ${highlightId === booking.id ? 'hl-card' : ''}`}
-                                            onClick={() => { handleViewBookingDetails(booking); setHighlightId(null); }}
+                                            onClick={() => {
+                                                handleViewBookingDetails(booking);
+                                                if (highlightId === booking.id) {
+                                                    setHighlightId(null);
+                                                    try {
+                                                        const seen = JSON.parse(localStorage.getItem('hl_seen_bookings') || '[]');
+                                                        if (!seen.includes(booking.id)) localStorage.setItem('hl_seen_bookings', JSON.stringify([...seen, booking.id]));
+                                                    } catch { }
+                                                }
+                                            }}
                                         >
-                                            {highlightId === booking.id && dismissedDot !== booking.id && (
+                                            {highlightId === booking.id && !dismissedDots.includes(booking.id) && (
                                                 <td style={{ position: 'absolute', top: 10, right: 10, width: 10, height: 10, background: '#2563eb', borderRadius: '50%', border: '2px solid white', boxShadow: '0 0 0 2px #2563eb', cursor: 'pointer', zIndex: 10 }}
-                                                    onClick={e => { e.stopPropagation(); setDismissedDot(booking.id); }} />
+                                                    onClick={e => { e.stopPropagation(); dismissDot(booking.id); }} />
                                             )}
                                             <td className="py-4 px-4 text-sm font-medium text-gray-900">{booking.machine?.name}</td>
                                             <td className="py-4 px-4 text-sm text-gray-600">{booking.user?.name}</td>
@@ -570,9 +606,17 @@ export default function Bookings() {
                             {filteredOrders.map((order) => (
                                 <div key={order.id} id={`card-${order.id}`}
                                     className={`bg-white border rounded-xl p-6 hover:shadow-md transition-shadow flex flex-col relative ${highlightId === order.id ? 'hl-card' : 'border-gray-200'}`}
-                                    onClick={() => { if (highlightId === order.id) setHighlightId(null); }}>
-                                    {highlightId === order.id && dismissedDot !== order.id && (
-                                        <div className="hl-dot" onClick={e => { e.stopPropagation(); setDismissedDot(order.id); }} />
+                                    onClick={() => {
+                                        if (highlightId === order.id) {
+                                            setHighlightId(null);
+                                            try {
+                                                const seen = JSON.parse(localStorage.getItem('hl_seen_bookings') || '[]');
+                                                if (!seen.includes(order.id)) localStorage.setItem('hl_seen_bookings', JSON.stringify([...seen, order.id]));
+                                            } catch { }
+                                        }
+                                    }}>
+                                    {highlightId === order.id && !dismissedDots.includes(order.id) && (
+                                        <div className="hl-dot" onClick={e => { e.stopPropagation(); dismissDot(order.id); }} />
                                     )}
                                     <div className="flex items-start justify-between mb-4">
                                         <div className="flex-1">
@@ -586,7 +630,6 @@ export default function Bookings() {
                                         <p className="text-2xl font-bold text-blue-600">Nu. {parseFloat(order.total_amount || 0).toFixed(2)}</p>
                                     </div>
                                     <div className="mb-4 flex-1">
-                                        {/* ✅ UPDATED: Smaller thumbnail + clickable for full view */}
                                         <img
                                             src={getScreenshotUrl(order)}
                                             alt={getProductName(order)}
@@ -628,7 +671,6 @@ export default function Bookings() {
                             </button>
                         </div>
                         <div className="p-6 overflow-y-auto flex-1 bg-gray-50">
-                            {/* ✅ UPDATED: Smaller image + clickable for full view */}
                             <div className="mb-6">
                                 <p className="text-sm text-gray-500 mb-2">Payment Screenshot</p>
                                 <img
@@ -673,7 +715,6 @@ export default function Bookings() {
                                             <span className="text-gray-600">Products Total:</span>
                                             <span className="font-medium">Nu. {(parseFloat(selectedOrder.total_amount || 0) - parseFloat(selectedOrder.shipping_cost || 0)).toFixed(2)}</span>
                                         </div>
-                                        {/* ✅ REMOVED: Shipping Cost line */}
                                         <div className="flex justify-between text-base pt-2 border-t border-blue-200">
                                             <span className="font-semibold text-gray-900">Total Paid:</span>
                                             <span className="font-bold text-blue-600">Nu. {parseFloat(selectedOrder.total_amount || 0).toFixed(2)}</span>
@@ -696,33 +737,19 @@ export default function Bookings() {
                         <div className="px-6 py-4 border-t border-gray-200 sticky bottom-0 bg-white rounded-b-2xl">
                             {selectedOrder.status === 'pending' ? (
                                 <div className="flex gap-3">
-                                    {/* ✅ UPDATED: Approve Button - Shows Custom Dialog */}
                                     <button
                                         onClick={() => handleApproveOrder(selectedOrder)}
                                         disabled={approveLoading}
                                         className={`flex-1 py-3 rounded-lg transition-colors flex items-center justify-center gap-2 font-semibold ${approveLoading ? 'bg-gray-400 text-gray-200 cursor-not-allowed' : 'bg-green-600 text-white hover:bg-green-700'}`}
                                     >
-                                        {approveLoading ? (<>
-                                            <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                                            Processing...
-                                        </>) : (<>
-                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
-                                            Approve Order
-                                        </>)}
+                                        {approveLoading ? (<><svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Processing...</>) : (<><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>Approve Order</>)}
                                     </button>
-                                    {/* ✅ UPDATED: Reject Button - Shows Custom Dialog */}
                                     <button
                                         onClick={() => handleRejectOrder(selectedOrder)}
                                         disabled={rejectLoading}
                                         className={`flex-1 py-3 rounded-lg transition-colors flex items-center justify-center gap-2 font-semibold ${rejectLoading ? 'bg-gray-400 text-gray-200 cursor-not-allowed' : 'bg-red-600 text-white hover:bg-red-700'}`}
                                     >
-                                        {rejectLoading ? (<>
-                                            <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                                            Processing...
-                                        </>) : (<>
-                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                                            Reject Order
-                                        </>)}
+                                        {rejectLoading ? (<><svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Processing...</>) : (<><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>Reject Order</>)}
                                     </button>
                                 </div>
                             ) : (
@@ -742,56 +769,31 @@ export default function Bookings() {
             {showImageLightbox && selectedOrder && (
                 <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-[60] p-4" onClick={() => setShowImageLightbox(false)}>
                     <div className="relative max-w-5xl w-full" onClick={(e) => e.stopPropagation()}>
-                        <button
-                            onClick={() => setShowImageLightbox(false)}
-                            className="absolute -top-10 right-0 text-white hover:text-gray-300 transition-colors"
-                        >
-                            <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                            </svg>
+                        <button onClick={() => setShowImageLightbox(false)} className="absolute -top-10 right-0 text-white hover:text-gray-300 transition-colors">
+                            <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
                         </button>
-                        <img
-                            src={selectedOrder.image}
-                            alt={getProductName(selectedOrder)}
-                            className="w-full h-auto max-h-[85vh] object-contain rounded-lg"
-                        />
+                        <img src={selectedOrder.image} alt={getProductName(selectedOrder)} className="w-full h-auto max-h-[85vh] object-contain rounded-lg" />
                     </div>
                 </div>
             )}
 
-            {/* ✅ NEW: Custom Approve Dialog - Green Theme */}
+            {/* ✅ NEW: Custom Approve Dialog */}
             {showApproveDialog && selectedOrder && (
                 <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[70] p-4" onClick={() => setShowApproveDialog(false)}>
                     <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
-                        {/* Success Icon */}
                         <div className="flex justify-center pt-8 pb-4">
                             <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center">
-                                <svg className="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-                                </svg>
+                                <svg className="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
                             </div>
                         </div>
-
-                        {/* Content */}
                         <div className="px-6 pb-6 text-center">
                             <h3 className="text-2xl font-bold text-gray-900 mb-2">Approve Order?</h3>
                             <p className="text-gray-600 mb-2">{selectedOrder.order_number}</p>
                             <p className="text-sm text-gray-500">This will confirm the payment and notify the user via email.</p>
                         </div>
-
-                        {/* Buttons */}
                         <div className="px-6 pb-6 flex gap-3">
-                            <button
-                                onClick={() => setShowApproveDialog(false)}
-                                className="flex-1 px-4 py-3 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-semibold"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={confirmApproveOrder}
-                                disabled={approveLoading}
-                                className={`flex-1 px-4 py-3 rounded-xl transition-colors font-semibold text-white ${approveLoading ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'}`}
-                            >
+                            <button onClick={() => setShowApproveDialog(false)} className="flex-1 px-4 py-3 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-semibold">Cancel</button>
+                            <button onClick={confirmApproveOrder} disabled={approveLoading} className={`flex-1 px-4 py-3 rounded-xl transition-colors font-semibold text-white ${approveLoading ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'}`}>
                                 {approveLoading ? 'Processing...' : 'Approve Order'}
                             </button>
                         </div>
@@ -799,53 +801,26 @@ export default function Bookings() {
                 </div>
             )}
 
-            {/* ✅ NEW: Custom Reject Dialog - Red Theme */}
+            {/* ✅ NEW: Custom Reject Dialog */}
             {showRejectDialog && selectedOrder && (
                 <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[70] p-4" onClick={() => setShowRejectDialog(false)}>
                     <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
-                        {/* Warning Icon */}
                         <div className="flex justify-center pt-8 pb-4">
                             <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center">
-                                <svg className="w-10 h-10 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                                </svg>
+                                <svg className="w-10 h-10 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
                             </div>
                         </div>
-
-                        {/* Content */}
                         <div className="px-6 pb-6">
                             <h3 className="text-2xl font-bold text-gray-900 mb-2 text-center">Reject Order</h3>
                             <p className="text-gray-600 mb-4 text-center">{selectedOrder.order_number}</p>
-
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">Rejection Reason *</label>
-                                <textarea
-                                    value={rejectionReason}
-                                    onChange={(e) => setRejectionReason(e.target.value)}
-                                    placeholder="Enter reason for rejection..."
-                                    rows="4"
-                                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 resize-none"
-                                    autoFocus
-                                />
+                                <textarea value={rejectionReason} onChange={(e) => setRejectionReason(e.target.value)} placeholder="Enter reason for rejection..." rows="4" className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 resize-none" autoFocus />
                             </div>
                         </div>
-
-                        {/* Buttons */}
                         <div className="px-6 pb-6 flex gap-3">
-                            <button
-                                onClick={() => {
-                                    setShowRejectDialog(false);
-                                    setRejectionReason('');
-                                }}
-                                className="flex-1 px-4 py-3 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-semibold"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={confirmRejectOrder}
-                                disabled={rejectLoading || !rejectionReason.trim()}
-                                className={`flex-1 px-4 py-3 rounded-xl transition-colors font-semibold text-white ${rejectLoading || !rejectionReason.trim() ? 'bg-gray-400 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700'}`}
-                            >
+                            <button onClick={() => { setShowRejectDialog(false); setRejectionReason(''); }} className="flex-1 px-4 py-3 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-semibold">Cancel</button>
+                            <button onClick={confirmRejectOrder} disabled={rejectLoading || !rejectionReason.trim()} className={`flex-1 px-4 py-3 rounded-xl transition-colors font-semibold text-white ${rejectLoading || !rejectionReason.trim() ? 'bg-gray-400 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700'}`}>
                                 {rejectLoading ? 'Processing...' : 'Reject Order'}
                             </button>
                         </div>
@@ -853,11 +828,10 @@ export default function Bookings() {
                 </div>
             )}
 
-            {/* ✅ NEW: Booking Details Modal with Terminate Button */}
+            {/* ✅ NEW: Booking Details Modal */}
             {showBookingDetailsModal && selectedBooking && (
                 <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onClick={closeAllModals}>
                     <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
-                        {/* Modal Header */}
                         <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white rounded-t-2xl z-10">
                             <div>
                                 <h3 className="text-xl font-bold text-gray-900">Booking Details</h3>
@@ -867,99 +841,49 @@ export default function Bookings() {
                                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
                             </button>
                         </div>
-
-                        {/* Modal Body */}
                         <div className="p-6 overflow-y-auto flex-1 bg-gray-50">
-                            {/* User Info */}
                             <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
                                 <h4 className="font-semibold text-blue-900 mb-3">User Information</h4>
                                 <div className="grid grid-cols-2 gap-4 text-sm">
-                                    <div>
-                                        <p className="text-blue-600">Name</p>
-                                        <p className="font-medium text-gray-900">{selectedBooking.user?.name}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-blue-600">Email</p>
-                                        <p className="font-medium text-gray-900">{selectedBooking.user?.email}</p>
-                                    </div>
-                                    {selectedBooking.user?.phone && (
-                                        <div>
-                                            <p className="text-blue-600">Phone</p>
-                                            <p className="font-medium text-gray-900">{selectedBooking.user?.phone}</p>
-                                        </div>
-                                    )}
+                                    <div><p className="text-blue-600">Name</p><p className="font-medium text-gray-900">{selectedBooking.user?.name}</p></div>
+                                    <div><p className="text-blue-600">Email</p><p className="font-medium text-gray-900">{selectedBooking.user?.email}</p></div>
+                                    {selectedBooking.user?.phone && <div><p className="text-blue-600">Phone</p><p className="font-medium text-gray-900">{selectedBooking.user?.phone}</p></div>}
                                 </div>
                             </div>
-
-                            {/* Booking Info */}
                             <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
                                 <h4 className="font-semibold text-gray-900 mb-3">Booking Information</h4>
                                 <div className="grid grid-cols-2 gap-4 text-sm">
-                                    <div>
-                                        <p className="text-gray-500">Machine</p>
-                                        <p className="font-medium text-gray-900">{selectedBooking.machine?.name}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-gray-500">Type</p>
-                                        <p className="font-medium text-gray-900">{selectedBooking.machine?.type || 'N/A'}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-gray-500">Date</p>
-                                        <p className="font-medium text-gray-900">{formatDate(selectedBooking.booking_date)}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-gray-500">Time Slot</p>
-                                        <p className="font-medium text-gray-900">{formatTimeSlot(selectedBooking.start_time, selectedBooking.end_time)}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-gray-500">Status</p>
+                                    <div><p className="text-gray-500">Machine</p><p className="font-medium text-gray-900">{selectedBooking.machine?.name}</p></div>
+                                    <div><p className="text-gray-500">Type</p><p className="font-medium text-gray-900">{selectedBooking.machine?.type || 'N/A'}</p></div>
+                                    <div><p className="text-gray-500">Date</p><p className="font-medium text-gray-900">{formatDate(selectedBooking.booking_date)}</p></div>
+                                    <div><p className="text-gray-500">Time Slot</p><p className="font-medium text-gray-900">{formatTimeSlot(selectedBooking.start_time, selectedBooking.end_time)}</p></div>
+                                    <div><p className="text-gray-500">Status</p>
                                         <span className={`inline-flex px-3 py-1 rounded-full text-xs font-medium border ${getBookingStatusBadgeClass(selectedBooking.status)}`}>
-                                            {selectedBooking.status === 'confirmed' || selectedBooking.status === 'upcoming' ? 'Booked' :
-                                                selectedBooking.status === 'cancelled' ? 'Cancelled' :
-                                                    selectedBooking.status === 'terminated' ? 'Terminated' : 'Booked'}
+                                            {selectedBooking.status === 'confirmed' || selectedBooking.status === 'upcoming' ? 'Booked' : selectedBooking.status === 'cancelled' ? 'Cancelled' : selectedBooking.status === 'terminated' ? 'Terminated' : 'Booked'}
                                         </span>
                                     </div>
                                 </div>
                             </div>
-
-                            {/* Termination Warning (only for Booked status) */}
                             {(selectedBooking.status === 'confirmed' || selectedBooking.status === 'upcoming') && (
                                 <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
                                     <div className="flex items-start gap-3">
-                                        <svg className="w-6 h-6 text-orange-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                                        </svg>
+                                        <svg className="w-6 h-6 text-orange-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
                                         <div>
                                             <p className="text-sm font-semibold text-orange-900"></p>
-                                            <p className="text-xs text-orange-700 mt-1">
-                                                Use this if the user did not arrive for their scheduled time. They will receive an email notification.
-                                            </p>
+                                            <p className="text-xs text-orange-700 mt-1">Use this if the user did not arrive for their scheduled time. They will receive an email notification.</p>
                                         </div>
                                     </div>
                                 </div>
                             )}
                         </div>
-
-                        {/* Modal Footer */}
                         <div className="px-6 py-4 border-t border-gray-200 sticky bottom-0 bg-white rounded-b-2xl">
                             {(selectedBooking.status === 'confirmed' || selectedBooking.status === 'upcoming') ? (
-                                <button
-                                    onClick={() => handleTerminateBooking(selectedBooking.id)}
-                                    disabled={terminateLoading}
-                                    className={`w-full py-3 rounded-lg transition-colors flex items-center justify-center gap-2 font-semibold ${terminateLoading ? 'bg-gray-400 text-gray-200 cursor-not-allowed' : 'bg-rose-700 text-white hover:bg-rose-800'}`}
-                                >
-                                    {terminateLoading ? (<>
-                                        <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                                        Processing...
-                                    </>) : (<>
-                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-                                        Terminate Booking
-                                    </>)}
+                                <button onClick={() => handleTerminateBooking(selectedBooking.id)} disabled={terminateLoading} className={`w-full py-3 rounded-lg transition-colors flex items-center justify-center gap-2 font-semibold ${terminateLoading ? 'bg-gray-400 text-gray-200 cursor-not-allowed' : 'bg-rose-700 text-white hover:bg-rose-800'}`}>
+                                    {terminateLoading ? (<><svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Processing...</>) : (<><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>Terminate Booking</>)}
                                 </button>
                             ) : (
                                 <div className="text-center text-sm text-gray-500">
-                                    {selectedBooking.status === 'cancelled' ? 'This booking was cancelled by the user.' :
-                                        selectedBooking.status === 'terminated' ? 'This booking was terminated due to no-show.' : 'No actions available.'}
+                                    {selectedBooking.status === 'cancelled' ? 'This booking was cancelled by the user.' : selectedBooking.status === 'terminated' ? 'This booking was terminated due to no-show.' : 'No actions available.'}
                                 </div>
                             )}
                         </div>
@@ -969,64 +893,22 @@ export default function Bookings() {
 
             {/* ✅ Terminate Booking Confirmation Modal */}
             {showTerminateModal && (
-                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[80] p-4"
-                    onClick={() => setShowTerminateModal(false)}>
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
-                        onClick={e => e.stopPropagation()}
-                        style={{ animation: 'tbModalIn .2s cubic-bezier(.16,1,.3,1) both' }}>
+                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[80] p-4" onClick={() => setShowTerminateModal(false)}>
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden" onClick={e => e.stopPropagation()} style={{ animation: 'tbModalIn .2s cubic-bezier(.16,1,.3,1) both' }}>
                         <style>{`@keyframes tbModalIn { from{opacity:0;transform:scale(.95) translateY(8px)} to{opacity:1;transform:scale(1) translateY(0)} }`}</style>
-
-                        {/* Icon */}
                         <div className="flex justify-center pt-8 pb-2">
                             <div className="w-16 h-16 rounded-full bg-rose-100 flex items-center justify-center">
-                                <svg className="w-8 h-8 text-rose-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
-                                        d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-                                </svg>
+                                <svg className="w-8 h-8 text-rose-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
                             </div>
                         </div>
-
-                        {/* Content */}
                         <div className="px-6 pt-3 pb-5 text-center">
                             <h3 className="text-xl font-bold text-gray-900 mb-2">Terminate Booking?</h3>
-                            <p className="text-sm text-gray-600 leading-relaxed">
-                                The user will be notified via email that they did not show up for their scheduled time.
-                                <br />
-                                <span className="text-rose-600 font-medium">This action cannot be undone.</span>
-                            </p>
+                            <p className="text-sm text-gray-600 leading-relaxed">The user will be notified via email that they did not show up for their scheduled time.<br /><span className="text-rose-600 font-medium">This action cannot be undone.</span></p>
                         </div>
-
-                        {/* Buttons */}
                         <div className="px-6 pb-6 flex gap-3">
-                            <button
-                                onClick={() => { setShowTerminateModal(false); setBookingToTerminate(null); }}
-                                className="flex-1 py-3 border-2 border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-semibold text-sm"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={confirmTerminate}
-                                disabled={terminateLoading}
-                                className={`flex-1 py-3 rounded-xl transition-colors font-semibold text-sm text-white flex items-center justify-center gap-2
-                                    ${terminateLoading ? 'bg-gray-400 cursor-not-allowed' : 'bg-rose-700 hover:bg-rose-800'}`}
-                            >
-                                {terminateLoading ? (
-                                    <>
-                                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                                        </svg>
-                                        Terminating…
-                                    </>
-                                ) : (
-                                    <>
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
-                                                d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-                                        </svg>
-                                        Yes, Terminate
-                                    </>
-                                )}
+                            <button onClick={() => { setShowTerminateModal(false); setBookingToTerminate(null); }} className="flex-1 py-3 border-2 border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-semibold text-sm">Cancel</button>
+                            <button onClick={confirmTerminate} disabled={terminateLoading} className={`flex-1 py-3 rounded-xl transition-colors font-semibold text-sm text-white flex items-center justify-center gap-2 ${terminateLoading ? 'bg-gray-400 cursor-not-allowed' : 'bg-rose-700 hover:bg-rose-800'}`}>
+                                {terminateLoading ? (<><svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>Terminating…</>) : (<><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>Yes, Terminate</>)}
                             </button>
                         </div>
                     </div>
@@ -1035,65 +917,22 @@ export default function Bookings() {
 
             {/* ✅ Custom Delete Order Confirmation Modal */}
             {showDeleteDialog && orderToDelete && (
-                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[80] p-4"
-                    onClick={() => { setShowDeleteDialog(false); setOrderToDelete(null); }}>
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
-                        onClick={e => e.stopPropagation()}
-                        style={{ animation: 'delModalIn .2s cubic-bezier(.16,1,.3,1) both' }}>
+                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[80] p-4" onClick={() => { setShowDeleteDialog(false); setOrderToDelete(null); }}>
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden" onClick={e => e.stopPropagation()} style={{ animation: 'delModalIn .2s cubic-bezier(.16,1,.3,1) both' }}>
                         <style>{`@keyframes delModalIn { from{opacity:0;transform:scale(.95) translateY(8px)} to{opacity:1;transform:scale(1) translateY(0)} }`}</style>
-
-                        {/* Icon */}
                         <div className="flex justify-center pt-8 pb-2">
                             <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center">
-                                <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
-                                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                </svg>
+                                <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                             </div>
                         </div>
-
-                        {/* Content */}
                         <div className="px-6 pt-3 pb-5 text-center">
                             <h3 className="text-xl font-bold text-gray-900 mb-2">Delete Order?</h3>
-                            <p className="text-sm text-gray-600 leading-relaxed">
-                                Are you sure you want to delete order{' '}
-                                <span className="font-semibold text-gray-900">{orderToDelete.order_number}</span>?
-                                <br />
-                                <span className="text-red-600 font-medium">This action cannot be undone.</span>
-                            </p>
+                            <p className="text-sm text-gray-600 leading-relaxed">Are you sure you want to delete order <span className="font-semibold text-gray-900">{orderToDelete.order_number}</span>?<br /><span className="text-red-600 font-medium">This action cannot be undone.</span></p>
                         </div>
-
-                        {/* Buttons */}
                         <div className="px-6 pb-6 flex gap-3">
-                            <button
-                                onClick={() => { setShowDeleteDialog(false); setOrderToDelete(null); }}
-                                className="flex-1 py-3 border-2 border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-semibold text-sm"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={confirmDeleteOrder}
-                                disabled={actionLoading}
-                                className={`flex-1 py-3 rounded-xl transition-colors font-semibold text-sm text-white flex items-center justify-center gap-2
-                                    ${actionLoading ? 'bg-gray-400 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700'}`}
-                            >
-                                {actionLoading ? (
-                                    <>
-                                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                                        </svg>
-                                        Deleting…
-                                    </>
-                                ) : (
-                                    <>
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
-                                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                        </svg>
-                                        Yes, Delete
-                                    </>
-                                )}
+                            <button onClick={() => { setShowDeleteDialog(false); setOrderToDelete(null); }} className="flex-1 py-3 border-2 border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-semibold text-sm">Cancel</button>
+                            <button onClick={confirmDeleteOrder} disabled={actionLoading} className={`flex-1 py-3 rounded-xl transition-colors font-semibold text-sm text-white flex items-center justify-center gap-2 ${actionLoading ? 'bg-gray-400 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700'}`}>
+                                {actionLoading ? (<><svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>Deleting…</>) : (<><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>Yes, Delete</>)}
                             </button>
                         </div>
                     </div>

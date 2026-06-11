@@ -279,13 +279,9 @@ class ProductOrderController extends Controller
                 ]);
             }
             
-            // Notify admin
-            $adminUser = User::where('role', 'admin')->first();
-            if ($adminUser) $adminUser->notify(new ProductOrderPaymentUploadedNotification($order->load('user')));
-
-            // Notify admin of re-upload
-            $admins = User::where('role', 'admin')->get();
+            // Notify admin (single notification, no duplicate)
             $order->load('user');
+            $admins = User::where('role', 'admin')->get();
             foreach ($admins as $admin) {
                 $admin->notify(new ProductOrderPaymentUploadedNotification($order));
             }

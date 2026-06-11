@@ -3,7 +3,6 @@ import axios from 'axios';
 
 // ── Modern SVG icons — monochrome, crisp ──
 const ICONS = {
-    // shape → [path, viewBox?]
     bell: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />,
     order: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />,
     money: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />,
@@ -20,7 +19,6 @@ const ICONS = {
     brush: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />,
 };
 
-// Icon tints per category — subtle, not garish
 const TYPE_META = {
     new_custom_order: { icon: 'brush', bg: '#eff6ff', fg: '#3b82f6' },
     custom_order_price_updated: { icon: 'money', bg: '#f0fdf4', fg: '#16a34a' },
@@ -145,9 +143,11 @@ export default function NotificationBell() {
         const id = data.booking_id || data.order_id || data.project_id || data.course_id || data.user_id || '';
         const h = id ? `&highlight=${id}` : '';
 
-        if (['new_custom_order', 'payment_uploaded', 'product_order_payment_uploaded'].includes(data.type))
+        // ✅ FIXED: product_order_payment_uploaded → Bookings & Orders (Product Orders tab)
+        // ✅ FIXED: payment_uploaded → Custom Orders only (for custom order payments)
+        if (['new_custom_order', 'payment_uploaded'].includes(data.type))
             window.location.href = `/admin/custom-orders?tab=custom${h}`;
-        else if (data.type === 'new_product_order')
+        else if (['new_product_order', 'product_order_payment_uploaded'].includes(data.type))
             window.location.href = `/admin/bookings?tab=product-orders${h}`;
         else if (['new_booking', 'booking_cancelled'].includes(data.type))
             window.location.href = `/admin/bookings?tab=machine-bookings${h}`;
@@ -216,10 +216,6 @@ export default function NotificationBell() {
                 }
                 .nb-item.unread .nb-msg { color:#0f172a; font-weight:600; }
                 .nb-time { font-size:.7rem; color:#9ca3af; margin-top:3px; }
-                .nb-dot {
-                    width:7px; height:7px; border-radius:50%;
-                    background:#3b82f6; flex-shrink:0; margin-top:5px;
-                }
                 .nb-badge {
                     position:absolute; top:-4px; right:-4px;
                     background:#ef4444; color:#fff;
@@ -251,7 +247,6 @@ export default function NotificationBell() {
             `}</style>
 
             <div style={{ position: 'relative' }} ref={dropdownRef}>
-                {/* Bell button */}
                 <button
                     className={`nb-bell-btn ${isOpen ? 'open' : ''}`}
                     onClick={() => { setIsOpen(o => !o); if (!isOpen) fetchNotifications(); }}
@@ -265,64 +260,38 @@ export default function NotificationBell() {
                     )}
                 </button>
 
-                {/* Dropdown */}
                 {isOpen && (
                     <div className="nb-dropdown">
-                        {/* Header */}
                         <div style={{
                             padding: '14px 16px 12px', borderBottom: '1px solid #f3f4f6',
                             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                         }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <span style={{ fontSize: '.875rem', fontWeight: 700, color: '#0f172a' }}>
-                                    Notifications
-                                </span>
+                                <span style={{ fontSize: '.875rem', fontWeight: 700, color: '#0f172a' }}>Notifications</span>
                                 {unreadCount > 0 && (
-                                    <span style={{
-                                        fontSize: '.65rem', fontWeight: 700,
-                                        background: '#eff6ff', color: '#3b82f6',
-                                        padding: '2px 7px', borderRadius: 9999,
-                                        border: '1px solid #bfdbfe',
-                                    }}>
+                                    <span style={{ fontSize: '.65rem', fontWeight: 700, background: '#eff6ff', color: '#3b82f6', padding: '2px 7px', borderRadius: 9999, border: '1px solid #bfdbfe' }}>
                                         {unreadCount} new
                                     </span>
                                 )}
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                                 {unreadCount > 0 && (
-                                    <button
-                                        onClick={markAllAsRead}
-                                        style={{
-                                            fontSize: '.72rem', fontWeight: 600, color: '#3b82f6',
-                                            background: 'none', border: 'none', cursor: 'pointer',
-                                            padding: '3px 8px', borderRadius: 6,
-                                            transition: 'background .15s',
-                                        }}
+                                    <button onClick={markAllAsRead} style={{ fontSize: '.72rem', fontWeight: 600, color: '#3b82f6', background: 'none', border: 'none', cursor: 'pointer', padding: '3px 8px', borderRadius: 6, transition: 'background .15s' }}
                                         onMouseEnter={e => e.currentTarget.style.background = '#eff6ff'}
-                                        onMouseLeave={e => e.currentTarget.style.background = 'none'}
-                                    >
+                                        onMouseLeave={e => e.currentTarget.style.background = 'none'}>
                                         Mark all read
                                     </button>
                                 )}
                                 {notifications.length > 0 && (
-                                    <button
-                                        onClick={clearAll}
-                                        style={{
-                                            fontSize: '.72rem', fontWeight: 600, color: '#ef4444',
-                                            background: 'none', border: 'none', cursor: 'pointer',
-                                            padding: '3px 8px', borderRadius: 6,
-                                            transition: 'background .15s',
-                                        }}
+                                    <button onClick={clearAll} style={{ fontSize: '.72rem', fontWeight: 600, color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', padding: '3px 8px', borderRadius: 6, transition: 'background .15s' }}
                                         onMouseEnter={e => e.currentTarget.style.background = '#fef2f2'}
-                                        onMouseLeave={e => e.currentTarget.style.background = 'none'}
-                                    >
+                                        onMouseLeave={e => e.currentTarget.style.background = 'none'}>
                                         Clear all
                                     </button>
                                 )}
                             </div>
                         </div>
 
-                        {/* List */}
                         <div style={{ overflowY: 'auto', maxHeight: 420 }}>
                             {loading ? (
                                 <div style={{ padding: '2rem', textAlign: 'center' }}>
@@ -331,9 +300,7 @@ export default function NotificationBell() {
                                 </div>
                             ) : notifications.length === 0 ? (
                                 <div className="nb-empty">
-                                    <svg className="nb-empty-icon" width="40" height="40" fill="none" stroke="#9ca3af" viewBox="0 0 24 24">
-                                        {ICONS.bell}
-                                    </svg>
+                                    <svg className="nb-empty-icon" width="40" height="40" fill="none" stroke="#9ca3af" viewBox="0 0 24 24">{ICONS.bell}</svg>
                                     <p style={{ fontSize: '.8rem', fontWeight: 600, color: '#6b7280' }}>All caught up!</p>
                                     <p style={{ fontSize: '.72rem' }}>No notifications yet</p>
                                 </div>
@@ -341,29 +308,20 @@ export default function NotificationBell() {
                                 notifications.map(notif => {
                                     const unread = !notif.read_at;
                                     return (
-                                        <div
-                                            key={notif.id}
-                                            className={`nb-item ${unread ? 'unread' : ''}`}
-                                            onClick={() => handleClick(notif)}
-                                        >
+                                        <div key={notif.id} className={`nb-item ${unread ? 'unread' : ''}`} onClick={() => handleClick(notif)}>
                                             <NotifIcon type={notif.data.type} />
                                             <div style={{ flex: 1, minWidth: 0 }}>
                                                 <p className="nb-msg">{notif.data.message}</p>
                                                 <p className="nb-time">{relTime(notif.created_at)}</p>
                                             </div>
-                                            {unread && <div className="nb-dot" />}
                                         </div>
                                     );
                                 })
                             )}
                         </div>
 
-                        {/* Footer */}
                         {notifications.length > 0 && (
-                            <div style={{
-                                padding: '10px 16px', borderTop: '1px solid #f3f4f6',
-                                textAlign: 'center',
-                            }}>
+                            <div style={{ padding: '10px 16px', borderTop: '1px solid #f3f4f6', textAlign: 'center' }}>
                                 <span style={{ fontSize: '.72rem', color: '#9ca3af' }}>
                                     {notifications.length} notification{notifications.length !== 1 ? 's' : ''} total
                                 </span>

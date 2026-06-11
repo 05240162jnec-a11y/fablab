@@ -16,8 +16,40 @@ export default function AssignedOrders() {
     // Highlight (from notification click)
     const location = useLocation();
     const hlParams = new URLSearchParams(location.search);
-    const [highlightId, setHighlightId] = useState(hlParams.get('highlight') ? Number(hlParams.get('highlight')) : null);
-    const [dismissedDot, setDismissedDot] = useState(null);
+
+    // ✅ Check localStorage "seen" list before activating animation
+    const [highlightId, setHighlightId] = useState(() => {
+        const id = hlParams.get('highlight') ? Number(hlParams.get('highlight')) : null;
+        if (!id) return null;
+        try {
+            const seen = JSON.parse(localStorage.getItem('hl_seen_pt') || '[]');
+            if (seen.includes(id)) return null;
+        } catch { }
+        return id;
+    });
+
+    // ✅ Persist dismissed dots in localStorage so they survive refresh
+    const [dismissedDots, setDismissedDots] = useState(() => {
+        try { return JSON.parse(localStorage.getItem('hl_dismissed_pt') || '[]'); }
+        catch { return []; }
+    });
+
+    const dismissDot = (id) => {
+        const updated = [...dismissedDots, id];
+        setDismissedDots(updated);
+        localStorage.setItem('hl_dismissed_pt', JSON.stringify(updated));
+        try {
+            const seen = JSON.parse(localStorage.getItem('hl_seen_pt') || '[]');
+            if (!seen.includes(id)) localStorage.setItem('hl_seen_pt', JSON.stringify([...seen, id]));
+        } catch { }
+    };
+
+    const markSeen = (id) => {
+        try {
+            const seen = JSON.parse(localStorage.getItem('hl_seen_pt') || '[]');
+            if (!seen.includes(id)) localStorage.setItem('hl_seen_pt', JSON.stringify([...seen, id]));
+        } catch { }
+    };
 
     useEffect(() => {
         const s = document.createElement('style');
@@ -214,33 +246,31 @@ export default function AssignedOrders() {
                                     key={order.id}
                                     id={`card-${order.id}`}
                                     className={`hover:bg-gray-50 transition cursor-pointer relative ${highlightId === order.id ? 'hl-card' : ''}`}
-                                    onClick={() => { handleViewImages(order); setHighlightId(null); }}
+                                    onClick={() => {
+                                        handleViewImages(order);
+                                        if (highlightId === order.id) {
+                                            setHighlightId(null);
+                                            markSeen(order.id);
+                                        }
+                                    }}
                                 >
-                                    {highlightId === order.id && dismissedDot !== order.id && (
-                                        <div onClick={e => { e.stopPropagation(); setDismissedDot(order.id); }}
+                                    {highlightId === order.id && !dismissedDots.includes(order.id) && (
+                                        <div onClick={e => { e.stopPropagation(); dismissDot(order.id); }}
                                             style={{ position: 'absolute', top: 10, right: 10, width: 10, height: 10, background: '#2563eb', borderRadius: '50%', border: '2px solid white', boxShadow: '0 0 0 2px #2563eb', cursor: 'pointer', zIndex: 10 }} />
                                     )}
                                     <td className="py-4 px-6 text-sm font-medium text-gray-900">#{String(order.id).padStart(3, '0')}</td>
                                     <td className="py-4 px-6 text-sm text-gray-700">{order.user_name}</td>
-                                    <td className="py-4 px-6 text-sm text-gray-700 max-w-xs truncate" title={order.description}>
-                                        {order.description}
-                                    </td>
+                                    <td className="py-4 px-6 text-sm text-gray-700 max-w-xs truncate" title={order.description}>{order.description}</td>
                                     <td className="py-4 px-6">
                                         <div className="flex items-center gap-2">
                                             {getStatusBadge(order.status)}
                                             {order.status === 'assigned' && (
-                                                <button
-                                                    onClick={(e) => handleStatusUpdate(order.id, 'in_progress', e)}
-                                                    className="ml-2 px-3 py-1.5 text-xs font-medium text-white bg-amber-500 rounded-lg hover:bg-amber-600 transition shadow-sm"
-                                                >
+                                                <button onClick={(e) => handleStatusUpdate(order.id, 'in_progress', e)} className="ml-2 px-3 py-1.5 text-xs font-medium text-white bg-amber-500 rounded-lg hover:bg-amber-600 transition shadow-sm">
                                                     ▶ Start
                                                 </button>
                                             )}
                                             {order.status === 'in_progress' && (
-                                                <button
-                                                    onClick={(e) => handleCompleteClick(order, e)}
-                                                    className="ml-2 px-3 py-1.5 text-xs font-medium text-white bg-green-500 rounded-lg hover:bg-green-600 transition shadow-sm"
-                                                >
+                                                <button onClick={(e) => handleCompleteClick(order, e)} className="ml-2 px-3 py-1.5 text-xs font-medium text-white bg-green-500 rounded-lg hover:bg-green-600 transition shadow-sm">
                                                     ✅ Complete
                                                 </button>
                                             )}
@@ -275,11 +305,7 @@ export default function AssignedOrders() {
                                 <p className="text-sm text-gray-600 mt-1">Order #{String(orderToComplete.id).padStart(3, '0')}</p>
                             </div>
                         </div>
-
-                        <p className="text-gray-700 mb-6">
-                            Are you sure you want to mark this order as <span className="font-semibold text-green-600">completed</span>?
-                        </p>
-
+                        <p className="text-gray-700 mb-6">Are you sure you want to mark this order as <span className="font-semibold text-green-600">completed</span>?</p>
                         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
                             <div className="flex gap-3">
                                 <svg className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -295,20 +321,9 @@ export default function AssignedOrders() {
                                 </div>
                             </div>
                         </div>
-
                         <div className="flex gap-3">
-                            <button
-                                onClick={closeModals}
-                                className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={confirmComplete}
-                                className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors shadow-md"
-                            >
-                                Yes, Mark Complete
-                            </button>
+                            <button onClick={closeModals} className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">Cancel</button>
+                            <button onClick={confirmComplete} className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors shadow-md">Yes, Mark Complete</button>
                         </div>
                     </div>
                 </div>
@@ -318,7 +333,6 @@ export default function AssignedOrders() {
             {showImageModal && selectedOrder && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={closeModals}>
                     <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-                        {/* Modal Header */}
                         <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10">
                             <div>
                                 <h3 className="text-xl font-bold text-gray-900">Order Details</h3>
@@ -330,40 +344,21 @@ export default function AssignedOrders() {
                                 </svg>
                             </button>
                         </div>
-
-                        {/* Modal Content */}
                         <div className="p-6 space-y-6">
-                            {/* Order Info */}
                             <div className="bg-gray-50 rounded-lg p-4">
                                 <h4 className="font-semibold text-gray-900 mb-3">Order Information</h4>
                                 <div className="grid grid-cols-2 gap-4 text-sm">
-                                    <div>
-                                        <p className="text-gray-500">Customer</p>
-                                        <p className="font-medium text-gray-900">{selectedOrder.user_name}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-gray-500">Status</p>
-                                        <div className="mt-1">{getStatusBadge(selectedOrder.status)}</div>
-                                    </div>
-                                    <div className="col-span-2">
-                                        <p className="text-gray-500">Description</p>
-                                        <p className="text-gray-700 mt-1">{selectedOrder.description}</p>
-                                    </div>
+                                    <div><p className="text-gray-500">Customer</p><p className="font-medium text-gray-900">{selectedOrder.user_name}</p></div>
+                                    <div><p className="text-gray-500">Status</p><div className="mt-1">{getStatusBadge(selectedOrder.status)}</div></div>
+                                    <div className="col-span-2"><p className="text-gray-500">Description</p><p className="text-gray-700 mt-1">{selectedOrder.description}</p></div>
                                 </div>
                             </div>
-
-                            {/* Design Images */}
                             <div>
                                 <div className="flex items-center justify-between mb-4">
                                     <h4 className="font-semibold text-gray-900">Design Images</h4>
                                     {(selectedOrder.design_images || (selectedOrder.design_image ? [selectedOrder.design_image] : [])).length > 0 && (
-                                        <button
-                                            onClick={() => downloadAllImages(selectedOrder)}
-                                            className="text-sm text-blue-600 hover:text-blue-800 font-medium flex items-center gap-2"
-                                        >
-                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                                            </svg>
+                                        <button onClick={() => downloadAllImages(selectedOrder)} className="text-sm text-blue-600 hover:text-blue-800 font-medium flex items-center gap-2">
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
                                             Download All
                                         </button>
                                     )}
@@ -375,18 +370,11 @@ export default function AssignedOrders() {
                                                 src={`http://127.0.0.1:8000/storage/${img}`}
                                                 alt={`Design ${index + 1}`}
                                                 className="w-full h-64 object-cover"
-                                                onError={(e) => {
-                                                    e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect fill="%23ddd" width="100" height="100"/%3E%3Ctext fill="%23999" x="50%25" y="50%25" text-anchor="middle" dy=".3em"%3ENo Image%3C/text%3E%3C/svg%3E';
-                                                }}
+                                                onError={(e) => { e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect fill="%23ddd" width="100" height="100"/%3E%3Ctext fill="%23999" x="50%25" y="50%25" text-anchor="middle" dy=".3em"%3ENo Image%3C/text%3E%3C/svg%3E'; }}
                                             />
                                             <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                                <button
-                                                    onClick={() => downloadImage(`http://127.0.0.1:8000/storage/${img}`, `order-${selectedOrder.id}-image-${index + 1}.jpg`)}
-                                                    className="bg-white text-gray-700 px-4 py-2 rounded-lg text-sm font-medium shadow-lg flex items-center gap-2 hover:bg-gray-100 transition"
-                                                >
-                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                                                    </svg>
+                                                <button onClick={() => downloadImage(`http://127.0.0.1:8000/storage/${img}`, `order-${selectedOrder.id}-image-${index + 1}.jpg`)} className="bg-white text-gray-700 px-4 py-2 rounded-lg text-sm font-medium shadow-lg flex items-center gap-2 hover:bg-gray-100 transition">
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
                                                     Download
                                                 </button>
                                             </div>
@@ -394,45 +382,24 @@ export default function AssignedOrders() {
                                     ))}
                                     {(!selectedOrder.design_images && !selectedOrder.design_image) && (
                                         <div className="col-span-2 text-center py-12 text-gray-400 bg-gray-50 rounded-lg border border-gray-200">
-                                            <svg className="w-12 h-12 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                            </svg>
+                                            <svg className="w-12 h-12 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                                             <p>No design images uploaded</p>
                                         </div>
                                     )}
                                 </div>
                             </div>
-
-                            {/* Action Buttons */}
                             <div className="flex gap-3 pt-4 border-t border-gray-200">
                                 {selectedOrder.status === 'assigned' && (
-                                    <button
-                                        onClick={(e) => {
-                                            closeModals(); // ✅ Close modal first
-                                            setTimeout(() => handleStatusUpdate(selectedOrder.id, 'in_progress', e), 100); // ✅ Then update
-                                        }}
-                                        className="flex-1 px-4 py-2.5 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition font-medium flex items-center justify-center gap-2"
-                                    >
+                                    <button onClick={(e) => { closeModals(); setTimeout(() => handleStatusUpdate(selectedOrder.id, 'in_progress', e), 100); }} className="flex-1 px-4 py-2.5 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition font-medium flex items-center justify-center gap-2">
                                         <span>▶</span> Start Production
                                     </button>
                                 )}
                                 {selectedOrder.status === 'in_progress' && (
-                                    <button
-                                        onClick={(e) => {
-                                            closeModals(); // ✅ Close the image modal first
-                                            setTimeout(() => handleCompleteClick(selectedOrder, e), 100); // ✅ Then show confirmation
-                                        }}
-                                        className="flex-1 px-4 py-2.5 bg-green-500 text-white rounded-lg hover:bg-green-600 transition font-medium flex items-center justify-center gap-2"
-                                    >
+                                    <button onClick={(e) => { closeModals(); setTimeout(() => handleCompleteClick(selectedOrder, e), 100); }} className="flex-1 px-4 py-2.5 bg-green-500 text-white rounded-lg hover:bg-green-600 transition font-medium flex items-center justify-center gap-2">
                                         <span>✅</span> Mark Complete
                                     </button>
                                 )}
-                                <button
-                                    onClick={closeModals}
-                                    className="flex-1 px-4 py-2.5 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition font-medium"
-                                >
-                                    Close
-                                </button>
+                                <button onClick={closeModals} className="flex-1 px-4 py-2.5 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition font-medium">Close</button>
                             </div>
                         </div>
                     </div>

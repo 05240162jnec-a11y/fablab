@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import axios from 'axios';
+import { usePageHeader } from './PageHeaderContext';
 
 export default function UserProjects() {
     const [projects, setProjects] = useState([]);
@@ -34,6 +36,28 @@ export default function UserProjects() {
 
     // Toast
     const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
+
+    // Highlight state (from notification click)
+    const location = useLocation();
+    const hlParams = new URLSearchParams(location.search);
+    const [highlightId, setHighlightId] = useState(hlParams.get('highlight') ? Number(hlParams.get('highlight')) : null);
+    const [dismissedDot, setDismissedDot] = useState(null);
+
+    useEffect(() => {
+        if (!highlightId) return;
+        const el = document.getElementById(`card-${highlightId}`);
+        if (el) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'center' }), 400);
+    }, []);
+
+    useEffect(() => {
+        const s = document.createElement('style');
+        s.id = 'hl-style-proj';
+        s.textContent = `
+            @keyframes hlPulse { 0%,100%{box-shadow:0 0 0 0 rgba(37,99,235,.5)} 50%{box-shadow:0 0 0 8px rgba(37,99,235,0)} }
+            .hl-card { border:2px solid #2563eb !important; animation:hlPulse 1.2s ease-in-out infinite; }
+        `;
+        if (!document.getElementById('hl-style-proj')) document.head.appendChild(s);
+    }, []);
 
     const showToast = (message, type = 'success') => {
         setToast({ show: true, message, type });
@@ -263,6 +287,11 @@ export default function UserProjects() {
             return;
         }
 
+        if (formState.document && formState.document.type !== 'application/pdf') {
+            showToast('❌ Only PDF files are allowed for project documents', 'error');
+            return;
+        }
+
         try {
             const token = sessionStorage.getItem('auth_token');
             const formData = new FormData();
@@ -299,6 +328,11 @@ export default function UserProjects() {
 
         if (!formState.title || !formState.description) {
             showToast('❌ Please fill all fields', 'error');
+            return;
+        }
+
+        if (formState.document && formState.document.type !== 'application/pdf') {
+            showToast('❌ Only PDF files are allowed for project documents', 'error');
             return;
         }
 
@@ -591,9 +625,14 @@ export default function UserProjects() {
                                     {filteredProjects.map((project) => (
                                         <tr
                                             key={project.id}
-                                            onClick={() => handleOpenView(project)}
-                                            className="hover:bg-gray-50 transition-colors cursor-pointer"
+                                            id={`card-${project.id}`}
+                                            onClick={() => { handleOpenView(project); setHighlightId(null); }}
+                                            className={`hover:bg-gray-50 transition-colors cursor-pointer relative ${highlightId === project.id ? 'hl-card' : ''}`}
                                         >
+                                            {highlightId === project.id && dismissedDot !== project.id && (
+                                                <div onClick={e => { e.stopPropagation(); setDismissedDot(project.id); }}
+                                                    style={{ position: 'absolute', top: 12, right: 12, width: 10, height: 10, background: '#2563eb', borderRadius: '50%', border: '2px solid white', boxShadow: '0 0 0 2px #2563eb', cursor: 'pointer', zIndex: 10 }} />
+                                            )}
                                             <td className="py-4 px-4" onClick={(e) => e.stopPropagation()}>
                                                 <input
                                                     type="checkbox"
@@ -767,8 +806,8 @@ export default function UserProjects() {
             {/* ===== SUBMIT PROJECT MODAL ===== */}
             {showSubmitModal && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full">
-                        <div className="flex items-center justify-between p-6 border-b border-gray-100">
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] flex flex-col">
+                        <div className="flex items-center justify-between p-6 border-b border-gray-100 flex-shrink-0">
                             <div>
                                 <h3 className="text-xl font-bold text-gray-900">Submit New Project</h3>
                                 <p className="text-sm text-gray-500 mt-1">Share your Fab Lab project with the community</p>
@@ -780,7 +819,7 @@ export default function UserProjects() {
                             </button>
                         </div>
 
-                        <form onSubmit={handleSubmitProject} className="p-6 space-y-4">
+                        <form onSubmit={handleSubmitProject} className="p-6 space-y-4 overflow-y-auto flex-1">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
                                     Project Title <span className="text-red-500">*</span>
@@ -862,10 +901,18 @@ export default function UserProjects() {
                                 <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-500 transition-colors">
                                     <input
                                         type="file"
-                                        onChange={(e) => setFormState({ ...formState, document: e.target.files[0] })}
+                                        onChange={(e) => {
+                                            const file = e.target.files[0];
+                                            if (file && file.type !== 'application/pdf') {
+                                                showToast('❌ Only PDF files are allowed', 'error');
+                                                e.target.value = '';
+                                                return;
+                                            }
+                                            setFormState({ ...formState, document: file });
+                                        }}
                                         className="hidden"
                                         id="document-upload"
-                                        accept="*/*"
+                                        accept=".pdf,application/pdf"
                                     />
                                     <label htmlFor="document-upload" className="cursor-pointer">
                                         <svg className="w-10 h-10 text-gray-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -876,11 +923,11 @@ export default function UserProjects() {
                                                 <span className="font-medium text-blue-600">{formState.document.name}</span>
                                             ) : (
                                                 <>
-                                                    <span className="font-medium text-blue-600">Click to upload</span> or drag and drop
+                                                    <span className="font-medium text-blue-600">Click to upload</span> your PDF document
                                                 </>
                                             )}
                                         </p>
-                                        <p className="text-xs text-gray-500 mt-1">Any file format, max 10MB</p>
+                                        <p className="text-xs text-gray-500 mt-1">PDF only, max 10MB</p>
                                     </label>
                                 </div>
                             </div>
@@ -891,7 +938,7 @@ export default function UserProjects() {
                                 </p>
                             </div>
 
-                            <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-100">
+                            <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-100 flex-shrink-0">
                                 <button
                                     type="button"
                                     onClick={closeAllModals}
@@ -1175,10 +1222,18 @@ export default function UserProjects() {
                                 <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-500 transition-colors">
                                     <input
                                         type="file"
-                                        onChange={(e) => setFormState({ ...formState, document: e.target.files[0] })}
+                                        onChange={(e) => {
+                                            const file = e.target.files[0];
+                                            if (file && file.type !== 'application/pdf') {
+                                                showToast('❌ Only PDF files are allowed', 'error');
+                                                e.target.value = '';
+                                                return;
+                                            }
+                                            setFormState({ ...formState, document: file });
+                                        }}
                                         className="hidden"
                                         id="document-edit"
-                                        accept="*/*"
+                                        accept=".pdf,application/pdf"
                                     />
                                     <label htmlFor="document-edit" className="cursor-pointer">
                                         <svg className="w-10 h-10 text-gray-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1189,12 +1244,13 @@ export default function UserProjects() {
                                                 <span className="font-medium text-blue-600">{formState.document.name}</span>
                                             ) : (
                                                 <>
-                                                    <span className="font-medium text-blue-600">Click to upload new document</span>
+                                                    <span className="font-medium text-blue-600">Click to upload new PDF</span>
                                                     <br />
                                                     <span className="text-xs text-gray-500">Leave empty to keep current document</span>
                                                 </>
                                             )}
                                         </p>
+                                        <p className="text-xs text-gray-500 mt-1">PDF only, max 10MB</p>
                                     </label>
                                 </div>
                             </div>

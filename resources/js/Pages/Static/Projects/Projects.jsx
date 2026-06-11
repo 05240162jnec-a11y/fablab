@@ -42,11 +42,12 @@ function Reveal({ children, delay = 0, style = {} }) {
     );
 }
 
-function ProjectModal({ project, onClose, isLoggedIn }) {
+function ProjectModal({ project, onClose, isLoggedIn, isRegularUser }) {
     if (!project) return null;
     const col = avatarColor(project.user?.name || '');
     const handleDownload = () => {
         if (!isLoggedIn) return;
+        if (!isRegularUser) { window.location.href = '/admin/projects'; return; }
         window.open(`${API_BASE}/user/projects/${project.id}/download`, '_blank');
     };
     return (
@@ -59,7 +60,10 @@ function ProjectModal({ project, onClose, isLoggedIn }) {
                 </button>
                 <div className="modal-inner">
                     <div className="modal-avatar-side" style={{ background: `${col}12` }}>
-                        <div className="modal-avatar-circle" style={{ background: col }}>
+                        {project.student_photo ? (
+                            <img src={project.student_photo} alt={project.user?.name} style={{ width: 88, height: 88, borderRadius: '50%', objectFit: 'cover', boxShadow: '0 8px 28px rgba(0,0,0,.2)', marginBottom: '.25rem' }} onError={e => { e.currentTarget.style.display = 'none'; e.currentTarget.nextSibling.style.display = 'flex'; }} />
+                        ) : null}
+                        <div className="modal-avatar-circle" style={{ background: col, display: project.student_photo ? 'none' : 'flex' }}>
                             {initials(project.user?.name)}
                         </div>
                         <p className="modal-avatar-name">{project.user?.name || 'Unknown'}</p>
@@ -80,13 +84,20 @@ function ProjectModal({ project, onClose, isLoggedIn }) {
                         )}
                         <div className="modal-actions">
                             {project.document_path && (
-                                isLoggedIn ? (
+                                isLoggedIn && isRegularUser ? (
                                     <button className="btn-modal-download" onClick={handleDownload}>
                                         <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                         </svg>
                                         Download Document
                                     </button>
+                                ) : isLoggedIn && !isRegularUser ? (
+                                    <a href="/admin/projects" className="btn-modal-download">
+                                        <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                        </svg>
+                                        Manage Projects
+                                    </a>
                                 ) : (
                                     <Link to="/login" className="btn-modal-download" onClick={onClose}>
                                         <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -101,6 +112,7 @@ function ProjectModal({ project, onClose, isLoggedIn }) {
                     </div>
                 </div>
             </div>
+
         </div>
     );
 }
@@ -113,8 +125,19 @@ export default function Projects() {
     const [heroIdx, setHeroIdx] = useState(0);
     const [selected, setSelected] = useState(null);
     const [menuOpen, setMenuOpen] = useState(false);
+    // ✅ Role restriction modal
+    const [showRoleModal, setShowRoleModal] = useState(false);
+    const restrictAlert = () => setShowRoleModal(true);
+
 
     const isLoggedIn = !!sessionStorage.getItem('auth_token');
+    const userRole = (() => { try { return JSON.parse(sessionStorage.getItem('user') || '{}')?.role; } catch { return null; } })();
+    const isRegularUser = !userRole || userRole === 'user';
+    const restrictUser = (cb) => {
+        if (!isLoggedIn) { navigate('/login'); return; }
+        if (!isRegularUser) { restrictAlert(); return; }
+        cb();
+    };
     const handleLogout = () => {
         sessionStorage.clear();
         ['auth_token', 'user', 'enrollments', 'courses', 'bookings', 'machines', 'cart_items'].forEach(k => {
@@ -299,15 +322,23 @@ export default function Projects() {
                 .project-spacer { flex:1; min-height:.25rem; }
                 .project-actions { display:flex; gap:.5rem; margin-top:.25rem; }
                 @media (min-width:480px) { .project-actions { gap:.6rem; } }
-                .btn-read-more-proj { flex:1; padding:.55rem; text-align:center; background:transparent; color:var(--green); font-size:.78rem; font-weight:700; border-radius:.65rem; border:1.5px solid var(--green); cursor:pointer; transition:all .22s; }
-                @media (min-width:480px) { .btn-read-more-proj { padding:.58rem; font-size:.8rem; } }
-                .btn-read-more-proj:hover { background:var(--green); color:white; }
+                .btn-read-more-proj { background:none; border:none; padding:.1rem 0; color:var(--green); font-size:.84rem; font-weight:700; cursor:pointer; text-align:left; transition:color .2s; }
+                .btn-read-more-proj:hover { color:var(--green-dk); text-decoration:underline; }
+                .btn-doc-proj { width:100%; padding:.65rem; background:var(--blue); color:white; font-size:.84rem; font-weight:700; border-radius:.65rem; border:none; cursor:pointer; letter-spacing:.03em; transition:all .22s; display:flex; align-items:center; justify-content:center; gap:.4rem; margin-top:.35rem; box-shadow:0 3px 12px rgba(26,86,219,.28); text-decoration:none; }
+                .btn-doc-proj:hover { background:var(--blue-dk); box-shadow:0 6px 20px rgba(26,86,219,.38); transform:translateY(-1px); }
+
                 .btn-download-proj { flex:1; padding:.55rem; text-align:center; background:var(--blue); color:white; font-size:.78rem; font-weight:700; border-radius:.65rem; border:none; cursor:pointer; box-shadow:0 3px 10px rgba(26,86,219,.25); transition:all .22s; display:flex; align-items:center; justify-content:center; gap:.35rem; }
                 @media (min-width:480px) { .btn-download-proj { padding:.58rem; font-size:.8rem; } }
                 .btn-download-proj:hover { background:var(--blue-dk); box-shadow:0 6px 18px rgba(26,86,219,.35); transform:translateY(-1px); }
                 .btn-login-proj { flex:1; padding:.55rem; text-align:center; background:var(--blue); color:white; font-size:.78rem; font-weight:700; border-radius:.65rem; border:none; cursor:pointer; box-shadow:0 3px 10px rgba(26,86,219,.25); transition:all .22s; text-decoration:none; display:flex; align-items:center; justify-content:center; }
                 @media (min-width:480px) { .btn-login-proj { padding:.58rem; font-size:.8rem; } }
                 .btn-login-proj:hover { background:var(--blue-dk); }
+
+                /* ── PROJECT PHOTO ── */
+                .project-photo-wrap { width:100%; aspect-ratio:3/4; max-height:260px; overflow:hidden; flex-shrink:0; background:#d4b8a5; }
+                .project-photo-wrap img { width:100%; height:100%; object-fit:cover; object-position:top center; transition:transform .55s ease; display:block; }
+                .project-card:hover .project-photo-wrap img { transform:scale(1.04); }
+                .project-photo-fallback { width:100%; aspect-ratio:3/4; max-height:260px; display:flex; align-items:center; justify-content:center; position:relative; overflow:hidden; flex-shrink:0; background:#d4b8a5; }
 
                 /* ── SKELETON ── */
                 .skeleton { background:linear-gradient(90deg,#e2e8f0 25%,#f1f5f9 50%,#e2e8f0 75%); background-size:200% 100%; animation:shimmer 1.5s infinite; border-radius:.5rem; }
@@ -378,7 +409,7 @@ export default function Projects() {
                 .social-btn:hover { background:var(--blue); border-color:var(--blue); color:white; transform:translateY(-2px); }
             `}</style>
 
-            {selected && <ProjectModal project={selected} onClose={() => setSelected(null)} isLoggedIn={isLoggedIn} />}
+            {selected && <ProjectModal project={selected} onClose={() => setSelected(null)} isLoggedIn={isLoggedIn} isRegularUser={isRegularUser} />}
 
             {/* ═══ NAV ═══ */}
             <nav className="nav-root">
@@ -477,17 +508,15 @@ export default function Projects() {
                     {loading ? (
                         <div className="projects-grid">
                             {[0, 1, 2, 3, 4, 5, 6, 7].map(i => (
-                                <div key={i} className="skeleton-card">
-                                    <div className="skeleton" style={{ height: 110 }} />
-                                    <div style={{ padding: '1rem 1.1rem 1.1rem', display: 'flex', flexDirection: 'column', gap: '.6rem' }}>
-                                        <div className="skeleton" style={{ height: 11, width: '35%' }} />
-                                        <div className="skeleton" style={{ height: 18, width: '80%' }} />
-                                        <div className="skeleton" style={{ height: 11, width: '50%' }} />
-                                        <div className="skeleton" style={{ height: 11, width: '90%' }} />
-                                        <div style={{ display: 'flex', gap: '.5rem', marginTop: '.5rem' }}>
-                                            <div className="skeleton" style={{ flex: 1, height: 34, borderRadius: '.65rem' }} />
-                                            <div className="skeleton" style={{ flex: 1, height: 34, borderRadius: '.65rem' }} />
+                                <div key={i} style={{ borderRadius: '1rem', background: '#e8d5c4', overflow: 'hidden' }}>
+                                    <div className="skeleton" style={{ aspectRatio: '3/4', maxHeight: 260, width: '100%', borderRadius: 0, background: '#d4b8a5' }} />
+                                    <div style={{ padding: '.85rem 1rem 1rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '.5rem' }}>
+                                        <div className="skeleton" style={{ height: 16, width: '60%', borderRadius: '.4rem' }} />
+                                        <div style={{ display: 'flex', gap: '.35rem' }}>
+                                            <div className="skeleton" style={{ height: 18, width: 55, borderRadius: '.3rem' }} />
+                                            <div className="skeleton" style={{ height: 18, width: 38, borderRadius: '.3rem' }} />
                                         </div>
+                                        <div className="skeleton" style={{ height: 34, width: '100%', borderRadius: '.5rem', marginTop: '.2rem' }} />
                                     </div>
                                 </div>
                             ))}
@@ -508,30 +537,44 @@ export default function Projects() {
                                 return (
                                     <Reveal key={project.id} delay={Math.min((idx % 4) * 0.08, 0.3)}>
                                         <div className="project-card" onClick={() => setSelected(project)}>
-                                            <div className="project-avatar-wrap" style={{ background: `${col}10` }}>
-                                                <div className="avatar-deco" style={{ width: 80, height: 80, background: col, top: -22, right: -22 }} />
-                                                <div className="avatar-deco" style={{ width: 44, height: 44, background: col, bottom: 8, left: 14 }} />
-                                                <div className="project-avatar" style={{ background: col }}>{initials(project.user?.name)}</div>
-                                            </div>
-                                            <div className="project-body">
-                                                {project.submitted_at && <span className="project-date">{formatDate(project.submitted_at)}</span>}
-                                                <h3 className="project-title">{project.title}</h3>
-                                                <div className="project-author"><span className="author-dot" />{project.user?.name || 'Unknown'}</div>
-                                                {project.description && <p className="project-desc">{project.description}</p>}
-                                                <div className="project-spacer" />
-                                                <div className="project-actions">
-                                                    <button className="btn-read-more-proj" onClick={e => { e.stopPropagation(); setSelected(project); }}>Read More</button>
-                                                    {hasDoc && (
-                                                        isLoggedIn ? (
-                                                            <button className="btn-download-proj" onClick={e => { e.stopPropagation(); window.open(`${API_BASE}/user/projects/${project.id}/download`, '_blank'); }}>
-                                                                <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                                                                Docs
-                                                            </button>
-                                                        ) : (
-                                                            <Link to="/login" className="btn-login-proj" onClick={e => e.stopPropagation()}>Docs</Link>
-                                                        )
-                                                    )}
+                                            {project.student_photo ? (
+                                                <div className="project-photo-wrap">
+                                                    <img
+                                                        src={project.student_photo}
+                                                        alt={project.title}
+                                                        onError={e => {
+                                                            e.currentTarget.parentNode.className = 'project-photo-fallback';
+                                                            e.currentTarget.parentNode.style.background = `${col}10`;
+                                                            e.currentTarget.parentNode.innerHTML = `<div style="width:68px;height:68px;border-radius:50%;background:${col};display:flex;align-items:center;justify-content:center;font-family:'Playfair Display',serif;font-size:1.4rem;font-weight:900;color:white;box-shadow:0 6px 20px rgba(0,0,0,.2);position:relative;z-index:1">${initials(project.user?.name)}</div>`;
+                                                        }}
+                                                    />
                                                 </div>
+                                            ) : (
+                                                <div className="project-photo-fallback" style={{ background: `${col}10` }}>
+                                                    <div className="avatar-deco" style={{ width: 80, height: 80, background: col, top: -22, right: -22 }} />
+                                                    <div className="avatar-deco" style={{ width: 44, height: 44, background: col, bottom: 8, left: 14 }} />
+                                                    <div className="project-avatar" style={{ background: col }}>{initials(project.user?.name)}</div>
+                                                </div>
+                                            )}
+                                            <div className="project-body">
+                                                <p className="project-name">{project.user?.name || 'Unknown'}</p>
+                                                <div className="project-tags">
+                                                    {project.title && <span className="project-tag tag-primary">{project.title.split(' ').slice(0, 1).join(' ')}</span>}
+                                                    {project.submitted_at && <span className="project-tag tag-secondary">{new Date(project.submitted_at).getFullYear()}</span>}
+                                                </div>
+                                                <button className="btn-read-more-proj" onClick={e => { e.stopPropagation(); setSelected(project); }}>Read More</button>
+                                                {hasDoc && (
+                                                    isLoggedIn && isRegularUser ? (
+                                                        <button className="btn-doc-proj" onClick={e => { e.stopPropagation(); window.open(`${API_BASE}/user/projects/${project.id}/download`, '_blank'); }}>
+                                                            <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                                                            Documentation
+                                                        </button>
+                                                    ) : isLoggedIn && !isRegularUser ? (
+                                                        <a href="/admin/projects" className="btn-doc-proj" onClick={e => e.stopPropagation()}>Manage Projects</a>
+                                                    ) : (
+                                                        <Link to="/login" className="btn-doc-proj" onClick={e => e.stopPropagation()}>Documentation</Link>
+                                                    )
+                                                )}
                                             </div>
                                         </div>
                                     </Reveal>
@@ -598,6 +641,24 @@ export default function Projects() {
                     </div>
                 </div>
             </footer>
+
+            {/* ✅ Role Restriction Modal */}
+            {showRoleModal && (
+                <div className="modal-backdrop" onClick={() => setShowRoleModal(false)} style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(5,10,25,.6)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', animation: 'fadeIn .2s ease' }}>
+                    <div onClick={e => e.stopPropagation()} style={{ background: 'white', borderRadius: '1.25rem', width: '100%', maxWidth: '400px', overflow: 'hidden', boxShadow: '0 32px 80px rgba(0,0,0,.25)', animation: 'slideUp .25s ease' }}>
+                        <div style={{ padding: '2rem', textAlign: 'center' }}>
+                            <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: '#fef3c7', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.25rem' }}>
+                                <svg width="32" height="32" fill="none" stroke="#d97706" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                </svg>
+                            </div>
+                            <h3 style={{ fontFamily: "'Playfair Display',serif", fontSize: '1.25rem', fontWeight: 800, color: '#0d1117', marginBottom: '.5rem' }}>Access Restricted</h3>
+                            <p style={{ fontSize: '.9rem', color: '#64748b', lineHeight: 1.6, marginBottom: '1.5rem' }}>This feature is only available for regular users. Please log in with a user account to continue.</p>
+                            <button onClick={() => setShowRoleModal(false)} style={{ padding: '.75rem 2rem', background: '#1a56db', color: 'white', fontWeight: 700, fontSize: '.9rem', borderRadius: '9999px', border: 'none', cursor: 'pointer', boxShadow: '0 4px 14px rgba(26,86,219,.35)' }}>Got it</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

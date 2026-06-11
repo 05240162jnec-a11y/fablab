@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import axios from 'axios';
-import { useDialog } from '../../Components/UniformDialogManager';
 
 export default function CustomOrders() {
     // Data States
@@ -42,9 +41,38 @@ export default function CustomOrders() {
     // Highlight (from notification click)
     const location = useLocation();
     const hlParams = new URLSearchParams(location.search);
-    const [highlightId, setHighlightId] = useState(hlParams.get('highlight') ? Number(hlParams.get('highlight')) : null);
-    const [dismissedDot, setDismissedDot] = useState(null);
+    const [highlightId, setHighlightId] = useState(() => {
+        const id = hlParams.get('highlight') ? Number(hlParams.get('highlight')) : null;
+        if (!id) return null;
+        try {
+            const seen = JSON.parse(localStorage.getItem('hl_seen_custom') || '[]');
+            if (seen.includes(id)) return null;
+        } catch { }
+        return id;
+    });
 
+    // ✅ Persist dismissed dots in localStorage so they survive refresh
+    const [dismissedDots, setDismissedDots] = useState(() => {
+        try { return JSON.parse(localStorage.getItem('hl_dismissed_custom') || '[]'); }
+        catch { return []; }
+    });
+
+    const dismissDot = (id) => {
+        const updated = [...dismissedDots, id];
+        setDismissedDots(updated);
+        localStorage.setItem('hl_dismissed_custom', JSON.stringify(updated));
+        try {
+            const seen = JSON.parse(localStorage.getItem('hl_seen_custom') || '[]');
+            if (!seen.includes(id)) localStorage.setItem('hl_seen_custom', JSON.stringify([...seen, id]));
+        } catch { }
+    };
+
+    useEffect(() => {
+        setSelectedOrderIds([]);
+        setIsSelectAll(false);
+    }, [statusFilter, searchTerm]);
+
+    // Highlight CSS + scroll
     useEffect(() => {
         const s = document.createElement('style');
         s.id = 'hl-style-co';
@@ -59,16 +87,11 @@ export default function CustomOrders() {
         }
     }, []);
 
-    // Fetch orders on mount
+    // Fetch orders on mount (separate from highlight useEffect)
     useEffect(() => {
         fetchOrders();
         fetchProductionTeam();
     }, []);
-
-    useEffect(() => {
-        setSelectedOrderIds([]);
-        setIsSelectAll(false);
-    }, [statusFilter, searchTerm]);
 
     // ✅ UPDATED: Fetch orders (Accepts override status to fix dropdown bug)
     const fetchOrders = async (overrideStatus = null) => {
@@ -253,15 +276,7 @@ export default function CustomOrders() {
     const handleBulkDelete = async () => {
         if (selectedOrderIds.length === 0) return;
 
-        const { showConfirm } = useDialog();
-        const confirmed = await showConfirm({
-            title: 'Confirm bulk delete',
-            message: `Are you sure you want to delete ${selectedOrderIds.length} order(s)? This action cannot be undone.`,
-            confirmText: 'Delete',
-            cancelText: 'Cancel',
-        });
-
-        if (!confirmed) return;
+        if (!window.confirm(`Are you sure you want to delete ${selectedOrderIds.length} order(s)? This action cannot be undone.`)) return;
 
         try {
             const authToken = localStorage.getItem('admin_token');
@@ -485,11 +500,20 @@ export default function CustomOrders() {
                                             <tr
                                                 key={order.id}
                                                 id={`card-${order.id}`}
-                                                onClick={() => { openDetailsModal(order); setHighlightId(null); }}
+                                                onClick={() => {
+                                                    openDetailsModal(order);
+                                                    if (highlightId === order.id) {
+                                                        setHighlightId(null);
+                                                        try {
+                                                            const seen = JSON.parse(localStorage.getItem('hl_seen_custom') || '[]');
+                                                            if (!seen.includes(order.id)) localStorage.setItem('hl_seen_custom', JSON.stringify([...seen, order.id]));
+                                                        } catch { }
+                                                    }
+                                                }}
                                                 className={`hover:bg-gray-50 cursor-pointer relative ${highlightId === order.id ? 'hl-card' : ''}`}
                                             >
-                                                {highlightId === order.id && dismissedDot !== order.id && (
-                                                    <div onClick={e => { e.stopPropagation(); setDismissedDot(order.id); }}
+                                                {highlightId === order.id && !dismissedDots.includes(order.id) && (
+                                                    <div onClick={e => { e.stopPropagation(); dismissDot(order.id); }}
                                                         style={{ position: 'absolute', top: 10, right: 10, width: 10, height: 10, background: '#2563eb', borderRadius: '50%', border: '2px solid white', boxShadow: '0 0 0 2px #2563eb', cursor: 'pointer', zIndex: 10 }} />
                                                 )}
                                                 <td className="px-6 py-4">

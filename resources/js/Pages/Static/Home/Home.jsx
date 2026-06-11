@@ -52,12 +52,17 @@ function Reveal({ children, delay = 0, style = {} }) {
 }
 
 /* ── Machine Modal ──────────────────────────────────────────────────────── */
-function MachineModal({ machine, onClose, isLoggedIn }) {
+function MachineModal({ machine, onClose, isLoggedIn, isRegularUser }) {
     const navigate = useNavigate();
     if (!machine) return null;
     const imgSrc = getImageUrl(machine.image) || FALLBACK_MACHINE;
     const isAvail = machine.status === 'available';
-    const handleBook = () => { onClose(); navigate(isLoggedIn ? '/user/machines' : '/login'); };
+    const handleBook = () => {
+        onClose();
+        if (!isLoggedIn) { navigate('/login'); return; }
+        if (!isRegularUser) { restrictAlert(); return; }
+        navigate('/user/machines');
+    };
     return (
         <div className="modal-backdrop" onClick={onClose}>
             <div className="modal-box" onClick={e => e.stopPropagation()}>
@@ -87,6 +92,24 @@ function MachineModal({ machine, onClose, isLoggedIn }) {
                     </div>
                 </div>
             </div>
+
+            {/* ✅ Role Restriction Modal */}
+            {showRoleModal && (
+                <div className="modal-backdrop" onClick={() => setShowRoleModal(false)} style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(5,10,25,.6)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', animation: 'fadeIn .2s ease' }}>
+                    <div onClick={e => e.stopPropagation()} style={{ background: 'white', borderRadius: '1.25rem', width: '100%', maxWidth: '400px', overflow: 'hidden', boxShadow: '0 32px 80px rgba(0,0,0,.25)', animation: 'slideUp .25s ease' }}>
+                        <div style={{ padding: '2rem', textAlign: 'center' }}>
+                            <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: '#fef3c7', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.25rem' }}>
+                                <svg width="32" height="32" fill="none" stroke="#d97706" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                </svg>
+                            </div>
+                            <h3 style={{ fontFamily: "'Playfair Display',serif", fontSize: '1.25rem', fontWeight: 800, color: '#0d1117', marginBottom: '.5rem' }}>Access Restricted</h3>
+                            <p style={{ fontSize: '.9rem', color: '#64748b', lineHeight: 1.6, marginBottom: '1.5rem' }}>This feature is only available for regular users. Please log in with a user account to continue.</p>
+                            <button onClick={() => setShowRoleModal(false)} style={{ padding: '.75rem 2rem', background: '#1a56db', color: 'white', fontWeight: 700, fontSize: '.9rem', borderRadius: '9999px', border: 'none', cursor: 'pointer', boxShadow: '0 4px 14px rgba(26,86,219,.35)' }}>Got it</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
@@ -104,6 +127,8 @@ export default function Home() {
     const [isPaused, setIsPaused] = useState(false);
 
     const isLoggedIn = !!sessionStorage.getItem('auth_token');
+    const userRole = (() => { try { return JSON.parse(sessionStorage.getItem('user') || '{}')?.role; } catch { return null; } })();
+    const isRegularUser = !userRole || userRole === 'user';
     const handleLogout = () => {
         sessionStorage.clear();
         ['auth_token', 'user', 'enrollments', 'courses', 'bookings', 'machines', 'cart_items'].forEach(k => {
@@ -114,6 +139,10 @@ export default function Home() {
     };
 
     const [menuOpen, setMenuOpen] = useState(false);
+    // ✅ Role restriction modal
+    const [showRoleModal, setShowRoleModal] = useState(false);
+    const restrictAlert = () => setShowRoleModal(true);
+
 
     const heroSlides = [
         { bg: '../images/home.jpg' },
@@ -161,8 +190,16 @@ export default function Home() {
     }, []);
 
     const totalUsers = users.length || 200;
-    const handleBookClick = useCallback(() => navigate(isLoggedIn ? '/user/machines' : '/login'), [isLoggedIn, navigate]);
-    const handleEnrollClick = useCallback(() => navigate(isLoggedIn ? '/user/learning' : '/login'), [isLoggedIn, navigate]);
+    const handleBookClick = useCallback(() => {
+        if (!isLoggedIn) { navigate('/login'); return; }
+        if (!isRegularUser) { restrictAlert(); return; }
+        navigate('/user/machines');
+    }, [isLoggedIn, isRegularUser, navigate]);
+    const handleEnrollClick = useCallback(() => {
+        if (!isLoggedIn) { navigate('/login'); return; }
+        if (!isRegularUser) { restrictAlert(); return; }
+        navigate('/user/learning');
+    }, [isLoggedIn, isRegularUser, navigate]);
 
     /* duplicate machines for infinite scroll illusion */
     const displayMachines = [...machines, ...machines];
@@ -563,7 +600,7 @@ export default function Home() {
 
             {/* MODAL */}
             {selectedMachine && (
-                <MachineModal machine={selectedMachine} onClose={() => setSelectedMachine(null)} isLoggedIn={isLoggedIn} />
+                <MachineModal machine={selectedMachine} onClose={() => setSelectedMachine(null)} isLoggedIn={isLoggedIn} isRegularUser={isRegularUser} />
             )}
 
             {/* ═══ NAV ═══ */}
@@ -875,10 +912,10 @@ export default function Home() {
                         {[
                             { img: '../images/custom.jpg', title: 'Machine Booking', desc: 'Reserve industry-grade fabrication equipment — 3D printers, CNC routers, laser cutters and more — on your schedule.', link: '/machines' },
                             { img: '../images/workshop.jpg', title: 'Workshops & Training', desc: 'Expert-led, hands-on sessions covering CNC, laser cutting, 3D printing, electronics, and more.', link: '/training' },
-                            { img: '../images/collaborative.jpg', title: 'Custom Fabrication Orders', desc: 'Submit a design brief and our production team turns your concept into a precision-fabricated physical product.', link: isLoggedIn ? '/user/shop-orders?tab=custom' : '/login' },
+                            { img: '../images/collaborative.jpg', title: 'Custom Fabrication Orders', desc: 'Submit a design brief and our production team turns your concept into a precision-fabricated physical product.', link: (!isLoggedIn) ? '/login' : (!isRegularUser) ? null : '/user/shop-orders?tab=custom' },
                         ].map((s, i) => (
                             <Reveal key={i} delay={i * 0.1}>
-                                <a href={s.link} className="service-card">
+                                <a href={s.link || undefined} onClick={s.link === null ? (e) => { e.preventDefault(); restrictAlert(); } : undefined} className="service-card">
                                     <div className="service-img-wrap">
                                         <img src={s.img} alt={s.title} />
                                         <div className="service-img-overlay" />
@@ -975,6 +1012,24 @@ export default function Home() {
                     </div>
                 </div>
             </footer>
+
+            {/* ✅ Role Restriction Modal */}
+            {showRoleModal && (
+                <div className="modal-backdrop" onClick={() => setShowRoleModal(false)} style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(5,10,25,.6)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', animation: 'fadeIn .2s ease' }}>
+                    <div onClick={e => e.stopPropagation()} style={{ background: 'white', borderRadius: '1.25rem', width: '100%', maxWidth: '400px', overflow: 'hidden', boxShadow: '0 32px 80px rgba(0,0,0,.25)', animation: 'slideUp .25s ease' }}>
+                        <div style={{ padding: '2rem', textAlign: 'center' }}>
+                            <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: '#fef3c7', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.25rem' }}>
+                                <svg width="32" height="32" fill="none" stroke="#d97706" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                </svg>
+                            </div>
+                            <h3 style={{ fontFamily: "'Playfair Display',serif", fontSize: '1.25rem', fontWeight: 800, color: '#0d1117', marginBottom: '.5rem' }}>Access Restricted</h3>
+                            <p style={{ fontSize: '.9rem', color: '#64748b', lineHeight: 1.6, marginBottom: '1.5rem' }}>This feature is only available for regular users. Please log in with a user account to continue.</p>
+                            <button onClick={() => setShowRoleModal(false)} style={{ padding: '.75rem 2rem', background: '#1a56db', color: 'white', fontWeight: 700, fontSize: '.9rem', borderRadius: '9999px', border: 'none', cursor: 'pointer', boxShadow: '0 4px 14px rgba(26,86,219,.35)' }}>Got it</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

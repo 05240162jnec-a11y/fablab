@@ -238,7 +238,7 @@ public function download($id)
     return response()->download($filePath, basename($project->document_path));
 }
         /**
-     * Preview project document (for viewing in browser)
+     * ✅ UPDATED: Preview project document (Smart Preview)
      */
     public function preview($id)
     {
@@ -262,26 +262,31 @@ public function download($id)
             return response()->json(['message' => 'File not found'], 404);
         }
 
-        // ✅ Get file extension and set correct MIME type
         $extension = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
         
-        $mimeTypes = [
-            'pdf' => 'application/pdf',
-            'jpg' => 'image/jpeg',
-            'jpeg' => 'image/jpeg',
-            'png' => 'image/png',
-            'gif' => 'image/gif',
-            'doc' => 'application/msword',
-            'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            'txt' => 'text/plain',
-        ];
-
-        $mimeType = $mimeTypes[$extension] ?? 'application/octet-stream';
-
-        // ✅ Return with correct headers for inline viewing
-        return response()->file($filePath, [
-            'Content-Type' => $mimeType,
-            'Content-Disposition' => 'inline; filename="' . basename($project->document_path) . '"',
+        // Files that can be previewed directly
+        $previewableTypes = ['pdf', 'jpg', 'jpeg', 'png', 'gif', 'txt'];
+        $isPreviewable = in_array($extension, $previewableTypes);
+        
+        // Get file info
+        $fileSize = filesize($filePath);
+        $fileSizeMB = round($fileSize / 1024 / 1024, 2);
+        
+        // For text files, read content (only if under 1MB)
+        $textContent = null;
+        if ($extension === 'txt' && $fileSizeMB < 1) {
+            $textContent = file_get_contents($filePath);
+        }
+        
+        return response()->json([
+            'success' => true,
+            'file_type' => $extension,
+            'file_path' => url('storage/' . $project->document_path),
+            'file_name' => basename($project->document_path),
+            'file_size' => $fileSizeMB,
+            'previewable' => $isPreviewable,
+            'content' => $textContent,
+            'mime_type' => mime_content_type($filePath),
         ]);
     }
 }

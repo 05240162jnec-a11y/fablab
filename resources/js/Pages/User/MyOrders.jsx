@@ -86,7 +86,7 @@ export default function MyOrders() {
         try {
             setLoading(true);
             setError(null);
-            const token = localStorage.getItem('auth_token');
+            const token = sessionStorage.getItem('auth_token');
 
             const response = await axios.get('http://127.0.0.1:8000/api/user/product-orders', {
                 headers: {
@@ -280,7 +280,7 @@ export default function MyOrders() {
         setSubmitting(true);
 
         try {
-            const token = localStorage.getItem('auth_token');
+            const token = sessionStorage.getItem('auth_token');
             const formData = new FormData();
             formData.append('payment_screenshot', file);
             formData.append('delivery_option', deliveryOption);
@@ -327,7 +327,7 @@ export default function MyOrders() {
     // View payment screenshot
     const handleViewScreenshot = async (order) => {
         try {
-            const token = localStorage.getItem('auth_token');
+            const token = sessionStorage.getItem('auth_token');
             const response = await axios.get(`http://127.0.0.1:8000/api/user/product-orders/${order.id}/screenshot`, {
                 headers: {
                     'Accept': 'application/json',
@@ -362,7 +362,7 @@ export default function MyOrders() {
                 setAlert({ ...alert, show: false });
 
                 try {
-                    const token = localStorage.getItem('auth_token');
+                    const token = sessionStorage.getItem('auth_token');
 
                     const response = await axios.post(
                         `http://127.0.0.1:8000/api/user/product-orders/${order.id}/cancel`,
@@ -435,7 +435,7 @@ export default function MyOrders() {
                 setAlert({ ...alert, show: false });
 
                 try {
-                    const token = localStorage.getItem('auth_token');
+                    const token = sessionStorage.getItem('auth_token');
                     const response = await axios.post(
                         'http://127.0.0.1:8000/api/user/product-orders/bulk-delete',
                         { order_ids: selectedOrderIds },

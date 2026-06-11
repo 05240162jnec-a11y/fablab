@@ -15,6 +15,8 @@ class Kernel extends ConsoleKernel
     protected $commands = [
         // Register our custom auto-complete command
         \App\Console\Commands\CompleteExpiredCourses::class,
+        // ✅ Process expired rejected product orders
+        \App\Console\Commands\ProcessExpiredProductOrders::class,
     ];
 
     /**
@@ -25,6 +27,13 @@ class Kernel extends ConsoleKernel
         // Auto-complete expired courses daily at midnight
         $schedule->command('courses:complete-expired')
                  ->dailyAt('00:00')
+                 ->timezone('Asia/Thimphu')
+                 ->withoutOverlapping()
+                 ->appendOutputTo(storage_path('logs/scheduler.log'));
+
+        // ✅ Process expired rejected product orders every 15 minutes
+        $schedule->command('orders:process-expired')
+                 ->everyFifteenMinutes()
                  ->timezone('Asia/Thimphu')
                  ->withoutOverlapping()
                  ->appendOutputTo(storage_path('logs/scheduler.log'));

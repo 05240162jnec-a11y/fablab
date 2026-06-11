@@ -25,6 +25,14 @@ export default function FAQ() {
     const [expandedFAQs, setExpandedFAQs] = useState({});
     const [activeCategory, setActiveCategory] = useState('All');
 
+    // Toast State
+    const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
+
+    const showToast = (message, type = 'success') => {
+        setToast({ show: true, message, type });
+        setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 3000);
+    };
+
     // Fetch FAQs on component mount
     useEffect(() => {
         fetchFAQs();
@@ -45,7 +53,7 @@ export default function FAQ() {
             setFAQs(response.data.faqs);
         } catch (error) {
             console.error('Error fetching FAQs:', error);
-            alert('Failed to load FAQs. Please try again.');
+            showToast('Failed to load FAQs. Please try again.', 'error');
         } finally {
             setLoading(false);
         }
@@ -121,10 +129,10 @@ export default function FAQ() {
 
             setFAQs([response.data.faq, ...faqs]);
             setShowAddModal(false);
-            alert('FAQ created successfully!');
+            showToast('FAQ created successfully!', 'success');
         } catch (error) {
             console.error('Error creating FAQ:', error);
-            alert('Failed to create FAQ. Please try again.');
+            showToast('Failed to create FAQ. Please try again.', 'error');
         } finally {
             setSubmitting(false);
         }
@@ -159,10 +167,10 @@ export default function FAQ() {
             ));
             setShowEditModal(false);
             setSelectedFAQ(null);
-            alert('FAQ updated successfully!');
+            showToast('FAQ updated successfully!', 'success');
         } catch (error) {
             console.error('Error updating FAQ:', error);
-            alert('Failed to update FAQ. Please try again.');
+            showToast('Failed to update FAQ. Please try again.', 'error');
         } finally {
             setSubmitting(false);
         }
@@ -186,10 +194,10 @@ export default function FAQ() {
             setFAQs(faqs.filter(faq => faq.id !== selectedFAQ.id));
             setShowDeleteModal(false);
             setSelectedFAQ(null);
-            alert('FAQ deleted successfully!');
+            showToast('FAQ deleted successfully!', 'success');
         } catch (error) {
             console.error('Error deleting FAQ:', error);
-            alert('Failed to delete FAQ. Please try again.');
+            showToast('Failed to delete FAQ. Please try again.', 'error');
         }
     };
 
@@ -579,6 +587,22 @@ export default function FAQ() {
                             </button>
                         </div>
                     </div>
+                </div>
+            )}
+            {/* Toast Notification */}
+            {toast.show && (
+                <div className={`fixed bottom-6 right-6 z-[100] px-6 py-3 rounded-lg shadow-lg text-white font-medium flex items-center gap-2 ${toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'
+                    }`}>
+                    {toast.type === 'success' ? (
+                        <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    ) : (
+                        <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    )}
+                    <span>{toast.message}</span>
                 </div>
             )}
         </div>

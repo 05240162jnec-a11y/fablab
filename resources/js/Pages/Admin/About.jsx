@@ -328,11 +328,11 @@ export default function About() {
     // Get section icon based on key
     const getSectionIcon = (key) => {
         const icons = {
-            'who_we_are': '👥',
-            'mission': '🎯',
-            'vision': '🔭',
+            'who_we_are': '',
+            'mission': '',
+            'vision': '',
         };
-        return icons[key] || '📄';
+        return icons[key] || '';
     };
 
     if (loading) {
@@ -363,20 +363,20 @@ export default function About() {
                         <button
                             onClick={() => setActiveTab('sections')}
                             className={`px-4 py-3 text-sm font-semibold border-b-2 transition-colors ${activeTab === 'sections'
-                                    ? 'border-blue-600 text-blue-600'
-                                    : 'border-transparent text-gray-600 hover:text-gray-800'
+                                ? 'border-blue-600 text-blue-600'
+                                : 'border-transparent text-gray-600 hover:text-gray-800'
                                 }`}
                         >
-                            About Sections
+                            📄 About Sections
                         </button>
                         <button
                             onClick={() => setActiveTab('team')}
                             className={`px-4 py-3 text-sm font-semibold border-b-2 transition-colors ${activeTab === 'team'
-                                    ? 'border-blue-600 text-blue-600'
-                                    : 'border-transparent text-gray-600 hover:text-gray-800'
+                                ? 'border-blue-600 text-blue-600'
+                                : 'border-transparent text-gray-600 hover:text-gray-800'
                                 }`}
                         >
-                            Team Members
+                            👥 Team Members
                         </button>
                     </div>
                 </div>
@@ -494,8 +494,8 @@ export default function About() {
                                             <button
                                                 onClick={() => handleToggleMemberStatus(member.id)}
                                                 className={`absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center transition-all ${member.is_active
-                                                        ? 'bg-green-100 text-green-600 hover:bg-green-200'
-                                                        : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                                                    ? 'bg-green-100 text-green-600 hover:bg-green-200'
+                                                    : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
                                                     }`}
                                                 title={member.is_active ? 'Active - Click to deactivate' : 'Inactive - Click to activate'}
                                             >
@@ -608,31 +608,33 @@ export default function About() {
                                 />
                             </div>
 
-                            {/* Image */}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Image (Optional)</label>
-                                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-500 transition-colors cursor-pointer">
-                                    <input
-                                        type="file"
-                                        accept="image/*"
-                                        onChange={handleSectionImageChange}
-                                        className="hidden"
-                                        id="section-image"
-                                    />
-                                    <label htmlFor="section-image" className="cursor-pointer">
-                                        {sectionForm.imagePreview ? (
-                                            <img src={sectionForm.imagePreview} alt="Preview" className="max-h-48 mx-auto rounded-lg" />
-                                        ) : (
-                                            <>
-                                                <svg className="w-12 h-12 text-gray-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                                </svg>
-                                                <p className="text-sm text-gray-600">Click to upload image</p>
-                                            </>
-                                        )}
-                                    </label>
+                            {/* Image — hidden for Mission & Vision sections */}
+                            {!['mission', 'vision'].includes(selectedSection.section_key) && (
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Image (Optional)</label>
+                                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-500 transition-colors cursor-pointer">
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            onChange={handleSectionImageChange}
+                                            className="hidden"
+                                            id="section-image"
+                                        />
+                                        <label htmlFor="section-image" className="cursor-pointer">
+                                            {sectionForm.imagePreview ? (
+                                                <img src={sectionForm.imagePreview} alt="Preview" className="max-h-48 mx-auto rounded-lg" />
+                                            ) : (
+                                                <>
+                                                    <svg className="w-12 h-12 text-gray-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                    </svg>
+                                                    <p className="text-sm text-gray-600">Click to upload image</p>
+                                                </>
+                                            )}
+                                        </label>
+                                    </div>
                                 </div>
-                            </div>
+                            )}
 
                             <div className="flex gap-3 pt-4 border-t border-gray-200">
                                 <button
@@ -830,8 +832,8 @@ export default function About() {
             {toast.show && (
                 <div className="fixed top-6 right-6 z-[9999] animate-fade-in">
                     <div className={`px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 min-w-[350px] ${toast.type === 'success'
-                            ? 'bg-gradient-to-r from-green-500 to-emerald-600'
-                            : 'bg-gradient-to-r from-red-500 to-rose-600'
+                        ? 'bg-gradient-to-r from-green-500 to-emerald-600'
+                        : 'bg-gradient-to-r from-red-500 to-rose-600'
                         } text-white`}>
                         {toast.type === 'success' ? (
                             <svg className="w-6 h-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">

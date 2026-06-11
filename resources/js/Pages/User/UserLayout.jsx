@@ -7,6 +7,23 @@ import NotificationBell from '../../Components/NotificationBell';
 export default function UserLayout() {
     const navigate = useNavigate();
 
+    // ✅ ROLE GUARD: Block admins and production team from /user/* routes
+    useEffect(() => {
+        const token = sessionStorage.getItem('auth_token');
+        if (!token) {
+            navigate('/login', { replace: true });
+            return;
+        }
+        try {
+            const role = JSON.parse(sessionStorage.getItem('user') || '{}')?.role;
+            if (role === 'admin') {
+                navigate('/admin/dashboard', { replace: true });
+            } else if (role === 'production_team') {
+                navigate('/production-team/dashboard', { replace: true });
+            }
+        } catch { }
+    }, []);
+
     // User data state
     const [user, setUser] = useState(null);
 
@@ -73,10 +90,7 @@ export default function UserLayout() {
     };
 
     const confirmLogout = () => {
-        // Clear session storage (unified auth)
         sessionStorage.clear();
-
-        // Also clear any legacy localStorage keys
         localStorage.removeItem('production_team_token');
         localStorage.removeItem('production_team_data');
         localStorage.removeItem('auth_token');
@@ -93,7 +107,6 @@ export default function UserLayout() {
         localStorage.removeItem('cart_items');
         localStorage.removeItem('user_profile');
         localStorage.removeItem('booking_data');
-
         navigate('/login', { replace: true });
     };
 
@@ -106,14 +119,12 @@ export default function UserLayout() {
         navigate('/user/profile');
     };
 
-    // ✅ NEW: Open image preview modal
     const openImagePreview = () => {
         if (user?.profile_photo) {
             setShowImageModal(true);
         }
     };
 
-    // Get user initials
     const getUserInitials = () => {
         if (user?.name) {
             const names = user.name.split(' ');
@@ -150,7 +161,6 @@ export default function UserLayout() {
                                     onClick={() => setShowProfileDropdown(!showProfileDropdown)}
                                     className="flex items-center gap-3 focus:outline-none"
                                 >
-                                    {/* ✅ UPDATED: Larger profile photo (w-12 h-12) and clickable */}
                                     {user?.profile_photo ? (
                                         <img
                                             src={user.profile_photo}
@@ -175,7 +185,6 @@ export default function UserLayout() {
                                 {/* Dropdown Menu */}
                                 {showProfileDropdown && (
                                     <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-[110] animate-fade-in">
-                                        {/* User Info */}
                                         <div className="px-4 py-3 border-b border-gray-100">
                                             <div className="flex items-center gap-3 mb-2">
                                                 {user?.profile_photo ? (
@@ -203,7 +212,6 @@ export default function UserLayout() {
                                             </span>
                                         </div>
 
-                                        {/* Menu Items */}
                                         <div className="py-1">
                                             <button
                                                 onClick={handleProfileClick}
@@ -216,7 +224,6 @@ export default function UserLayout() {
                                             </button>
                                         </div>
 
-                                        {/* Logout */}
                                         <div className="py-1 border-t border-gray-100">
                                             <button
                                                 onClick={handleLogout}
@@ -241,7 +248,7 @@ export default function UserLayout() {
                 </div>
             </div>
 
-            {/* ✅ NEW: Image Preview Modal */}
+            {/* Image Preview Modal */}
             {showImageModal && user?.profile_photo && (
                 <div
                     className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-[200] p-4"

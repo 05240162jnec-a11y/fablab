@@ -682,7 +682,7 @@ export default function Courses() {
                                     {/* View Details Button */}
                                     <button
                                         onClick={() => handleViewCourse(course)}
-                                        className="w-full py-2.5 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors"
+                                        className="w-full py-2.5 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
                                     >
                                         View Details
                                     </button>
@@ -818,7 +818,7 @@ export default function Courses() {
                                         {/* Download Button */}
                                         <button
                                             onClick={() => handleDownloadEnrollments(selectedCourse.id, selectedCourse.title)}
-                                            className="flex items-center gap-1 px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors"
+                                            className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
                                             title="Download as CSV"
                                         >
                                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -831,7 +831,7 @@ export default function Courses() {
                                         {filteredEnrollments.length > 0 && (
                                             <button
                                                 onClick={() => handleClearEnrollments(selectedCourse.id, selectedCourse.title)}
-                                                className="flex items-center gap-1 px-3 py-1.5 bg-orange-600 text-white text-sm rounded-lg hover:bg-orange-700 transition-colors"
+                                                className="flex items-center gap-1 px-3 py-1.5 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 transition-colors"
                                                 title="Clear active enrollments (preserves completions)"
                                             >
                                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

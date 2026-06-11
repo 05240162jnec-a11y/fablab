@@ -11,6 +11,7 @@ export default function Projects() {
     const [selectedProject, setSelectedProject] = useState(null);
     const [rejectionReason, setRejectionReason] = useState('');
     const [documentUrl, setDocumentUrl] = useState(null);
+    const [documentInfo, setDocumentInfo] = useState(null); // ✅ NEW
 
     // Data States
     const [projects, setProjects] = useState([]);
@@ -147,7 +148,7 @@ export default function Projects() {
         }
     };
 
-    // Open Document Preview
+    // ✅ UPDATED: Open Document Preview (Smart Preview)
     const handlePreviewDocument = async (project) => {
         try {
             const adminToken = localStorage.getItem('admin_token');
@@ -157,19 +158,13 @@ export default function Projects() {
                     headers: {
                         'Authorization': `Bearer ${adminToken}`,
                     },
-                    responseType: 'blob',
                 }
             );
 
-            // Get the content type from response headers
-            const contentType = response.headers['content-type'];
-
-            // Create blob with correct MIME type
-            const blob = new Blob([response.data], { type: contentType || 'application/pdf' });
-            const url = window.URL.createObjectURL(blob);
-
-            setDocumentUrl(url);
-            setShowDocumentPreviewModal(true);
+            if (response.data.success) {
+                setDocumentInfo(response.data);
+                setShowDocumentPreviewModal(true);
+            }
         } catch (error) {
             console.error('Preview error:', error);
             showToast('❌ Failed to load document preview', 'error');
@@ -364,13 +359,10 @@ export default function Projects() {
         }
     };
 
-    // ✅ NEW: Close only preview modal (keep view modal open)
+    // ✅ UPDATED: Close only preview modal (keep view modal open)
     const closePreviewModal = () => {
         setShowDocumentPreviewModal(false);
-        if (documentUrl) {
-            window.URL.revokeObjectURL(documentUrl);
-            setDocumentUrl(null);
-        }
+        setDocumentInfo(null);
     };
 
     // Close all modals
@@ -848,21 +840,98 @@ export default function Projects() {
                 </div>
             )}
 
-            {/* ✅ DOCUMENT PREVIEW MODAL - With Fixed Back Button */}
-            {showDocumentPreviewModal && documentUrl && (
+            {/* ✅ UPDATED: SMART DOCUMENT PREVIEW MODAL */}
+            {showDocumentPreviewModal && documentInfo && (
                 <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[100] p-0" onClick={closePreviewModal}>
                     <div className="bg-white w-full h-full flex flex-col" onClick={(e) => e.stopPropagation()}>
-                        {/* Preview Content - Full Screen */}
-                        <div className="flex-1 bg-gray-100 overflow-auto relative">
-                            <iframe
-                                src={documentUrl}
-                                className="w-full h-full"
-                                title="Document Preview"
-                                style={{ border: 'none' }}
-                            />
+                        {/* Header */}
+                        <div className="bg-gray-50 border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+                            <div>
+                                <h3 className="text-lg font-bold text-gray-900">Document Preview</h3>
+                                <p className="text-sm text-gray-500">{documentInfo.file_name} ({documentInfo.file_size} MB)</p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                {/* Download Button */}
+                                <button
+                                    onClick={() => handleDownloadDocument(selectedProject)}
+                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+                                >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                    </svg>
+                                    Download
+                                </button>
+                                {/* Close Button */}
+                                <button
+                                    onClick={closePreviewModal}
+                                    className="text-gray-400 hover:text-gray-600 p-2 hover:bg-gray-200 rounded-lg transition-colors"
+                                >
+                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            </div>
                         </div>
 
-                        {/* ✅ Simple Back Arrow Button - Returns to Project Details Modal */}
+                        {/* Preview Content */}
+                        <div className="flex-1 bg-gray-100 overflow-auto relative">
+                            {/* PDF Preview */}
+                            {documentInfo.file_type === 'pdf' && (
+                                <iframe
+                                    src={documentInfo.file_path}
+                                    className="w-full h-full"
+                                    title="PDF Preview"
+                                    style={{ border: 'none' }}
+                                />
+                            )}
+
+                            {/* Image Preview */}
+                            {['jpg', 'jpeg', 'png', 'gif'].includes(documentInfo.file_type) && (
+                                <div className="flex items-center justify-center h-full p-8">
+                                    <img
+                                        src={documentInfo.file_path}
+                                        alt={documentInfo.file_name}
+                                        className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+                                    />
+                                </div>
+                            )}
+
+                            {/* Text File Preview */}
+                            {documentInfo.file_type === 'txt' && (
+                                <div className="max-w-4xl mx-auto p-8">
+                                    <div className="bg-white rounded-lg shadow-lg p-6">
+                                        <pre className="whitespace-pre-wrap font-mono text-sm text-gray-800">
+                                            {documentInfo.content || 'No content available'}
+                                        </pre>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Non-previewable Files (Office documents) */}
+                            {!documentInfo.previewable && (
+                                <div className="flex items-center justify-center h-full">
+                                    <div className="text-center max-w-md p-8">
+                                        <div className="w-24 h-24 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-6">
+                                            <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                            </svg>
+                                        </div>
+                                        <h3 className="text-xl font-bold text-gray-900 mb-2">Preview Not Available</h3>
+                                        <p className="text-gray-600 mb-6">
+                                            This file type (.{documentInfo.file_type.toUpperCase()}) cannot be previewed in the browser. Please download to view.
+                                        </p>
+                                        <button
+                                            onClick={() => handleDownloadDocument(selectedProject)}
+                                            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
+                                        >
+                                            Download File
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Back Button */}
                         <button
                             onClick={closePreviewModal}
                             className="absolute top-4 left-4 w-10 h-10 bg-white/90 hover:bg-white rounded-full flex items-center justify-center shadow-lg transition-all hover:shadow-xl group z-10"

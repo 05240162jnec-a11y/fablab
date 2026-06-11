@@ -6,8 +6,12 @@ export default function Projects() {
     const [showViewModal, setShowViewModal] = useState(false);
     const [showRejectModal, setShowRejectModal] = useState(false);
     const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
+    const [showDocumentPreviewModal, setShowDocumentPreviewModal] = useState(false);
+    const [showImagePreviewModal, setShowImagePreviewModal] = useState(false);
     const [selectedProject, setSelectedProject] = useState(null);
     const [rejectionReason, setRejectionReason] = useState('');
+    const [documentUrl, setDocumentUrl] = useState(null);
+    const [documentInfo, setDocumentInfo] = useState(null);
 
     // Data States
     const [projects, setProjects] = useState([]);
@@ -51,6 +55,8 @@ export default function Projects() {
             });
 
             if (response.data.success) {
+                console.log('📸 Projects data:', response.data.data);
+                console.log('📸 First project student_photo:', response.data.data[0]?.student_photo);
                 setProjects(response.data.data);
                 setStats(response.data.stats);
                 setError(null);
@@ -137,6 +143,82 @@ export default function Projects() {
         setShowRejectModal(true);
     };
 
+    // ✅ NEW: Open student photo preview
+    const openStudentPhotoPreview = () => {
+        if (selectedProject?.student_photo) {
+            setShowImagePreviewModal(true);
+        }
+    };
+
+    // ✅ UPDATED: Open Document Preview (Smart Preview)
+    const handlePreviewDocument = async (project) => {
+        try {
+            const token = getToken();
+            const response = await axios.get(
+                `http://127.0.0.1:8000/api/production-team/projects/${project.id}/preview`,
+                {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                    },
+                }
+            );
+
+            if (response.data.success) {
+                setDocumentInfo(response.data);
+                setShowDocumentPreviewModal(true);
+            }
+        } catch (error) {
+            console.error('Preview error:', error);
+            showToast('❌ Failed to load document preview', 'error');
+        }
+    };
+
+    // Download Document
+    const handleDownloadDocument = async (project) => {
+        try {
+            const token = getToken();
+            const response = await axios.get(
+                `http://127.0.0.1:8000/api/production-team/projects/${project.id}/download`,
+                {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                    },
+                    responseType: 'blob',
+                }
+            );
+
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+
+            const contentDisposition = response.headers['content-disposition'];
+            let filename = `project_${project.id}_document`;
+            if (contentDisposition) {
+                const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+                if (filenameMatch && filenameMatch[1]) {
+                    filename = filenameMatch[1].replace(/['"]/g, '');
+                }
+            } else {
+                const originalPath = project.document_path;
+                if (originalPath) {
+                    const extension = originalPath.split('.').pop();
+                    filename = `${project.title.replace(/\s+/g, '_')}.${extension}`;
+                }
+            }
+
+            link.setAttribute('download', filename);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+
+            showToast('✅ Document downloaded successfully!', 'success');
+        } catch (error) {
+            console.error('Download error:', error);
+            showToast('❌ Failed to download document', 'error');
+        }
+    };
+
     // Confirm Reject
     const handleConfirmReject = async () => {
         if (!rejectionReason.trim()) {
@@ -194,52 +276,6 @@ export default function Projects() {
         }
     };
 
-    // Download Document
-    const handleDownloadDocument = async (project) => {
-        try {
-            const token = getToken();
-            const response = await axios.get(
-                `http://127.0.0.1:8000/api/production-team/projects/${project.id}/download`,
-                {
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                    },
-                    responseType: 'blob',
-                }
-            );
-
-            const url = window.URL.createObjectURL(new Blob([response.data]));
-            const link = document.createElement('a');
-            link.href = url;
-
-            const contentDisposition = response.headers['content-disposition'];
-            let filename = `project_${project.id}_document`;
-            if (contentDisposition) {
-                const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-                if (filenameMatch && filenameMatch[1]) {
-                    filename = filenameMatch[1].replace(/['"]/g, '');
-                }
-            } else {
-                const originalPath = project.document_path;
-                if (originalPath) {
-                    const extension = originalPath.split('.').pop();
-                    filename = `${project.title.replace(/\s+/g, '_')}.${extension}`;
-                }
-            }
-
-            link.setAttribute('download', filename);
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            window.URL.revokeObjectURL(url);
-
-            showToast('✅ Document downloaded successfully!', 'success');
-        } catch (error) {
-            console.error('Download error:', error);
-            showToast('❌ Failed to download document', 'error');
-        }
-    };
-
     // Format date
     const formatDate = (dateString) => {
         if (!dateString) return '—';
@@ -289,13 +325,61 @@ export default function Projects() {
         }
     };
 
+    // ✅ NEW: Get file extension
+    const getFileExtension = (path) => {
+        if (!path) return 'file';
+        return path.split('.').pop().toLowerCase();
+    };
+
+    // ✅ NEW: Get file icon based on extension (Google Drive style)
+    const getFileIcon = (path) => {
+        const ext = getFileExtension(path);
+        switch (ext) {
+            case 'pdf':
+                return { color: 'text-red-600', bg: 'bg-red-50', label: 'PDF' };
+            case 'doc':
+            case 'docx':
+                return { color: 'text-blue-600', bg: 'bg-blue-50', label: 'DOC' };
+            case 'xls':
+            case 'xlsx':
+                return { color: 'text-green-600', bg: 'bg-green-50', label: 'XLS' };
+            case 'ppt':
+            case 'pptx':
+                return { color: 'text-orange-600', bg: 'bg-orange-50', label: 'PPT' };
+            case 'txt':
+                return { color: 'text-gray-600', bg: 'bg-gray-50', label: 'TXT' };
+            case 'jpg':
+            case 'jpeg':
+            case 'png':
+            case 'gif':
+                return { color: 'text-purple-600', bg: 'bg-purple-50', label: 'IMG' };
+            case 'zip':
+            case 'rar':
+                return { color: 'text-yellow-600', bg: 'bg-yellow-50', label: 'ZIP' };
+            default:
+                return { color: 'text-gray-600', bg: 'bg-gray-50', label: ext.toUpperCase().substring(0, 3) };
+        }
+    };
+
+    // ✅ UPDATED: Close only preview modal (keep view modal open)
+    const closePreviewModal = () => {
+        setShowDocumentPreviewModal(false);
+        setDocumentInfo(null);
+    };
+
     // Close all modals
     const closeAllModals = () => {
         setShowViewModal(false);
         setShowRejectModal(false);
         setShowBulkDeleteModal(false);
+        setShowDocumentPreviewModal(false);
+        setShowImagePreviewModal(false);
         setSelectedProject(null);
         setRejectionReason('');
+        if (documentUrl) {
+            window.URL.revokeObjectURL(documentUrl);
+            setDocumentUrl(null);
+        }
     };
 
     return (
@@ -319,9 +403,9 @@ export default function Projects() {
                         {/* Total Projects */}
                         <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
                             <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 bg-blue-50 rounded-lg flex items-center justify-center">
-                                    <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                <div className="w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center">
+                                    <svg className="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                                     </svg>
                                 </div>
                                 <div>
@@ -334,9 +418,9 @@ export default function Projects() {
                         {/* Pending */}
                         <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
                             <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 bg-amber-50 rounded-lg flex items-center justify-center">
-                                    <svg className="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                <div className="w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center">
+                                    <svg className="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                     </svg>
                                 </div>
                                 <div>
@@ -349,9 +433,9 @@ export default function Projects() {
                         {/* Approved */}
                         <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
                             <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 bg-emerald-50 rounded-lg flex items-center justify-center">
-                                    <svg className="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                <div className="w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center">
+                                    <svg className="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                                     </svg>
                                 </div>
                                 <div>
@@ -364,9 +448,9 @@ export default function Projects() {
                         {/* Rejected */}
                         <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
                             <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 bg-rose-50 rounded-lg flex items-center justify-center">
-                                    <svg className="w-6 h-6 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                <div className="w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center">
+                                    <svg className="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
                                     </svg>
                                 </div>
                                 <div>
@@ -505,9 +589,18 @@ export default function Projects() {
                                                 </td>
                                                 <td className="py-4 px-4">
                                                     <div className="flex items-center gap-2">
-                                                        <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-gray-700 font-semibold text-xs">
-                                                            {getInitials(project.user?.name)}
-                                                        </div>
+                                                        {/* ✅ UPDATED: Show student photo or initials */}
+                                                        {project.student_photo ? (
+                                                            <img
+                                                                src={project.student_photo}
+                                                                alt={project.user?.name || 'Student'}
+                                                                className="w-8 h-8 rounded-full object-cover"
+                                                            />
+                                                        ) : (
+                                                            <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-gray-700 font-semibold text-xs">
+                                                                {getInitials(project.user?.name)}
+                                                            </div>
+                                                        )}
                                                         <div>
                                                             <p className="text-sm font-medium text-gray-900">{project.user?.name || 'Unknown'}</p>
                                                             <p className="text-xs text-gray-500">{project.user?.email || ''}</p>
@@ -574,9 +667,22 @@ export default function Projects() {
                         <div className="p-6">
                             {/* Header with student info */}
                             <div className="flex items-center gap-4 mb-6 pb-6 border-b border-gray-200">
-                                <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full flex items-center justify-center text-white font-bold text-xl flex-shrink-0">
-                                    {getInitials(selectedProject.user?.name)}
-                                </div>
+                                {/* ✅ UPDATED: Show student photo or initials - CLICKABLE */}
+                                {selectedProject.student_photo ? (
+                                    <img
+                                        src={selectedProject.student_photo}
+                                        alt={selectedProject.user?.name || 'Student'}
+                                        onClick={openStudentPhotoPreview}
+                                        className="w-16 h-16 rounded-full object-cover cursor-pointer hover:shadow-lg transition-shadow"
+                                    />
+                                ) : (
+                                    <div
+                                        onClick={openStudentPhotoPreview}
+                                        className="w-16 h-16 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full flex items-center justify-center text-white font-bold text-xl flex-shrink-0 cursor-pointer hover:shadow-lg transition-shadow"
+                                    >
+                                        {getInitials(selectedProject.user?.name)}
+                                    </div>
+                                )}
                                 <div className="flex-1">
                                     <h4 className="text-xl font-bold text-gray-900">{selectedProject.title}</h4>
                                     <p className="text-sm text-gray-600">
@@ -594,27 +700,29 @@ export default function Projects() {
                                 <p className="text-gray-600 leading-relaxed whitespace-pre-wrap">{selectedProject.description}</p>
                             </div>
 
-                            {/* Document */}
+                            {/* ✅ UPDATED: Google Drive-style Document Card */}
                             <div className="mb-6">
                                 <h5 className="font-semibold text-gray-900 mb-3">Project Document</h5>
                                 <button
-                                    onClick={() => handleDownloadDocument(selectedProject)}
-                                    className="flex items-center gap-3 p-4 bg-gray-50 rounded-lg hover:bg-blue-50 transition-colors border border-gray-200 hover:border-blue-300 group w-full"
+                                    onClick={() => handlePreviewDocument(selectedProject)}
+                                    className="w-full flex items-center gap-3 p-4 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-all group cursor-pointer"
                                 >
-                                    <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                                        <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                                        </svg>
-                                    </div>
-                                    <div className="flex-1 text-left">
-                                        <p className="text-sm font-medium text-gray-900 group-hover:text-blue-600 transition-colors">
-                                            {selectedProject.document_path?.split('/').pop() || 'Document'}
+                                    {/* File Icon based on type */}
+                                    {(() => {
+                                        const fileInfo = getFileIcon(selectedProject.document_path);
+                                        return (
+                                            <div className={`flex-shrink-0 w-12 h-12 ${fileInfo.bg} rounded flex items-center justify-center`}>
+                                                <span className={`text-xs font-bold ${fileInfo.color}`}>{fileInfo.label}</span>
+                                            </div>
+                                        );
+                                    })()}
+
+                                    {/* Filename */}
+                                    <div className="flex-1 text-left min-w-0">
+                                        <p className="text-sm font-medium text-gray-900 truncate group-hover:text-gray-700">
+                                            {selectedProject.document_path?.split('/').pop() || 'Project Document'}
                                         </p>
-                                        <p className="text-xs text-gray-500">Click to download</p>
                                     </div>
-                                    <svg className="w-5 h-5 text-gray-400 group-hover:text-blue-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                                    </svg>
                                 </button>
                             </div>
 
@@ -643,9 +751,7 @@ export default function Projects() {
                                         {selectedProject.reviewed_at ? formatDate(selectedProject.reviewed_at) : 'Not yet reviewed'}
                                     </p>
                                     {selectedProject.reviewer?.name && (
-                                        <p className="text-xs text-gray-500">
-                                            by {selectedProject.reviewer.name} ({selectedProject.reviewer.email})
-                                        </p>
+                                        <p className="text-xs text-gray-500">by {selectedProject.reviewer.name}</p>
                                     )}
                                 </div>
                             </div>
@@ -704,6 +810,139 @@ export default function Projects() {
                                 </div>
                             )}
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ✅ NEW: Student Photo Preview Modal */}
+            {showImagePreviewModal && selectedProject?.student_photo && (
+                <div
+                    className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-[200] p-4"
+                    onClick={() => setShowImagePreviewModal(false)}
+                >
+                    <div className="relative max-w-2xl max-h-[90vh]">
+                        <img
+                            src={selectedProject.student_photo}
+                            alt={selectedProject.user?.name || 'Student'}
+                            className="max-w-full max-h-[90vh] rounded-lg object-contain"
+                            onClick={(e) => e.stopPropagation()}
+                        />
+                        <button
+                            onClick={() => setShowImagePreviewModal(false)}
+                            className="absolute top-4 right-4 w-10 h-10 bg-white/20 hover:bg-white/40 rounded-full flex items-center justify-center text-white transition-colors"
+                        >
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black/60 text-white px-4 py-2 rounded-full text-sm">
+                            {selectedProject.user?.name || 'Student'}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ✅ UPDATED: SMART DOCUMENT PREVIEW MODAL */}
+            {showDocumentPreviewModal && documentInfo && (
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[100] p-0" onClick={closePreviewModal}>
+                    <div className="bg-white w-full h-full flex flex-col" onClick={(e) => e.stopPropagation()}>
+                        {/* Header */}
+                        <div className="bg-gray-50 border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+                            <div>
+                                <h3 className="text-lg font-bold text-gray-900">Document Preview</h3>
+                                <p className="text-sm text-gray-500">{documentInfo.file_name} ({documentInfo.file_size} MB)</p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                {/* Download Button */}
+                                <button
+                                    onClick={() => handleDownloadDocument(selectedProject)}
+                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+                                >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                    </svg>
+                                    Download
+                                </button>
+                                {/* Close Button */}
+                                <button
+                                    onClick={closePreviewModal}
+                                    className="text-gray-400 hover:text-gray-600 p-2 hover:bg-gray-200 rounded-lg transition-colors"
+                                >
+                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Preview Content */}
+                        <div className="flex-1 bg-gray-100 overflow-auto relative">
+                            {/* PDF Preview */}
+                            {documentInfo.file_type === 'pdf' && (
+                                <iframe
+                                    src={documentInfo.file_path}
+                                    className="w-full h-full"
+                                    title="PDF Preview"
+                                    style={{ border: 'none' }}
+                                />
+                            )}
+
+                            {/* Image Preview */}
+                            {['jpg', 'jpeg', 'png', 'gif'].includes(documentInfo.file_type) && (
+                                <div className="flex items-center justify-center h-full p-8">
+                                    <img
+                                        src={documentInfo.file_path}
+                                        alt={documentInfo.file_name}
+                                        className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+                                    />
+                                </div>
+                            )}
+
+                            {/* Text File Preview */}
+                            {documentInfo.file_type === 'txt' && (
+                                <div className="max-w-4xl mx-auto p-8">
+                                    <div className="bg-white rounded-lg shadow-lg p-6">
+                                        <pre className="whitespace-pre-wrap font-mono text-sm text-gray-800">
+                                            {documentInfo.content || 'No content available'}
+                                        </pre>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Non-previewable Files (Office documents) */}
+                            {!documentInfo.previewable && (
+                                <div className="flex items-center justify-center h-full">
+                                    <div className="text-center max-w-md p-8">
+                                        <div className="w-24 h-24 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-6">
+                                            <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                            </svg>
+                                        </div>
+                                        <h3 className="text-xl font-bold text-gray-900 mb-2">Preview Not Available</h3>
+                                        <p className="text-gray-600 mb-6">
+                                            This file type (.{documentInfo.file_type.toUpperCase()}) cannot be previewed in the browser. Please download to view.
+                                        </p>
+                                        <button
+                                            onClick={() => handleDownloadDocument(selectedProject)}
+                                            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
+                                        >
+                                            Download File
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Back Button */}
+                        <button
+                            onClick={closePreviewModal}
+                            className="absolute top-4 left-4 w-10 h-10 bg-white/90 hover:bg-white rounded-full flex items-center justify-center shadow-lg transition-all hover:shadow-xl group z-10"
+                            title="Back to Project Details"
+                        >
+                            <svg className="w-5 h-5 text-gray-700 group-hover:text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                            </svg>
+                        </button>
                     </div>
                 </div>
             )}

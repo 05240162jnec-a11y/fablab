@@ -16,68 +16,125 @@ class ProjectController extends Controller
      * Get all project submissions (for production team)
      */
     public function index()
-{
-    $projects = Project::with(['user', 'reviewer'])
-        ->orderBy('created_at', 'desc')
-        ->get()
-        ->map(function($project) {
-            // If reviewer doesn't exist in users table, provide fallback
-            $reviewer = null;
-            if ($project->reviewer) {
-                $reviewer = [
-                    'id' => $project->reviewer->id,
-                    'name' => $project->reviewer->name,
-                    'email' => $project->reviewer->email,
-                ];
-            } elseif ($project->reviewed_by) {
-                // Try to find in users table with a direct query
-                $user = \App\Models\User::find($project->reviewed_by);
-                if ($user) {
+    {
+        $projects = Project::with(['user', 'reviewer'])
+            ->orderBy('created_at', 'desc')
+            ->get()
+            ->map(function($project) {
+                // If reviewer doesn't exist in users table, provide fallback
+                $reviewer = null;
+                if ($project->reviewer) {
                     $reviewer = [
-                        'id' => $user->id,
-                        'name' => $user->name,
-                        'email' => $user->email,
+                        'id' => $project->reviewer->id,
+                        'name' => $project->reviewer->name,
+                        'email' => $project->reviewer->email,
                     ];
-                } else {
-                    // Reviewer doesn't exist - mark as "Admin" or "Unknown"
-                    $reviewer = [
-                        'id' => $project->reviewed_by,
-                        'name' => 'Admin User',
-                        'email' => 'admin@jnec.rub.edu.bt',
-                    ];
+                } elseif ($project->reviewed_by) {
+                    // Try to find in users table with a direct query
+                    $user = \App\Models\User::find($project->reviewed_by);
+                    if ($user) {
+                        $reviewer = [
+                            'id' => $user->id,
+                            'name' => $user->name,
+                            'email' => $user->email,
+                        ];
+                    } else {
+                        // Reviewer doesn't exist - mark as "Admin" or "Unknown"
+                        $reviewer = [
+                            'id' => $project->reviewed_by,
+                            'name' => 'Admin User',
+                            'email' => 'admin@jnec.rub.edu.bt',
+                        ];
+                    }
                 }
-            }
 
-            return [
-                'id' => $project->id,
-                'title' => $project->title,
-                'description' => $project->description,
-                'document_path' => $project->document_path,
-                'status' => $project->status,
-                'admin_comments' => $project->admin_comments,
-                'submitted_at' => $project->submitted_at,
-                'reviewed_at' => $project->reviewed_at,
-                'user' => [
-                    'id' => $project->user->id ?? null,
-                    'name' => $project->user->name ?? 'Unknown',
-                    'email' => $project->user->email ?? null,
-                ],
-                'reviewer' => $reviewer,
-            ];
-        });
+                return [
+                    'id' => $project->id,
+                    'title' => $project->title,
+                    'description' => $project->description,
+                    'document_path' => $project->document_path,
+                    // ✅ ADDED: Return student_photo with full URL
+                    'student_photo' => $project->student_photo 
+                        ? url('storage/' . $project->student_photo) 
+                        : null,
+                    'status' => $project->status,
+                    'admin_comments' => $project->admin_comments,
+                    'submitted_at' => $project->submitted_at,
+                    'reviewed_at' => $project->reviewed_at,
+                    'user' => [
+                        'id' => $project->user->id ?? null,
+                        'name' => $project->user->name ?? 'Unknown',
+                        'email' => $project->user->email ?? null,
+                    ],
+                    'reviewer' => $reviewer,
+                ];
+            });
 
-    // Calculate stats
-    $stats = [
-        'total' => $projects->count(),
-        'pending' => $projects->where('status', 'pending')->count(),
-        'approved' => $projects->where('status', 'approved')->count(),
-        'rejected' => $projects->where('status', 'rejected')->count(),
+        // Calculate stats
+        $stats = [
+            'total' => $projects->count(),
+            'pending' => $projects->where('status', 'pending')->count(),
+            'approved' => $projects->where('status', 'approved')->count(),
+            'rejected' => $projects->where('status', 'rejected')->count(),
+        ];
+
+        return response()->json([
+            'success' => true,
+            'data' => $projects,
+            'stats' => $stats
+        ]);
+    }
+
+    /**
+ * ✅ UPDATED: Preview project document (smart preview based on file type)
+ */
+public function preview($id)
+{
+    $project = Project::findOrFail($id);
+    
+    $possiblePaths = [
+        storage_path('app/public/' . $project->document_path),
+        storage_path('app/' . $project->document_path),
+        public_path('storage/' . $project->document_path),
     ];
+    
+    $filePath = null;
+    foreach ($possiblePaths as $path) {
+        if (file_exists($path)) {
+            $filePath = $path;
+            break;
+        }
+    }
+    
+    if (!$filePath) {
+        return response()->json(['message' => 'File not found'], 404);
+    }
 
+    $extension = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
+    
+    // Files that can be previewed directly
+    $previewableTypes = ['pdf', 'jpg', 'jpeg', 'png', 'gif', 'txt'];
+    $isPreviewable = in_array($extension, $previewableTypes);
+    
+    // Get file info
+    $fileSize = filesize($filePath);
+    $fileSizeMB = round($fileSize / 1024 / 1024, 2);
+    
+    // For text files, read content
+    $textContent = null;
+    if ($extension === 'txt' && $fileSizeMB < 1) { // Only if < 1MB
+        $textContent = file_get_contents($filePath);
+    }
+    
     return response()->json([
         'success' => true,
-        'data' => $projects,
-        'stats' => $stats
+        'file_type' => $extension,
+        'file_path' => url('storage/' . $project->document_path),
+        'file_name' => basename($project->document_path),
+        'file_size' => $fileSizeMB,
+        'previewable' => $isPreviewable,
+        'content' => $textContent,
+        'mime_type' => mime_content_type($filePath),
     ]);
 }
 

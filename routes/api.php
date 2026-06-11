@@ -236,11 +236,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user/product-orders', [\App\Http\Controllers\Api\User\ProductOrderController::class, 'index']);
     Route::post('/user/product-orders', [\App\Http\Controllers\Api\User\ProductOrderController::class, 'store']);
     Route::get('/user/product-orders/{id}', [\App\Http\Controllers\Api\User\ProductOrderController::class, 'show']);
+    // ✅ Static routes MUST come before {id} wildcard routes
+    Route::post('/user/product-orders/process-expired', [App\Http\Controllers\Api\User\ProductOrderController::class, 'processExpiredOrders']);
+    Route::post('/user/product-orders/bulk-delete', [App\Http\Controllers\Api\User\ProductOrderController::class, 'bulkDelete']);
     Route::post('/user/product-orders/{id}/upload-payment', [\App\Http\Controllers\Api\User\ProductOrderController::class, 'uploadPayment']);
     Route::post('/user/product-orders/{id}/cancel', [\App\Http\Controllers\Api\User\ProductOrderController::class, 'cancel']);
     Route::get('/user/product-orders/{id}/screenshot', [\App\Http\Controllers\Api\User\ProductOrderController::class, 'screenshot']);
-    Route::post('/user/product-orders/process-expired', [App\Http\Controllers\Api\User\ProductOrderController::class, 'processExpiredOrders']);
-    Route::post('/user/product-orders/bulk-delete', [App\Http\Controllers\Api\User\ProductOrderController::class, 'bulkDelete']);
 
     // User Project Routes
     Route::get('/user/projects', [App\Http\Controllers\Api\UserProjectController::class, 'index']);
@@ -275,6 +276,7 @@ Route::middleware('auth:sanctum')->prefix('production-team')->group(function () 
     Route::delete('/projects/{id}', [App\Http\Controllers\Api\ProductionTeam\ProjectController::class, 'destroy']);
     Route::post('/projects/bulk-delete', [App\Http\Controllers\Api\ProductionTeam\ProjectController::class, 'bulkDelete']);
     Route::get('/projects/{id}/download', [App\Http\Controllers\Api\ProductionTeam\ProjectController::class, 'download']);
+    Route::get('/projects/{id}/preview', [App\Http\Controllers\Api\ProductionTeam\ProjectController::class, 'preview']);
     
     // Production Team Notification Routes
     Route::get('/notifications', [App\Http\Controllers\Api\NotificationController::class, 'index']);

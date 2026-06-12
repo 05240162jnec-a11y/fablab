@@ -23,7 +23,19 @@ export default function UserLayout() {
             }
         } catch { }
     }, []);
-
+    // ✅ Handle back/forward (bfcache) navigation after logout
+    useEffect(() => {
+        const handlePageShow = (event) => {
+            if (event.persisted) {
+                const token = sessionStorage.getItem('auth_token');
+                if (!token) {
+                    window.location.replace('/login');
+                }
+            }
+        };
+        window.addEventListener('pageshow', handlePageShow);
+        return () => window.removeEventListener('pageshow', handlePageShow);
+    }, []);
     // User data state
     const [user, setUser] = useState(null);
 

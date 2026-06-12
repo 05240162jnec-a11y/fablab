@@ -176,7 +176,7 @@ export default function Login() {
                     <form onSubmit={handleSubmit} autoComplete="off" data-form-type="other">
                         {/* Decoy fields to absorb browser/password-manager autofill */}
                         <input type="text" name="fake-username" autoComplete="username" tabIndex="-1" aria-hidden="true" style={{ position: 'absolute', width: 0, height: 0, opacity: 0, pointerEvents: 'none' }} />
-                        <input type="password" name="fake-password" autoComplete="new-password" tabIndex="-1" aria-hidden="true" style={{ position: 'absolute', width: 0, height: 0, opacity: 0, pointerEvents: 'none' }} />
+                        <input type="password" name="fake-password" autoComplete="current-password" tabIndex="-1" aria-hidden="true" style={{ position: 'absolute', width: 0, height: 0, opacity: 0, pointerEvents: 'none' }} />
 
                         {/* Email */}
                         <div className="field">

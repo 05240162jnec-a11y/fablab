@@ -6,7 +6,7 @@ const API_BASE = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api';
 function getImageUrl(path) {
     if (!path) return null;
     if (path.startsWith('http')) return path;
-    return `http://127.0.0.1:8000/storage/${path}`;
+    return `${window.location.origin}/storage/${path}`;
 }
 function calcDuration(start, end) {
     if (!start || !end) return null;

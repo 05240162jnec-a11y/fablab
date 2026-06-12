@@ -23,6 +23,7 @@ export default function UserSidebar({ onLogout }) {
     };
 
     const confirmLogout = () => {
+        setShowLogoutConfirm(false);
         sessionStorage.clear();
         localStorage.clear(); // ✅ Wipe ALL localStorage on logout
         if (onLogout) onLogout();

@@ -173,11 +173,15 @@ export default function Login() {
                         </div>
                     )}
 
-                    <form onSubmit={handleSubmit} autoComplete="off">
+                    <form onSubmit={handleSubmit} autoComplete="off" data-form-type="other">
+                        {/* Decoy fields to absorb browser/password-manager autofill */}
+                        <input type="text" name="fake-username" autoComplete="username" tabIndex="-1" aria-hidden="true" style={{ position: 'absolute', width: 0, height: 0, opacity: 0, pointerEvents: 'none' }} />
+                        <input type="password" name="fake-password" autoComplete="new-password" tabIndex="-1" aria-hidden="true" style={{ position: 'absolute', width: 0, height: 0, opacity: 0, pointerEvents: 'none' }} />
+
                         {/* Email */}
                         <div className="field">
                             <input type="email" name="email" value={formData.email} onChange={handleChange}
-                                placeholder="Email" required autoComplete="new-password" className={`login-input ${errors.email ? 'err' : ''}`} />
+                                placeholder="Email" required autoComplete="off" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" className={`login-input ${errors.email ? 'err' : ''}`} />
                             {errors.email && <p className="err-txt">{Array.isArray(errors.email) ? errors.email[0] : errors.email}</p>}
                         </div>
 
@@ -185,7 +189,7 @@ export default function Login() {
                         <div className="field">
                             <input type={showPwd ? 'text' : 'password'} name="password"
                                 value={formData.password} onChange={handleChange}
-                                placeholder="Password" required autoComplete="new-password" className={`login-input ${errors.password ? 'err' : ''}`} />
+                                placeholder="Password" required autoComplete="off" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" className={`login-input ${errors.password ? 'err' : ''}`} />
                             <button type="button" className="eye-btn" onClick={() => setShowPwd(p => !p)} aria-label="Toggle password">
                                 {showPwd ? (
                                     <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>

@@ -280,12 +280,6 @@ class UserCourseController extends Controller
                 $admin->notify(new NewEnrollmentNotification($user, $course));
             }
 
-            // Notify user
-            $user->notify(new CourseEnrollmentNotification($course, 'enrolled'));
-            // Notify admin
-            $admin = User::where('role', 'admin')->first();
-            if ($admin) $admin->notify(new NewEnrollmentNotification($course, $user));
-
             return response()->json([
                 'message' => 'Successfully enrolled in course!',
                 'enrollment' => [
@@ -343,9 +337,6 @@ class UserCourseController extends Controller
                     $course->decrement('enrollment');
                 }
             });
-
-            // Notify user
-            $user->notify(new CourseEnrollmentNotification($course, 'unenrolled'));
 
             // Notify the user
             $user->notify(new CourseEnrollmentNotification($course, 'unenrolled'));

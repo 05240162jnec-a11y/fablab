@@ -92,24 +92,6 @@ function MachineModal({ machine, onClose, isLoggedIn, onRestrict }) {
                     </div>
                 </div>
             </div>
-
-            {/* ✅ Role Restriction Modal */}
-            {showRoleModal && (
-                <div className="modal-backdrop" onClick={() => setShowRoleModal(false)} style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(5,10,25,.6)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', animation: 'fadeIn .2s ease' }}>
-                    <div onClick={e => e.stopPropagation()} style={{ background: 'white', borderRadius: '1.25rem', width: '100%', maxWidth: '400px', overflow: 'hidden', boxShadow: '0 32px 80px rgba(0,0,0,.25)', animation: 'slideUp .25s ease' }}>
-                        <div style={{ padding: '2rem', textAlign: 'center' }}>
-                            <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: '#fef3c7', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.25rem' }}>
-                                <svg width="32" height="32" fill="none" stroke="#d97706" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                                </svg>
-                            </div>
-                            <h3 style={{ fontFamily: "'Playfair Display',serif", fontSize: '1.25rem', fontWeight: 800, color: '#0d1117', marginBottom: '.5rem' }}>Access Restricted</h3>
-                            <p style={{ fontSize: '.9rem', color: '#64748b', lineHeight: 1.6, marginBottom: '1.5rem' }}>This feature is only available for regular users. Please log in with a user account to continue.</p>
-                            <button onClick={() => setShowRoleModal(false)} style={{ padding: '.75rem 2rem', background: '#1a56db', color: 'white', fontWeight: 700, fontSize: '.9rem', borderRadius: '9999px', border: 'none', cursor: 'pointer', boxShadow: '0 4px 14px rgba(26,86,219,.35)' }}>Got it</button>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 }

@@ -48,7 +48,7 @@ export default function UserLayout() {
                     const parsed = JSON.parse(storedUser);
 
                     // Fetch fresh data from API to get profile_photo
-                    const response = await axios.get('http://127.0.0.1:8000/api/user/profile', {
+                    const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/user/profile`, {
                         headers: {
                             'Accept': 'application/json',
                             'Authorization': `Bearer ${token}`,
@@ -90,8 +90,9 @@ export default function UserLayout() {
     };
 
     const confirmLogout = () => {
+        setShowLogoutConfirm(false);
         sessionStorage.clear();
-        localStorage.clear(); // ✅ Wipe ALL localStorage on logout
+        localStorage.clear();
         navigate('/login', { replace: true });
     };
 

@@ -184,8 +184,8 @@ export default function About() {
         })();
     }, []);
 
-    const leader = teamMembers.length > 0 ? teamMembers[0] : null;
-    const fabGuys = teamMembers.length > 1 ? teamMembers.slice(1) : [];
+    const leader = teamMembers.find(m => m.section === 'leader') || null;
+    const fabGuys = teamMembers.filter(m => m.section !== 'leader');
 
     return (
         <div style={{ fontFamily: "'DM Sans', sans-serif", background: '#f9fafb', color: '#0d1117', overflowX: 'hidden' }}>

@@ -26,9 +26,14 @@ export default function Login() {
             sessionStorage.clear();
             sessionStorage.setItem('auth_token', response.data.token);
             if (response.data.user) {
-                sessionStorage.setItem('user', JSON.stringify(response.data.user));
+                // ✅ Always ensure role is stored — default to 'user' for regular users
+                const userData = {
+                    ...response.data.user,
+                    role: response.data.user.role || 'user'
+                };
+                sessionStorage.setItem('user', JSON.stringify(userData));
             }
-            const userRole = response.data.user?.role;
+            const userRole = response.data.user?.role || 'user';
             const redirectPath =
                 userRole === 'admin' ? '/admin/dashboard' :
                     userRole === 'production_team' ? '/production-team/dashboard' :

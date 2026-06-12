@@ -23,23 +23,9 @@ export default function UserSidebar({ onLogout }) {
     };
 
     const confirmLogout = () => {
-        // ✅ Clear ALL user data (match Login.jsx)
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('user');
-        localStorage.removeItem('user_data');
-        localStorage.removeItem('enrollments');
-        localStorage.removeItem('courses');
-        localStorage.removeItem('bookings');
-        localStorage.removeItem('machines');
-        localStorage.removeItem('dashboard_data');
-        localStorage.removeItem('cart_items');
-        localStorage.removeItem('user_profile');
-        localStorage.removeItem('booking_data');
         sessionStorage.clear();
-
+        localStorage.clear(); // ✅ Wipe ALL localStorage on logout
         if (onLogout) onLogout();
-
-        // ✅ Force full page reload to clear React state
         window.location.href = '/login';
     };
 
@@ -152,7 +138,17 @@ export default function UserSidebar({ onLogout }) {
                 </nav>
 
                 {/* Footer / Logout */}
-                <div className="p-4 border-t border-slate-700/50 bg-slate-900/50">
+                <div className="p-4 border-t border-slate-700/50 bg-slate-900/50 space-y-1">
+                    {/* ✅ Back to Home */}
+                    <a
+                        href="/"
+                        className="flex items-center gap-3 w-full px-4 py-3 text-slate-400 hover:text-white hover:bg-slate-800/50 rounded-xl transition-all font-medium"
+                    >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                        </svg>
+                        Back to Home
+                    </a>
                     <button
                         onClick={handleLogout}
                         className="flex items-center gap-3 w-full px-4 py-3 text-white-400 hover:text-white-300 hover:bg-white-500/10 rounded-xl transition-all text-left font-medium"

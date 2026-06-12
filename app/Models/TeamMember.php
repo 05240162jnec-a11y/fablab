@@ -12,6 +12,7 @@ class TeamMember extends Model
     protected $fillable = [
         'name',
         'role',
+        'section',
         'image_path',
         'linkedin_url',
         'facebook_url',
@@ -24,13 +25,11 @@ class TeamMember extends Model
         'is_active' => 'boolean',
     ];
 
-    // Scope: Only active members
     public function scopeActive($query)
     {
         return $query->where('is_active', true);
     }
 
-    // Scope: Order by position
     public function scopeOrdered($query)
     {
         return $query->orderBy('order')->orderBy('name');

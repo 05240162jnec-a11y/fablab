@@ -140,6 +140,7 @@ export default function About() {
         setMemberForm({
             name: '',
             role: '',
+            section: 'fab_team',
             image: null,
             imagePreview: null,
             linkedin_url: '',
@@ -154,6 +155,7 @@ export default function About() {
         setMemberForm({
             name: member.name,
             role: member.role,
+            section: member.section || 'fab_team',
             image: null,
             imagePreview: member.image,
             linkedin_url: member.linkedin_url || '',
@@ -187,6 +189,7 @@ export default function About() {
             const formData = new FormData();
             formData.append('name', memberForm.name);
             formData.append('role', memberForm.role);
+            formData.append('section', memberForm.section);
             formData.append('image', memberForm.image);
             formData.append('linkedin_url', memberForm.linkedin_url);
             formData.append('facebook_url', memberForm.facebook_url);
@@ -225,6 +228,7 @@ export default function About() {
             const formData = new FormData();
             formData.append('name', memberForm.name);
             formData.append('role', memberForm.role);
+            formData.append('section', memberForm.section);
             if (memberForm.image) formData.append('image', memberForm.image);
             formData.append('linkedin_url', memberForm.linkedin_url);
             formData.append('facebook_url', memberForm.facebook_url);
@@ -514,7 +518,10 @@ export default function About() {
                                         {/* Content */}
                                         <div className="p-4">
                                             <h3 className="font-bold text-gray-900 mb-1">{member.name}</h3>
-                                            <p className="text-sm text-gray-600 italic mb-3">{member.role}</p>
+                                            <p className="text-sm text-gray-600 italic mb-1">{member.role}</p>
+                                            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full mb-2 inline-block ${member.section === 'leader' ? 'bg-yellow-100 text-yellow-700' : 'bg-blue-100 text-blue-700'}`}>
+                                                {member.section === 'leader' ? '⭐ Leader' : 'Fab Team'}
+                                            </span>
 
                                             {/* Social Links */}
                                             <div className="flex gap-2 mb-3">
@@ -727,6 +734,23 @@ export default function About() {
                                         required
                                     />
                                 </div>
+                            </div>
+
+                            {/* Section */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Section *</label>
+                                <select
+                                    value={memberForm.section}
+                                    onChange={(e) => setMemberForm({ ...memberForm, section: e.target.value })}
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                                    required
+                                >
+                                    <option value="fab_team">Fab Team</option>
+                                    <option value="leader">Leader</option>
+                                </select>
+                                <p className="text-xs text-gray-500 mt-1">
+                                    "Leader" appears in the Leader section on the About page. "Fab Team" appears in the team grid below.
+                                </p>
                             </div>
 
                             {/* Social Links */}

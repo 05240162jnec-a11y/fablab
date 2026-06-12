@@ -137,7 +137,13 @@ export default function Shop() {
 
     const isLoggedIn = !!sessionStorage.getItem('auth_token');
     const userRole = (() => { try { return JSON.parse(sessionStorage.getItem('user') || '{}')?.role; } catch { return null; } })();
-    const isRegularUser = !userRole || userRole === 'user';
+    const isRegularUser = !isLoggedIn || (userRole !== 'admin' && userRole !== 'production_team');
+    const getProjectsLink = () => {
+        if (!isLoggedIn) return '/projects';
+        if (userRole === 'admin') return '/admin/projects';
+        if (userRole === 'production_team') return '/production-team/projects';
+        return '/user/projects';
+    };
     const restrictUser = (cb) => {
         if (!isLoggedIn) { navigate('/login'); return; }
         if (!isRegularUser) { showToast('This feature is only available for regular users.', 'warn'); return; }
@@ -145,10 +151,7 @@ export default function Shop() {
     };
     const handleLogout = () => {
         sessionStorage.clear();
-        ['auth_token', 'user', 'enrollments', 'courses', 'bookings', 'machines', 'cart_items'].forEach(k => {
-            localStorage.removeItem(k);
-            sessionStorage.removeItem(k);
-        });
+        localStorage.clear();
         window.location.href = '/';
     };
 
@@ -520,7 +523,7 @@ export default function Shop() {
                         <a href="/machines" className="nav-link">Machines</a>
                         <a href="/shop" className="nav-link active">Shop</a>
                         <a href="/training" className="nav-link">Training</a>
-                        <a href="/projects" className="nav-link">Projects</a>
+                        <a href={getProjectsLink()} className="nav-link">Projects</a>
                         <a href="/about" className="nav-link">About</a>
                         <a href="/gallery" className="nav-link">Gallery</a>
                         <a href="/faq" className="nav-link">FAQ</a>
@@ -544,7 +547,7 @@ export default function Shop() {
                     <a href="/machines" className="nav-mobile-link" onClick={() => setMenuOpen(false)}>Machines</a>
                     <a href="/shop" className="nav-mobile-link active" onClick={() => setMenuOpen(false)}>Shop</a>
                     <a href="/training" className="nav-mobile-link" onClick={() => setMenuOpen(false)}>Training</a>
-                    <a href="/projects" className="nav-mobile-link" onClick={() => setMenuOpen(false)}>Projects</a>
+                    <a href={getProjectsLink()} className="nav-mobile-link" onClick={() => setMenuOpen(false)}>Projects</a>
                     <a href="/about" className="nav-mobile-link" onClick={() => setMenuOpen(false)}>About</a>
                     <a href="/gallery" className="nav-mobile-link" onClick={() => setMenuOpen(false)}>Gallery</a>
                     <a href="/faq" className="nav-mobile-link" onClick={() => setMenuOpen(false)}>FAQ</a>

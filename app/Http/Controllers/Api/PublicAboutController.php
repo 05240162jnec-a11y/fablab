@@ -8,12 +8,8 @@ use App\Models\TeamMember;
 
 class PublicAboutController extends Controller
 {
-    /**
-     * Get all public about page data
-     */
     public function index()
     {
-        // Get all active about sections
         $sections = AboutSection::where('is_active', true)
             ->orderBy('order')
             ->get()
@@ -27,7 +23,6 @@ class PublicAboutController extends Controller
                 ];
             });
 
-        // Get all active team members
         $teamMembers = TeamMember::active()
             ->ordered()
             ->get()
@@ -36,6 +31,7 @@ class PublicAboutController extends Controller
                     'id' => $member->id,
                     'name' => $member->name,
                     'role' => $member->role,
+                    'section' => $member->section,
                     'image' => $member->image_path ? asset('storage/' . $member->image_path) : null,
                     'linkedin_url' => $member->linkedin_url,
                     'facebook_url' => $member->facebook_url,

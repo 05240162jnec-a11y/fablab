@@ -94,17 +94,8 @@ export default function AdminLayout() {
     };
 
     const confirmLogout = () => {
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('admin_token');
-        localStorage.removeItem('user');
-        localStorage.removeItem('admin');
-        localStorage.removeItem('admin_dashboard_data');
-        localStorage.removeItem('user_data');
-        localStorage.removeItem('enrollments');
-        localStorage.removeItem('courses');
-        localStorage.removeItem('bookings');
-        localStorage.removeItem('machines');
         sessionStorage.clear();
+        localStorage.clear(); // ✅ Wipe ALL localStorage on logout
         navigate('/login', { replace: true });
     };
 

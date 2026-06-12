@@ -42,12 +42,13 @@ function Reveal({ children, delay = 0, style = {} }) {
     );
 }
 
-function ProjectModal({ project, onClose, isLoggedIn, isRegularUser }) {
+function ProjectModal({ project, onClose, isLoggedIn, isRegularUser, userRole }) {
     if (!project) return null;
     const col = avatarColor(project.user?.name || '');
     const handleDownload = () => {
         if (!isLoggedIn) return;
-        if (!isRegularUser) { window.location.href = '/admin/projects'; return; }
+        if (userRole === 'admin') { window.location.href = '/admin/projects'; return; }
+        if (userRole === 'production_team') { window.location.href = '/production-team/projects'; return; }
         window.open(`${API_BASE}/user/projects/${project.id}/download`, '_blank');
     };
     return (
@@ -59,16 +60,23 @@ function ProjectModal({ project, onClose, isLoggedIn, isRegularUser }) {
                     </svg>
                 </button>
                 <div className="modal-inner">
-                    <div className="modal-avatar-side" style={{ background: `${col}12` }}>
+                    <div className="modal-avatar-side" style={{ background: `${col}22` }}>
                         {project.student_photo ? (
-                            <img src={project.student_photo} alt={project.user?.name} style={{ width: 88, height: 88, borderRadius: '50%', objectFit: 'cover', boxShadow: '0 8px 28px rgba(0,0,0,.2)', marginBottom: '.25rem' }} onError={e => { e.currentTarget.style.display = 'none'; e.currentTarget.nextSibling.style.display = 'flex'; }} />
-                        ) : null}
-                        <div className="modal-avatar-circle" style={{ background: col, display: project.student_photo ? 'none' : 'flex' }}>
-                            {initials(project.user?.name)}
+                            <img className="modal-avatar-side-img" src={project.student_photo} alt={project.user?.name}
+                                onError={e => { e.currentTarget.style.display = 'none'; }} />
+                        ) : (
+                            <div className="modal-avatar-side-fallback" style={{ background: `${col}22` }}>
+                                <div className="modal-avatar-circle" style={{ background: col }}>
+                                    {initials(project.user?.name)}
+                                </div>
+                            </div>
+                        )}
+                        <div className="modal-avatar-gradient" />
+                        <div className="modal-avatar-info">
+                            <p className="modal-avatar-name">{project.user?.name || 'Unknown'}</p>
+                            {project.submitted_at && <p className="modal-avatar-date">Submitted {formatDate(project.submitted_at)}</p>}
+                            {project.reviewed_at && <p className="modal-avatar-date">Approved {formatDate(project.reviewed_at)}</p>}
                         </div>
-                        <p className="modal-avatar-name">{project.user?.name || 'Unknown'}</p>
-                        {project.submitted_at && <p className="modal-avatar-date">Submitted {formatDate(project.submitted_at)}</p>}
-                        {project.reviewed_at && <p className="modal-avatar-date">Approved {formatDate(project.reviewed_at)}</p>}
                     </div>
                     <div className="modal-info-side">
                         <span className="modal-approved-badge">✓ Approved</span>
@@ -91,8 +99,15 @@ function ProjectModal({ project, onClose, isLoggedIn, isRegularUser }) {
                                         </svg>
                                         Download Document
                                     </button>
-                                ) : isLoggedIn && !isRegularUser ? (
+                                ) : isLoggedIn && userRole === 'admin' ? (
                                     <a href="/admin/projects" className="btn-modal-download">
+                                        <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                        </svg>
+                                        Manage Projects
+                                    </a>
+                                ) : isLoggedIn && userRole === 'production_team' ? (
+                                    <a href="/production-team/projects" className="btn-modal-download">
                                         <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                                         </svg>
@@ -132,7 +147,13 @@ export default function Projects() {
 
     const isLoggedIn = !!sessionStorage.getItem('auth_token');
     const userRole = (() => { try { return JSON.parse(sessionStorage.getItem('user') || '{}')?.role; } catch { return null; } })();
-    const isRegularUser = !userRole || userRole === 'user';
+    const isRegularUser = !isLoggedIn || (userRole !== 'admin' && userRole !== 'production_team');
+    const getProjectsLink = () => {
+        if (!isLoggedIn) return '/projects';
+        if (userRole === 'admin') return '/admin/projects';
+        if (userRole === 'production_team') return '/production-team/projects';
+        return '/user/projects';
+    };
     const restrictUser = (cb) => {
         if (!isLoggedIn) { navigate('/login'); return; }
         if (!isRegularUser) { restrictAlert(); return; }
@@ -146,6 +167,8 @@ export default function Projects() {
         });
         window.location.href = '/';
     };
+
+    // ✅ REMOVED: Auto-redirect for logged-in users
 
     const heroSlides = ['../images/home.jpg', '../images/home2.jpg', '../images/home3.jpg'];
 
@@ -360,13 +383,17 @@ export default function Projects() {
                 .modal-close:hover { background:#e2e8f0; color:var(--ink); }
                 /* stacks on mobile, side-by-side on 560px+ */
                 .modal-inner { display:grid; grid-template-columns:1fr; }
-                @media (min-width:560px) { .modal-inner { grid-template-columns:.9fr 1.1fr; min-height:360px; } }
-                .modal-avatar-side { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:.75rem; padding:2rem 1.5rem; }
-                @media (min-width:560px) { .modal-avatar-side { padding:2.5rem 1.5rem; } }
+                @media (min-width:560px) { .modal-inner { grid-template-columns:1fr 1.2fr; min-height:400px; } }
+                .modal-avatar-side { position:relative; overflow:hidden; min-height:220px; display:flex; flex-direction:column; justify-content:flex-end; }
+                @media (min-width:560px) { .modal-avatar-side { min-height:400px; } }
+                .modal-avatar-side-img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; object-position:top center; display:block; }
+                .modal-avatar-side-fallback { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; }
+                .modal-avatar-gradient { position:absolute; inset:0; background:linear-gradient(to top, rgba(5,10,25,.72) 0%, rgba(5,10,25,.1) 55%, transparent 100%); }
+                .modal-avatar-info { position:relative; z-index:2; padding:1.25rem 1.25rem 1.5rem; }
+                .modal-avatar-name { font-size:1rem; font-weight:800; color:white; text-shadow:0 1px 4px rgba(0,0,0,.4); }
+                .modal-avatar-date { font-size:.72rem; color:rgba(255,255,255,.7); margin-top:.2rem; }
                 .modal-avatar-circle { width:76px; height:76px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-family:'Playfair Display',serif; font-size:1.5rem; font-weight:900; color:white; box-shadow:0 8px 28px rgba(0,0,0,.2); }
                 @media (min-width:560px) { .modal-avatar-circle { width:88px; height:88px; font-size:1.8rem; } }
-                .modal-avatar-name { font-size:.95rem; font-weight:700; color:var(--ink); text-align:center; }
-                .modal-avatar-date { font-size:.75rem; color:var(--muted); text-align:center; }
                 .modal-info-side { padding:1.75rem 1.5rem; display:flex; flex-direction:column; border-top:1px solid var(--border); }
                 @media (min-width:560px) { .modal-info-side { padding:2.25rem 2rem 2.25rem 1.5rem; border-top:none; border-left:1px solid var(--border); } }
                 .modal-approved-badge { display:inline-flex; align-items:center; gap:.35rem; font-size:.68rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--green-dk); background:var(--green-lt); padding:.25rem .7rem; border-radius:9999px; margin-bottom:.75rem; width:fit-content; }
@@ -409,9 +436,9 @@ export default function Projects() {
                 .social-btn:hover { background:var(--blue); border-color:var(--blue); color:white; transform:translateY(-2px); }
             `}</style>
 
-            {selected && <ProjectModal project={selected} onClose={() => setSelected(null)} isLoggedIn={isLoggedIn} isRegularUser={isRegularUser} />}
+            {selected && <ProjectModal project={selected} onClose={() => setSelected(null)} isLoggedIn={isLoggedIn} isRegularUser={isRegularUser} userRole={userRole} />}
 
-            {/* ═══ NAV ═══ */}
+            {/* ═══ NAV ══ */}
             <nav className="nav-root">
                 <div className="nav-inner">
                     <a href="/" className="nav-logo-wrap">

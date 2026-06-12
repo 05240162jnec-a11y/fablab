@@ -47,7 +47,9 @@ function MachineModal({ machine, onClose, isLoggedIn, isRegularUser, onRestrict 
     const handleBook = () => {
         onClose();
         if (!isLoggedIn) { navigate('/login'); return; }
-        if (!isRegularUser) { onRestrict(); return; }
+        const role = (() => { try { return JSON.parse(sessionStorage.getItem('user') || '{}')?.role; } catch { return null; } })();
+        if (role === 'admin') { onRestrict(); return; }
+        if (role === 'production_team') { navigate('/production-team/book-machine'); return; }
         navigate('/user/machines');
     };
 
@@ -122,10 +124,17 @@ export default function Machines() {
     const heroSlides = ['../images/b1.jpg', '../images/b2.jpg', '../images/b3.webp'];
     const isLoggedIn = !!sessionStorage.getItem('auth_token');
     const userRole = (() => { try { return JSON.parse(sessionStorage.getItem('user') || '{}')?.role; } catch { return null; } })();
-    const isRegularUser = !userRole || userRole === 'user';
+    const isRegularUser = !isLoggedIn || (userRole !== 'admin' && userRole !== 'production_team');
+    const getProjectsLink = () => {
+        if (!isLoggedIn) return '/projects';
+        if (userRole === 'admin') return '/admin/projects';
+        if (userRole === 'production_team') return '/production-team/projects';
+        return '/user/projects';
+    };
     const restrictUser = (cb) => {
         if (!isLoggedIn) { navigate('/login'); return; }
-        if (!isRegularUser) { restrictAlert(); return; }
+        if (userRole === 'admin') { restrictAlert(); return; }
+        if (userRole === 'production_team') { navigate('/production-team/book-machine'); return; }
         cb();
     };
     const handleLogout = () => {
@@ -170,8 +179,11 @@ export default function Machines() {
     }, [search]);
 
     const handleBookClick = useCallback(() => {
-        restrictUser(() => navigate('/user/machines'));
-    }, [isLoggedIn, isRegularUser, navigate]);
+        if (!isLoggedIn) { navigate('/login'); return; }
+        if (userRole === 'admin') { restrictAlert(); return; }
+        if (userRole === 'production_team') { navigate('/production-team/book-machine'); return; }
+        navigate('/user/machines');
+    }, [isLoggedIn, userRole, navigate]);
 
     const statusLabel = (s) => s === 'available' ? 'Available' : s === 'maintenance' ? 'Maintenance' : s === 'in_use' ? 'In Use' : 'Offline';
     const statusClass = (s) => s === 'available' ? 'tag-available' : s === 'maintenance' ? 'tag-maintenance' : s === 'in_use' ? 'tag-in-use' : 'tag-offline';
@@ -389,7 +401,7 @@ export default function Machines() {
                         <a href="/machines" className="nav-link active">Machines</a>
                         <a href="/shop" className="nav-link">Shop</a>
                         <a href="/training" className="nav-link">Training</a>
-                        <a href="/projects" className="nav-link">Projects</a>
+                        <a href={getProjectsLink()} className="nav-link">Projects</a>
                         <a href="/about" className="nav-link">About</a>
                         <a href="/gallery" className="nav-link">Gallery</a>
                         <a href="/faq" className="nav-link">FAQ</a>
@@ -404,7 +416,7 @@ export default function Machines() {
                     <a href="/machines" className="nav-mobile-link active" onClick={() => setMenuOpen(false)}>Machines</a>
                     <a href="/shop" className="nav-mobile-link" onClick={() => setMenuOpen(false)}>Shop</a>
                     <a href="/training" className="nav-mobile-link" onClick={() => setMenuOpen(false)}>Training</a>
-                    <a href="/projects" className="nav-mobile-link" onClick={() => setMenuOpen(false)}>Projects</a>
+                    <a href={getProjectsLink()} className="nav-mobile-link" onClick={() => setMenuOpen(false)}>Projects</a>
                     <a href="/about" className="nav-mobile-link" onClick={() => setMenuOpen(false)}>About</a>
                     <a href="/gallery" className="nav-mobile-link" onClick={() => setMenuOpen(false)}>Gallery</a>
                     <a href="/faq" className="nav-mobile-link" onClick={() => setMenuOpen(false)}>FAQ</a>

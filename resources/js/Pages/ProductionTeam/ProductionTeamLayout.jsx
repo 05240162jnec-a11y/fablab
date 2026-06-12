@@ -8,6 +8,27 @@ export default function ProductionTeamLayout() {
     const [expandedMenus, setExpandedMenus] = useState({});
     const navigate = useNavigate();
 
+    // ✅ ROLE GUARD: Only production_team can access /production-team/* routes
+    useEffect(() => {
+        const token = sessionStorage.getItem('auth_token');
+        if (!token) {
+            navigate('/login', { replace: true });
+            return;
+        }
+        try {
+            const role = JSON.parse(sessionStorage.getItem('user') || '{}')?.role;
+            if (role === 'admin') {
+                navigate('/admin/dashboard', { replace: true });
+                return;
+            }
+            if (role && role !== 'production_team') {
+                navigate('/user/dashboard', { replace: true });
+                return;
+            }
+        } catch { }
+    }, []);
+
+
     // ✅ Production team member data state
     const [teamMember, setTeamMember] = useState(null);
 

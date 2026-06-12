@@ -52,7 +52,7 @@ function Reveal({ children, delay = 0, style = {} }) {
 }
 
 /* ── Machine Modal ──────────────────────────────────────────────────────── */
-function MachineModal({ machine, onClose, isLoggedIn, isRegularUser }) {
+function MachineModal({ machine, onClose, isLoggedIn, onRestrict }) {
     const navigate = useNavigate();
     if (!machine) return null;
     const imgSrc = getImageUrl(machine.image) || FALLBACK_MACHINE;
@@ -128,18 +128,20 @@ export default function Home() {
 
     const isLoggedIn = !!sessionStorage.getItem('auth_token');
     const userRole = (() => { try { return JSON.parse(sessionStorage.getItem('user') || '{}')?.role; } catch { return null; } })();
-    const isRegularUser = !userRole || userRole === 'user';
+    const isRegularUser = !isLoggedIn || (userRole !== 'admin' && userRole !== 'production_team');
+    const getProjectsLink = () => {
+        if (!isLoggedIn) return '/projects';
+        if (userRole === 'admin') return '/admin/projects';
+        if (userRole === 'production_team') return '/production-team/projects';
+        return '/user/projects';
+    };
     const handleLogout = () => {
         sessionStorage.clear();
-        ['auth_token', 'user', 'enrollments', 'courses', 'bookings', 'machines', 'cart_items'].forEach(k => {
-            localStorage.removeItem(k);
-            sessionStorage.removeItem(k);
-        });
+        localStorage.clear();
         window.location.href = '/';
     };
 
     const [menuOpen, setMenuOpen] = useState(false);
-    // ✅ Role restriction modal
     const [showRoleModal, setShowRoleModal] = useState(false);
     const restrictAlert = () => setShowRoleModal(true);
 
@@ -192,9 +194,10 @@ export default function Home() {
     const totalUsers = users.length || 200;
     const handleBookClick = useCallback(() => {
         if (!isLoggedIn) { navigate('/login'); return; }
-        if (!isRegularUser) { restrictAlert(); return; }
+        if (userRole === 'admin') { restrictAlert(); return; }
+        if (userRole === 'production_team') { navigate('/production-team/book-machine'); return; }
         navigate('/user/machines');
-    }, [isLoggedIn, isRegularUser, navigate]);
+    }, [isLoggedIn, userRole, navigate]);
     const handleEnrollClick = useCallback(() => {
         if (!isLoggedIn) { navigate('/login'); return; }
         if (!isRegularUser) { restrictAlert(); return; }
@@ -600,7 +603,7 @@ export default function Home() {
 
             {/* MODAL */}
             {selectedMachine && (
-                <MachineModal machine={selectedMachine} onClose={() => setSelectedMachine(null)} isLoggedIn={isLoggedIn} isRegularUser={isRegularUser} />
+                <MachineModal machine={selectedMachine} onClose={() => setSelectedMachine(null)} isLoggedIn={isLoggedIn} onRestrict={restrictAlert} />
             )}
 
             {/* ═══ NAV ═══ */}
@@ -623,7 +626,7 @@ export default function Home() {
                         <a href="/machines" className="nav-link">Machines</a>
                         <a href="/shop" className="nav-link">Shop</a>
                         <a href="/training" className="nav-link">Training</a>
-                        <a href="/projects" className="nav-link">Projects</a>
+                        <a href={getProjectsLink()} className="nav-link">Projects</a>
                         <a href="/about" className="nav-link">About</a>
                         <a href="/gallery" className="nav-link">Gallery</a>
                         <a href="/faq" className="nav-link">FAQ</a>
@@ -648,7 +651,7 @@ export default function Home() {
                     <a href="/machines" className="nav-mobile-link" onClick={() => setMenuOpen(false)}>Machines</a>
                     <a href="/shop" className="nav-mobile-link" onClick={() => setMenuOpen(false)}>Shop</a>
                     <a href="/training" className="nav-mobile-link" onClick={() => setMenuOpen(false)}>Training</a>
-                    <a href="/projects" className="nav-mobile-link" onClick={() => setMenuOpen(false)}>Projects</a>
+                    <a href={getProjectsLink()} className="nav-mobile-link" onClick={() => setMenuOpen(false)}>Projects</a>
                     <a href="/about" className="nav-mobile-link" onClick={() => setMenuOpen(false)}>About</a>
                     <a href="/gallery" className="nav-mobile-link" onClick={() => setMenuOpen(false)}>Gallery</a>
                     <a href="/faq" className="nav-mobile-link" onClick={() => setMenuOpen(false)}>FAQ</a>
@@ -912,7 +915,7 @@ export default function Home() {
                         {[
                             { img: '../images/custom.jpg', title: 'Machine Booking', desc: 'Reserve industry-grade fabrication equipment — 3D printers, CNC routers, laser cutters and more — on your schedule.', link: '/machines' },
                             { img: '../images/workshop.jpg', title: 'Workshops & Training', desc: 'Expert-led, hands-on sessions covering CNC, laser cutting, 3D printing, electronics, and more.', link: '/training' },
-                            { img: '../images/collaborative.jpg', title: 'Custom Fabrication Orders', desc: 'Submit a design brief and our production team turns your concept into a precision-fabricated physical product.', link: (!isLoggedIn) ? '/login' : (!isRegularUser) ? null : '/user/shop-orders?tab=custom' },
+                            { img: '../images/collaborative.jpg', title: 'Custom Fabrication Orders', desc: 'Submit a design brief and our production team turns your concept into a precision-fabricated physical product.', link: (!isLoggedIn) ? '/login' : (userRole === 'admin') ? null : (userRole === 'production_team') ? '/production-team/custom-orders' : '/user/shop-orders?tab=custom' },
                         ].map((s, i) => (
                             <Reveal key={i} delay={i * 0.1}>
                                 <a href={s.link || undefined} onClick={s.link === null ? (e) => { e.preventDefault(); restrictAlert(); } : undefined} className="service-card">

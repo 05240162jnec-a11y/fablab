@@ -14,9 +14,6 @@ class AboutController extends Controller
     // ABOUT SECTIONS MANAGEMENT
     // ═══════════════════════════════════════════════
 
-    /**
-     * Get all about sections
-     */
     public function getSections()
     {
         $sections = AboutSection::orderBy('order')->get();
@@ -37,9 +34,6 @@ class AboutController extends Controller
         ]);
     }
 
-    /**
-     * Update about section
-     */
     public function updateSection(Request $request, $id)
     {
         $section = AboutSection::findOrFail($id);
@@ -55,13 +49,10 @@ class AboutController extends Controller
             'body' => $request->body,
         ];
 
-        // Handle image upload
         if ($request->hasFile('image')) {
-            // Delete old image if exists
             if ($section->image_path && Storage::disk('public')->exists($section->image_path)) {
                 Storage::disk('public')->delete($section->image_path);
             }
-
             $image = $request->file('image');
             $imageName = time() . '_' . $image->getClientOriginalName();
             $imagePath = $image->storeAs('about', $imageName, 'public');
@@ -87,9 +78,6 @@ class AboutController extends Controller
     // TEAM MEMBERS MANAGEMENT
     // ═══════════════════════════════════════════════
 
-    /**
-     * Get all team members
-     */
     public function getTeamMembers()
     {
         $members = TeamMember::orderBy('order')->orderBy('name')->get();
@@ -101,6 +89,7 @@ class AboutController extends Controller
                     'id' => $member->id,
                     'name' => $member->name,
                     'role' => $member->role,
+                    'section' => $member->section,
                     'image' => $member->image_path ? asset('storage/' . $member->image_path) : null,
                     'linkedin_url' => $member->linkedin_url,
                     'facebook_url' => $member->facebook_url,
@@ -112,14 +101,12 @@ class AboutController extends Controller
         ]);
     }
 
-    /**
-     * Store new team member
-     */
     public function storeTeamMember(Request $request)
     {
         $request->validate([
             'name' => 'required|string|max:255',
             'role' => 'required|string|max:255',
+            'section' => 'required|in:leader,fab_team',
             'image' => 'required|image|mimes:jpeg,png,jpg,webp|max:5120',
             'linkedin_url' => 'nullable|url|max:255',
             'facebook_url' => 'nullable|url|max:255',
@@ -136,6 +123,7 @@ class AboutController extends Controller
         $member = TeamMember::create([
             'name' => $request->name,
             'role' => $request->role,
+            'section' => $request->section,
             'image_path' => $imagePath,
             'linkedin_url' => $request->linkedin_url,
             'facebook_url' => $request->facebook_url,
@@ -151,6 +139,7 @@ class AboutController extends Controller
                 'id' => $member->id,
                 'name' => $member->name,
                 'role' => $member->role,
+                'section' => $member->section,
                 'image' => $member->image_path ? asset('storage/' . $member->image_path) : null,
                 'linkedin_url' => $member->linkedin_url,
                 'facebook_url' => $member->facebook_url,
@@ -159,9 +148,6 @@ class AboutController extends Controller
         ], 201);
     }
 
-    /**
-     * Update team member
-     */
     public function updateTeamMember(Request $request, $id)
     {
         $member = TeamMember::findOrFail($id);
@@ -169,6 +155,7 @@ class AboutController extends Controller
         $request->validate([
             'name' => 'required|string|max:255',
             'role' => 'required|string|max:255',
+            'section' => 'required|in:leader,fab_team',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
             'linkedin_url' => 'nullable|url|max:255',
             'facebook_url' => 'nullable|url|max:255',
@@ -178,19 +165,17 @@ class AboutController extends Controller
         $updateData = [
             'name' => $request->name,
             'role' => $request->role,
+            'section' => $request->section,
             'linkedin_url' => $request->linkedin_url,
             'facebook_url' => $request->facebook_url,
             'twitter_url' => $request->twitter_url,
             'order' => $request->order ?? $member->order,
         ];
 
-        // Handle image upload
         if ($request->hasFile('image')) {
-            // Delete old image if exists
             if ($member->image_path && Storage::disk('public')->exists($member->image_path)) {
                 Storage::disk('public')->delete($member->image_path);
             }
-
             $image = $request->file('image');
             $imageName = time() . '_' . $image->getClientOriginalName();
             $imagePath = $image->storeAs('team', $imageName, 'public');
@@ -206,6 +191,7 @@ class AboutController extends Controller
                 'id' => $member->id,
                 'name' => $member->name,
                 'role' => $member->role,
+                'section' => $member->section,
                 'image' => $member->image_path ? asset('storage/' . $member->image_path) : null,
                 'linkedin_url' => $member->linkedin_url,
                 'facebook_url' => $member->facebook_url,
@@ -214,9 +200,6 @@ class AboutController extends Controller
         ]);
     }
 
-    /**
-     * Toggle team member active status
-     */
     public function toggleTeamMemberStatus($id)
     {
         $member = TeamMember::findOrFail($id);
@@ -229,14 +212,10 @@ class AboutController extends Controller
         ]);
     }
 
-    /**
-     * Delete team member
-     */
     public function destroyTeamMember($id)
     {
         $member = TeamMember::findOrFail($id);
 
-        // Delete image file
         if ($member->image_path && Storage::disk('public')->exists($member->image_path)) {
             Storage::disk('public')->delete($member->image_path);
         }

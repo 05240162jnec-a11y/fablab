@@ -91,22 +91,7 @@ export default function UserLayout() {
 
     const confirmLogout = () => {
         sessionStorage.clear();
-        localStorage.removeItem('production_team_token');
-        localStorage.removeItem('production_team_data');
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('admin_token');
-        localStorage.removeItem('user_token');
-        localStorage.removeItem('user');
-        localStorage.removeItem('admin');
-        localStorage.removeItem('admin_data');
-        localStorage.removeItem('user_data');
-        localStorage.removeItem('enrollments');
-        localStorage.removeItem('courses');
-        localStorage.removeItem('bookings');
-        localStorage.removeItem('machines');
-        localStorage.removeItem('cart_items');
-        localStorage.removeItem('user_profile');
-        localStorage.removeItem('booking_data');
+        localStorage.clear(); // ✅ Wipe ALL localStorage on logout
         navigate('/login', { replace: true });
     };
 

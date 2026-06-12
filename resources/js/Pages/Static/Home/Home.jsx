@@ -60,7 +60,9 @@ function MachineModal({ machine, onClose, isLoggedIn, onRestrict }) {
     const handleBook = () => {
         onClose();
         if (!isLoggedIn) { navigate('/login'); return; }
-        if (!isRegularUser) { restrictAlert(); return; }
+        const role = (() => { try { return JSON.parse(sessionStorage.getItem('user') || '{}')?.role; } catch { return null; } })();
+        if (role === 'admin') { onRestrict(); return; }
+        if (role === 'production_team') { navigate('/production-team/book-machine'); return; }
         navigate('/user/machines');
     };
     return (

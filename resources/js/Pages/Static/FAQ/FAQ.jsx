@@ -571,7 +571,6 @@ export default function FAQ() {
                         </div>
                         <div className="cta-actions">
                             <Link to="/register" className="btn-cta-primary">Create Account</Link>
-                            <a href="/contact" className="btn-cta-outline">Contact Us</a>
                         </div>
                     </div>
                 </div>

@@ -933,7 +933,6 @@ export default function Home() {
                             </div>
                             <div className="cta-actions">
                                 <Link to="/register" className="btn-cta-primary">Create Free Account</Link>
-                                <Link to="/contact" className="btn-cta-outline">Talk to Us</Link>
                             </div>
                         </div>
                     </Reveal>

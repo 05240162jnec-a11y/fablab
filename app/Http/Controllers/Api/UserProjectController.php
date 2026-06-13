@@ -53,7 +53,7 @@ class UserProjectController extends Controller
         $request->validate([
             'title' => 'required|string|max:255',
             'description' => 'required|string',
-            'document' => 'required|file|max:10240', // Max 10MB
+            'document' => 'required|file|max:51200', // Max 50MB (matches server upload limit)
             'photo' => 'nullable|image|mimes:png,jpg,jpeg|max:2048', // Max 2MB
         ]);
 
@@ -113,7 +113,7 @@ class UserProjectController extends Controller
         $request->validate([
             'title' => 'required|string|max:255',
             'description' => 'required|string',
-            'document' => 'nullable|file|max:10240',
+            'document' => 'nullable|file|max:51200',
             'photo' => 'nullable|image|mimes:png,jpg,jpeg|max:2048',
         ]);
 

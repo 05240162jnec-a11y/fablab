@@ -39,7 +39,7 @@ function Reveal({ children, delay = 0, style = {} }) {
 }
 
 // ✅ onRestrict passed from parent
-function MachineModal({ machine, onClose, isLoggedIn, isRegularUser, onRestrict }) {
+function MachineModal({ machine, onClose, isLoggedIn, isRegularUser, onRestrict, onImageClick }) {
     const navigate = useNavigate();
     if (!machine) return null;
     const imgSrc = getImageUrl(machine.image) || FALLBACK;
@@ -63,7 +63,7 @@ function MachineModal({ machine, onClose, isLoggedIn, isRegularUser, onRestrict 
                 </button>
                 <div className="modal-inner">
                     <div className="modal-img-side">
-                        <img src={imgSrc} alt={machine.name} onError={e => { e.currentTarget.src = FALLBACK; }} />
+                        <img src={imgSrc} alt={machine.name} onError={e => { e.currentTarget.src = FALLBACK; }} onClick={onImageClick} />
                     </div>
                     <div className="modal-info-side">
                         <h2 className="modal-title">{machine.name}</h2>
@@ -312,10 +312,9 @@ export default function Machines() {
                 .modal-close:hover { background:#e2e8f0; color:var(--ink); }
                 .modal-inner { display:grid; grid-template-columns:1fr; }
                 @media (min-width:600px) { .modal-inner { grid-template-columns:1fr 1.15fr; min-height:400px; } }
-                .modal-img-side { background:#f0f4f8; display:flex; align-items:center; justify-content:center; padding:2rem; min-height:200px; }
+                .modal-img-side { background:#f0f4f8; display:flex; align-items:center; justify-content:center; padding:0; min-height:240px; overflow:hidden; }
                 @media (min-width:600px) { .modal-img-side { min-height:auto; } }
-                .modal-img-side img { width:100%; max-height:260px; object-fit:contain; border-radius:1rem; }
-                @media (min-width:600px) { .modal-img-side img { max-height:320px; } }
+                .modal-img-side img { width:100%; height:100%; object-fit:cover; cursor:zoom-in; }
                 .modal-info-side { padding:1.75rem 1.5rem; display:flex; flex-direction:column; }
                 @media (min-width:600px) { .modal-info-side { padding:2.5rem 2rem 2.5rem 1.75rem; } }
                 .modal-title { font-family:'Playfair Display',serif; font-size:1.4rem; font-weight:800; color:var(--ink); letter-spacing:-.02em; margin-bottom:.6rem; line-height:1.2; }
@@ -363,7 +362,14 @@ export default function Machines() {
 
             {/* ✅ Machine Modal */}
             {selectedMachine && (
-                <MachineModal machine={selectedMachine} onClose={() => setSelectedMachine(null)} isLoggedIn={isLoggedIn} isRegularUser={isRegularUser} onRestrict={restrictAlert} />
+                <MachineModal
+                    machine={selectedMachine}
+                    onClose={() => setSelectedMachine(null)}
+                    isLoggedIn={isLoggedIn}
+                    isRegularUser={isRegularUser}
+                    onRestrict={restrictAlert}
+                    onImageClick={() => setLightboxImg(getImageUrl(selectedMachine.image) || FALLBACK)}
+                />
             )}
 
             {/* ✅ Image Lightbox */}

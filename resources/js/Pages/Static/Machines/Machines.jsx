@@ -6,7 +6,7 @@ const API_BASE = import.meta.env.VITE_API_URL || `${import.meta.env.VITE_API_URL
 function getImageUrl(path) {
     if (!path) return null;
     if (path.startsWith('http')) return path;
-    return `${(import.meta.env.VITE_API_URL || 'http://192.168.255.97/api').replace('/api','')}/storage/${path}`;
+    return `${(import.meta.env.VITE_API_URL || 'http://192.168.255.97/api').replace('/api', '')}/storage/${path}`;
 }
 
 const FALLBACK = 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&w=800&q=80';
@@ -156,12 +156,6 @@ export default function Machines() {
     useEffect(() => {
         const t = setInterval(() => setHeroSlideIdx(p => (p + 1) % heroSlides.length), 5000);
         return () => clearInterval(t);
-    }, []);
-
-    useEffect(() => {
-        const fn = e => { if (e.key === 'Escape') setSelectedMachine(null); };
-        window.addEventListener('keydown', fn);
-        return () => window.removeEventListener('keydown', fn);
     }, []);
 
     useEffect(() => {
@@ -366,6 +360,11 @@ export default function Machines() {
                 .social-btn { width:38px; height:38px; border-radius:50%; background:#0d1a2e; border:1px solid #1e2d42; display:flex; align-items:center; justify-content:center; color:#64748b; text-decoration:none; transition:all .25s; }
                 .social-btn:hover { background:var(--blue); border-color:var(--blue); color:white; transform:translateY(-2px); }
             `}</style>
+
+            {/* ✅ Machine Modal */}
+            {selectedMachine && (
+                <MachineModal machine={selectedMachine} onClose={() => setSelectedMachine(null)} isLoggedIn={isLoggedIn} isRegularUser={isRegularUser} onRestrict={restrictAlert} />
+            )}
 
             {/* ✅ Image Lightbox */}
             {lightboxImg && (

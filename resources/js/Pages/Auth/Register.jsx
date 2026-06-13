@@ -186,11 +186,39 @@ export default function Register() {
                 .eye-btn:hover { color:white; }
 
                 /* Phone row — stacks on very small screens */
-                .phone-row { display:flex; gap:8px; flex-wrap:wrap; }
+                .phone-row { display:flex; gap:8px; flex-wrap:wrap; align-items:flex-start; }
                 .phone-row .country-col { width:100%; }
                 .phone-row .num-col { width:100%; }
                 @media (min-width:360px) { .phone-row { flex-wrap:nowrap; } .phone-row .country-col { width:44%; flex-shrink:0; } .phone-row .num-col { flex:1; min-width:0; } }
                 .phone-row .reg-input { padding-right:13px; }
+
+                /* Restyle the CountrySelect button to match the dark glass theme */
+                .phone-row .country-col button {
+                    width:100% !important;
+                    padding:10px 14px !important;
+                    background:rgba(255,255,255,.14) !important;
+                    border:1px solid rgba(255,255,255,.2) !important;
+                    border-radius:9px !important;
+                    color:white !important;
+                    font-size:.875rem !important;
+                    transition:all .25s !important;
+                }
+                @media (min-width:480px) { .phone-row .country-col button { padding:11px 14px !important; font-size:.9rem !important; } }
+                .phone-row .country-col button:hover,
+                .phone-row .country-col button:focus {
+                    background:rgba(255,255,255,.22) !important;
+                    border-color:rgba(255,255,255,.45) !important;
+                    box-shadow:0 0 0 3px rgba(255,255,255,.08) !important;
+                    outline:none !important;
+                }
+                .phone-row .country-col button span {
+                    color:white !important;
+                    font-weight:500 !important;
+                    white-space:nowrap;
+                    overflow:hidden;
+                    text-overflow:ellipsis;
+                }
+                .phone-row .country-col button svg { color:rgba(255,255,255,.65) !important; flex-shrink:0; }
 
                 .help-txt { color:rgba(255,255,255,.45); font-size:.72rem; margin-top:4px; }
                 .err-txt  { color:#fca5a5; font-size:.75rem; margin-top:4px; font-weight:500; }

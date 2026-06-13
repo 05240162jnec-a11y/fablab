@@ -68,7 +68,7 @@ export default function CustomOrders() {
         try {
             setLoading(true);
             const token = localStorage.getItem('auth_token');
-            const response = await axios.get('http://127.0.0.1:8000/api/user/custom-orders', {
+            const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/user/custom-orders`, {
                 headers: { 'Accept': 'application/json', 'Authorization': `Bearer ${token}` }
             });
             const ordersData = response.data?.data?.data || [];
@@ -163,7 +163,7 @@ export default function CustomOrders() {
     const handleEditOrder = (order) => {
         setFormState({ title: order.title || '', description: order.description || '', quantity: order.quantity?.toString() || '1', design_images: [] });
         const existingImgs = order.design_images || (order.design_image ? [order.design_image] : []);
-        const existingPreviews = existingImgs.map(img => `http://127.0.0.1:8000/storage/${img}`);
+        const existingPreviews = existingImgs.map(img => `${(import.meta.env.VITE_API_URL || 'http://192.168.255.97/api').replace('/api','')}/storage/${img}`);
         setImagePreviews(existingPreviews);
         setIsEditMode(true);
         setShowViewModal(false);
@@ -242,7 +242,7 @@ export default function CustomOrders() {
             formData.append('description', formState.description);
             formData.append('quantity', formState.quantity);
             formState.design_images.forEach((file, index) => { formData.append(`design_images[${index}]`, file); });
-            const url = isEditMode ? `http://127.0.0.1:8000/api/user/custom-orders/${selectedOrder.id}` : 'http://127.0.0.1:8000/api/user/custom-orders';
+            const url = isEditMode ? `${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/user/custom-orders/${selectedOrder.id}` : `${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/user/custom-orders`;
             const method = isEditMode ? 'put' : 'post';
             const response = await axios({ method, url, data: formData, headers: { 'Accept': 'application/json', 'Content-Type': 'multipart/form-data', 'Authorization': `Bearer ${token}` } });
             if (response.data.success) {
@@ -281,7 +281,7 @@ export default function CustomOrders() {
             formData.append('payment_screenshot', file);
             formData.append('delivery_option', deliveryOption);
             if (deliveryOption === 'shipping') { formData.append('shipping_address', shippingAddress); }
-            const response = await axios.post(`http://127.0.0.1:8000/api/user/custom-orders/${selectedOrder.id}/upload-payment`, formData, { headers: { 'Accept': 'application/json', 'Content-Type': 'multipart/form-data', 'Authorization': `Bearer ${token}` } });
+            const response = await axios.post(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/user/custom-orders/${selectedOrder.id}/upload-payment`, formData, { headers: { 'Accept': 'application/json', 'Content-Type': 'multipart/form-data', 'Authorization': `Bearer ${token}` } });
             setShowPaymentModal(false);
             setShowSuccessModal(true);
             await fetchOrders();
@@ -297,7 +297,7 @@ export default function CustomOrders() {
         showAlert('confirm', 'Cancel Order', 'Are you sure you want to cancel this order?', async () => {
             try {
                 const token = localStorage.getItem('auth_token');
-                const response = await axios.post(`http://127.0.0.1:8000/api/user/custom-orders/${orderId}/cancel`, {}, { headers: { 'Accept': 'application/json', 'Authorization': `Bearer ${token}` } });
+                const response = await axios.post(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/user/custom-orders/${orderId}/cancel`, {}, { headers: { 'Accept': 'application/json', 'Authorization': `Bearer ${token}` } });
                 showAlert('success', 'Success', response.data.message);
                 setShowViewModal(false);
                 await fetchOrders();
@@ -323,7 +323,7 @@ export default function CustomOrders() {
         showAlert('confirm', 'Delete Orders', `Are you sure you want to delete ${selectedOrderIds.length} order(s)? This action cannot be undone.`, async () => {
             try {
                 const token = localStorage.getItem('auth_token');
-                const response = await axios.post('http://127.0.0.1:8000/api/user/custom-orders/bulk-delete', { order_ids: selectedOrderIds }, { headers: { 'Accept': 'application/json', 'Authorization': `Bearer ${token}` } });
+                const response = await axios.post(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/user/custom-orders/bulk-delete`, { order_ids: selectedOrderIds }, { headers: { 'Accept': 'application/json', 'Authorization': `Bearer ${token}` } });
                 if (response.data.success) { showAlert('success', 'Success', 'Orders deleted successfully!'); setSelectedOrderIds([]); fetchOrders(); }
                 else { showAlert('error', 'Error', response.data.message || 'Failed to delete orders.'); }
             } catch (err) {
@@ -439,9 +439,9 @@ export default function CustomOrders() {
                                         }} className="cursor-pointer">
                                             <div className="relative w-full h-40 bg-gray-100 overflow-hidden">
                                                 {order.design_images && order.design_images.length > 0 ? (
-                                                    <img src={`http://127.0.0.1:8000/storage/${order.design_images[0]}`} alt={order.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                                                    <img src={`${(import.meta.env.VITE_API_URL || 'http://192.168.255.97/api').replace('/api','')}/storage/${order.design_images[0]}`} alt={order.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                                                 ) : order.design_image ? (
-                                                    <img src={`http://127.0.0.1:8000/storage/${order.design_image}`} alt={order.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                                                    <img src={`${(import.meta.env.VITE_API_URL || 'http://192.168.255.97/api').replace('/api','')}/storage/${order.design_image}`} alt={order.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                                                 ) : (
                                                     <div className="w-full h-full flex items-center justify-center">
                                                         <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
@@ -568,13 +568,13 @@ export default function CustomOrders() {
                                 <div className="grid grid-cols-2 gap-3">
                                     {selectedOrder.design_images.map((img, idx) => (
                                         <div key={idx} className="w-full aspect-video bg-gray-100 rounded-lg overflow-hidden">
-                                            <img src={`http://127.0.0.1:8000/storage/${img}`} alt={`${selectedOrder.title} - Design ${idx + 1}`} className="w-full h-full object-cover" />
+                                            <img src={`${(import.meta.env.VITE_API_URL || 'http://192.168.255.97/api').replace('/api','')}/storage/${img}`} alt={`${selectedOrder.title} - Design ${idx + 1}`} className="w-full h-full object-cover" />
                                         </div>
                                     ))}
                                 </div>
                             ) : selectedOrder.design_image ? (
                                 <div className="w-full h-48 bg-gray-100 rounded-lg overflow-hidden">
-                                    <img src={`http://127.0.0.1:8000/storage/${selectedOrder.design_image}`} alt={selectedOrder.title} className="w-full h-full object-cover" />
+                                    <img src={`${(import.meta.env.VITE_API_URL || 'http://192.168.255.97/api').replace('/api','')}/storage/${selectedOrder.design_image}`} alt={selectedOrder.title} className="w-full h-full object-cover" />
                                 </div>
                             ) : (
                                 <div className="w-full h-48 bg-gray-100 rounded-lg flex items-center justify-center">
@@ -690,7 +690,7 @@ export default function CustomOrders() {
                                     <div className="bg-gray-50 rounded-lg p-4">
                                         <h4 className="font-semibold text-gray-900 mb-3">Order Summary</h4>
                                         <div className="flex items-center gap-3 mb-3 pb-3 border-b border-gray-200">
-                                            {selectedOrder.design_images && selectedOrder.design_images.length > 0 ? (<img src={`http://127.0.0.1:8000/storage/${selectedOrder.design_images[0]}`} alt={selectedOrder.title} className="w-12 h-12 rounded object-cover" />) : selectedOrder.design_image ? (<img src={`http://127.0.0.1:8000/storage/${selectedOrder.design_image}`} alt={selectedOrder.title} className="w-12 h-12 rounded object-cover" />) : (<div className="w-12 h-12 bg-gray-200 rounded flex items-center justify-center"><svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg></div>)}
+                                            {selectedOrder.design_images && selectedOrder.design_images.length > 0 ? (<img src={`${(import.meta.env.VITE_API_URL || 'http://192.168.255.97/api').replace('/api','')}/storage/${selectedOrder.design_images[0]}`} alt={selectedOrder.title} className="w-12 h-12 rounded object-cover" />) : selectedOrder.design_image ? (<img src={`${(import.meta.env.VITE_API_URL || 'http://192.168.255.97/api').replace('/api','')}/storage/${selectedOrder.design_image}`} alt={selectedOrder.title} className="w-12 h-12 rounded object-cover" />) : (<div className="w-12 h-12 bg-gray-200 rounded flex items-center justify-center"><svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg></div>)}
                                             <div className="flex-1"><p className="text-sm font-medium text-gray-900 truncate">{selectedOrder.title}</p><p className="text-xs text-gray-500">Qty: {selectedOrder.quantity}</p></div>
                                             <p className="text-sm font-medium text-gray-900">{formatCurrency(selectedOrder.estimated_price)}</p>
                                         </div>
@@ -755,7 +755,7 @@ export default function CustomOrders() {
                                     <div className="bg-gray-50 rounded-lg p-4">
                                         <h4 className="font-semibold text-gray-900 mb-3">Order Summary</h4>
                                         <div className="flex items-center gap-3 mb-3 pb-3 border-b border-gray-200">
-                                            {selectedOrder.design_images && selectedOrder.design_images.length > 0 ? (<img src={`http://127.0.0.1:8000/storage/${selectedOrder.design_images[0]}`} alt={selectedOrder.title} className="w-12 h-12 rounded object-cover" />) : selectedOrder.design_image ? (<img src={`http://127.0.0.1:8000/storage/${selectedOrder.design_image}`} alt={selectedOrder.title} className="w-12 h-12 rounded object-cover" />) : (<div className="w-12 h-12 bg-gray-200 rounded flex items-center justify-center"><svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg></div>)}
+                                            {selectedOrder.design_images && selectedOrder.design_images.length > 0 ? (<img src={`${(import.meta.env.VITE_API_URL || 'http://192.168.255.97/api').replace('/api','')}/storage/${selectedOrder.design_images[0]}`} alt={selectedOrder.title} className="w-12 h-12 rounded object-cover" />) : selectedOrder.design_image ? (<img src={`${(import.meta.env.VITE_API_URL || 'http://192.168.255.97/api').replace('/api','')}/storage/${selectedOrder.design_image}`} alt={selectedOrder.title} className="w-12 h-12 rounded object-cover" />) : (<div className="w-12 h-12 bg-gray-200 rounded flex items-center justify-center"><svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg></div>)}
                                             <div className="flex-1"><p className="text-sm font-medium text-gray-900 truncate">{selectedOrder.title}</p><p className="text-xs text-gray-500">Qty: {selectedOrder.quantity}</p></div>
                                             <p className="text-sm font-medium text-gray-900">{formatCurrency(selectedOrder.estimated_price)}</p>
                                         </div>

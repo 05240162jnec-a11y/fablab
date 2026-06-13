@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // ✅ Base configuration
-axios.defaults.baseURL = 'http://127.0.0.1:8000/api';
+axios.defaults.baseURL = `${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}`;
 axios.defaults.headers.common['Accept'] = 'application/json';
 axios.defaults.headers.common['Content-Type'] = 'application/json';
 

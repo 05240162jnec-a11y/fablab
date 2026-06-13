@@ -102,7 +102,7 @@ export default function Machines() {
         try {
             setFetchLoading(true);
             const token = localStorage.getItem('production_team_token');
-            const response = await axios.get('http://127.0.0.1:8000/api/admin/machines', {
+            const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/machines`, {
                 headers: {
                     'Accept': 'application/json',
                     'Authorization': `Bearer ${token}`,
@@ -172,7 +172,7 @@ export default function Machines() {
                 data.append('image', formData.image);
             }
 
-            const response = await axios.post('http://127.0.0.1:8000/api/admin/machines', data, {
+            const response = await axios.post(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/machines`, data, {
                 headers: {
                     'Accept': 'application/json',
                     'Authorization': `Bearer ${token}`,
@@ -203,7 +203,7 @@ export default function Machines() {
             description: machine.description || '',
             image: null
         });
-        setPreviewImage(machine.image ? `http://127.0.0.1:8000/storage/${machine.image}` : null);
+        setPreviewImage(machine.image ? `${(import.meta.env.VITE_API_URL || 'http://192.168.255.97/api').replace('/api','')}/storage/${machine.image}` : null);
         setShowViewModal(false);
         setShowEditModal(true);
     };
@@ -225,7 +225,7 @@ export default function Machines() {
             }
             data.append('_method', 'PUT');
 
-            const response = await axios.post(`http://127.0.0.1:8000/api/admin/machines/${selectedMachine.id}`, data, {
+            const response = await axios.post(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/machines/${selectedMachine.id}`, data, {
                 headers: {
                     'Accept': 'application/json',
                     'Authorization': `Bearer ${token}`,
@@ -265,7 +265,7 @@ export default function Machines() {
     const confirmDelete = async () => {
         try {
             const token = localStorage.getItem('production_team_token');
-            await axios.delete(`http://127.0.0.1:8000/api/admin/machines/${selectedMachine.id}`, {
+            await axios.delete(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/machines/${selectedMachine.id}`, {
                 headers: {
                     'Accept': 'application/json',
                     'Authorization': `Bearer ${token}`,
@@ -301,7 +301,7 @@ export default function Machines() {
             const token = localStorage.getItem('production_team_token');
 
             const response = await axios.post(
-                `http://127.0.0.1:8000/api/admin/machines/${machine.id}/toggle-maintenance`,
+                `${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/machines/${machine.id}/toggle-maintenance`,
                 {
                     status: newStatus,
                     notify_users: true
@@ -553,7 +553,7 @@ export default function Machines() {
 
                                     {machine.image ? (
                                         <img
-                                            src={`http://127.0.0.1:8000/storage/${machine.image}`}
+                                            src={`${(import.meta.env.VITE_API_URL || 'http://192.168.255.97/api').replace('/api','')}/storage/${machine.image}`}
                                             alt={machine.name}
                                             className="w-full h-full object-cover object-center"
                                         />
@@ -685,7 +685,7 @@ export default function Machines() {
                         </div>
                         <div className="p-6 space-y-4">
                             {selectedMachine.image && (
-                                <img src={`http://127.0.0.1:8000/storage/${selectedMachine.image}`} alt={selectedMachine.name} className="w-full h-64 object-cover rounded-lg" />
+                                <img src={`${(import.meta.env.VITE_API_URL || 'http://192.168.255.97/api').replace('/api','')}/storage/${selectedMachine.image}`} alt={selectedMachine.name} className="w-full h-64 object-cover rounded-lg" />
                             )}
 
                             <div className="grid grid-cols-2 gap-4">

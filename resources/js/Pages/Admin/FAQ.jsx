@@ -43,7 +43,7 @@ export default function FAQ() {
             setLoading(true);
             const adminToken = localStorage.getItem('admin_token');
 
-            const response = await axios.get('http://127.0.0.1:8000/api/admin/faq', {
+            const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/faq`, {
                 headers: {
                     'Accept': 'application/json',
                     'Authorization': `Bearer ${adminToken}`,
@@ -112,7 +112,7 @@ export default function FAQ() {
             const adminToken = localStorage.getItem('admin_token');
 
             const response = await axios.post(
-                'http://127.0.0.1:8000/api/admin/faq',
+                `${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/faq`,
                 {
                     question: formData.question,
                     answer: formData.answer,
@@ -147,7 +147,7 @@ export default function FAQ() {
             const adminToken = localStorage.getItem('admin_token');
 
             const response = await axios.put(
-                `http://127.0.0.1:8000/api/admin/faq/${selectedFAQ.id}`,
+                `${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/faq/${selectedFAQ.id}`,
                 {
                     question: formData.question,
                     answer: formData.answer,
@@ -182,7 +182,7 @@ export default function FAQ() {
             const adminToken = localStorage.getItem('admin_token');
 
             await axios.delete(
-                `http://127.0.0.1:8000/api/admin/faq/${selectedFAQ.id}`,
+                `${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/faq/${selectedFAQ.id}`,
                 {
                     headers: {
                         'Accept': 'application/json',

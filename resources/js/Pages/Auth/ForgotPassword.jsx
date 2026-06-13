@@ -20,7 +20,7 @@ export default function ForgotPassword() {
         setMessage('');
         setErrors({});
         try {
-            const response = await axios.post('http://127.0.0.1:8000/api/forgot-password', formData);
+            const response = await axios.post(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/forgot-password`, formData);
             setMessage('✅ ' + response.data.message);
             setFormData({ email: '' });
         } catch (error) {

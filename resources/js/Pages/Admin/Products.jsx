@@ -61,7 +61,7 @@ export default function Products() {
             setError(null);
             const adminToken = localStorage.getItem('admin_token');
 
-            const response = await axios.get('http://127.0.0.1:8000/api/admin/products', {
+            const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/products`, {
                 headers: {
                     'Accept': 'application/json',
                     'Authorization': `Bearer ${adminToken}`
@@ -83,7 +83,7 @@ export default function Products() {
     const fetchSettings = async () => {
         try {
             const adminToken = sessionStorage.getItem('auth_token');
-            const response = await axios.get('http://127.0.0.1:8000/api/admin/settings/payment-deadline/hours', {
+            const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/settings/payment-deadline/hours`, {
                 headers: { 'Accept': 'application/json', 'Authorization': `Bearer ${adminToken}` }
             });
             if (response.data.success) {
@@ -123,7 +123,7 @@ export default function Products() {
         try {
             setDeadlineLoading(true);
             const adminToken = sessionStorage.getItem('auth_token');
-            await axios.put(`http://127.0.0.1:8000/api/admin/settings/payment_upload_deadline_hours`, {
+            await axios.put(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/settings/payment_upload_deadline_hours`, {
                 value: hours,
                 description: 'Hours allowed for user to re-upload payment after rejection'
             }, {
@@ -149,7 +149,7 @@ export default function Products() {
     const fetchStockThreshold = async () => {
         try {
             const token = sessionStorage.getItem('auth_token');
-            const response = await axios.get('http://127.0.0.1:8000/api/admin/settings/stock-alert/threshold', {
+            const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/settings/stock-alert/threshold`, {
                 headers: {
                     'Accept': 'application/json',
                     'Authorization': `Bearer ${token}`
@@ -266,7 +266,7 @@ export default function Products() {
                 if (img.startsWith('http')) {
                     return img;
                 }
-                return `http://127.0.0.1:8000/storage/${img}`;
+                return `${(import.meta.env.VITE_API_URL || 'http://192.168.255.97/api').replace('/api','')}/storage/${img}`;
             }) || []
         };
 
@@ -292,7 +292,7 @@ export default function Products() {
                 if (img.startsWith('http')) {
                     return img;
                 }
-                return `http://127.0.0.1:8000/storage/${img}`;
+                return `${(import.meta.env.VITE_API_URL || 'http://192.168.255.97/api').replace('/api','')}/storage/${img}`;
             });
             setPreviewImages(fullUrls);
         } else {
@@ -348,7 +348,7 @@ export default function Products() {
             const newStatus = product.status === 'active' ? 'inactive' : 'active';
 
             const response = await axios.put(
-                `http://127.0.0.1:8000/api/admin/products/${productId}/toggle-status`,
+                `${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/products/${productId}/toggle-status`,
                 { status: newStatus },
                 {
                     headers: {
@@ -383,7 +383,7 @@ export default function Products() {
                     const adminToken = sessionStorage.getItem('auth_token');
 
                     const response = await axios.delete(
-                        `http://127.0.0.1:8000/api/admin/products/${productId}`,
+                        `${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/products/${productId}`,
                         {
                             headers: {
                                 'Accept': 'application/json',
@@ -432,7 +432,7 @@ export default function Products() {
             }
 
             const response = await axios.post(
-                'http://127.0.0.1:8000/api/admin/products',
+                `${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/products`,
                 data,
                 {
                     headers: {
@@ -478,7 +478,7 @@ export default function Products() {
             });
 
             const response = await axios.post(
-                `http://127.0.0.1:8000/api/admin/products/${selectedProduct.id}`,
+                `${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/products/${selectedProduct.id}`,
                 data,
                 {
                     headers: {
@@ -698,7 +698,7 @@ export default function Products() {
                                                 setStockAlertThreshold(newValue);
 
                                                 const token = sessionStorage.getItem('auth_token');
-                                                axios.put('http://127.0.0.1:8000/api/admin/settings/stock-alert/threshold', {
+                                                axios.put(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/settings/stock-alert/threshold`, {
                                                     value: newValue
                                                 }, {
                                                     headers: {
@@ -839,7 +839,7 @@ export default function Products() {
                                                         <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
                                                             {product.images && product.images.length > 0 ? (
                                                                 <img
-                                                                    src={`http://127.0.0.1:8000/storage/${product.images[0]}`}
+                                                                    src={`${(import.meta.env.VITE_API_URL || 'http://192.168.255.97/api').replace('/api','')}/storage/${product.images[0]}`}
                                                                     alt={product.name}
                                                                     className="w-full h-full object-cover rounded-lg"
                                                                 />

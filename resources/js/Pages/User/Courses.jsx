@@ -43,7 +43,7 @@ export default function Courses() {
             setError(null);
             const authToken = sessionStorage.getItem('auth_token');
 
-            const response = await axios.get('http://127.0.0.1:8000/api/user/courses', {
+            const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/user/courses`, {
                 headers: {
                     'Accept': 'application/json',
                     'Authorization': `Bearer ${authToken}`,
@@ -64,7 +64,7 @@ export default function Courses() {
         try {
             const authToken = sessionStorage.getItem('auth_token');
 
-            const response = await axios.get('http://127.0.0.1:8000/api/user/profile', {
+            const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/user/profile`, {
                 headers: {
                     'Accept': 'application/json',
                     'Authorization': `Bearer ${authToken}`,
@@ -91,7 +91,7 @@ export default function Courses() {
         try {
             const authToken = sessionStorage.getItem('auth_token');
 
-            const response = await axios.get('http://127.0.0.1:8000/api/user/my-courses', {
+            const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/user/my-courses`, {
                 headers: {
                     'Accept': 'application/json',
                     'Authorization': `Bearer ${authToken}`,
@@ -150,7 +150,7 @@ export default function Courses() {
             const authToken = sessionStorage.getItem('auth_token');
 
             const response = await axios.post(
-                `http://127.0.0.1:8000/api/user/courses/${course.id}/unenroll`,
+                `${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/user/courses/${course.id}/unenroll`,
                 {},
                 {
                     headers: {
@@ -196,7 +196,7 @@ export default function Courses() {
             const authToken = sessionStorage.getItem('auth_token');
 
             const response = await axios.post(
-                `http://127.0.0.1:8000/api/user/courses/${selectedCourse.id}/enroll`,
+                `${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/user/courses/${selectedCourse.id}/enroll`,
                 enrollData,
                 {
                     headers: {

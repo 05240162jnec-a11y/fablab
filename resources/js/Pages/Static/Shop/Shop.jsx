@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api';
+const API_BASE = import.meta.env.VITE_API_URL || `${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}`;
 
 function getImageUrl(path) {
     if (!path) return null;
     if (path.startsWith('http')) return path;
-    return `http://127.0.0.1:8000/storage/${path}`;
+    return `${(import.meta.env.VITE_API_URL || 'http://192.168.255.97/api').replace('/api','')}/storage/${path}`;
 }
 const FALLBACK_IMG = 'https://images.unsplash.com/photo-1513549557204-16188c958d25?auto=format&fit=crop&w=800&q=80';
 

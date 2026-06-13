@@ -14,7 +14,7 @@ export default function Certificates() {
             setLoading(true);
             const token = localStorage.getItem('admin_token');
 
-            const response = await axios.get('http://127.0.0.1:8000/api/admin/courses', {
+            const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/courses`, {
                 headers: {
                     'Accept': 'application/json',
                     'Authorization': `Bearer ${token}`,

@@ -90,7 +90,7 @@ export default function ProductionTeamProfile() {
         try {
             setLoading(true);
             const token = sessionStorage.getItem('auth_token');
-            const response = await axios.get('http://127.0.0.1:8000/api/production-team/profile', {
+            const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/production-team/profile`, {
                 headers: { 'Accept': 'application/json', 'Authorization': `Bearer ${token}` }
             });
             if (response.data.success) {
@@ -151,7 +151,7 @@ export default function ProductionTeamProfile() {
             formData.append('gender', editForm.gender);
             if (profilePhoto) formData.append('profile_photo', profilePhoto);
 
-            const response = await axios.post('http://127.0.0.1:8000/api/production-team/profile/update', formData, {
+            const response = await axios.post(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/production-team/profile/update`, formData, {
                 headers: { 'Accept': 'application/json', 'Authorization': `Bearer ${token}`, 'Content-Type': 'multipart/form-data' }
             });
             if (response.data.success) {
@@ -175,7 +175,7 @@ export default function ProductionTeamProfile() {
         setPasswordLoading(true); setSuccessMessage(null); setError(null);
         try {
             const token = sessionStorage.getItem('auth_token');
-            await axios.post('http://127.0.0.1:8000/api/production-team/profile/change-password', {
+            await axios.post(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/production-team/profile/change-password`, {
                 current_password: passwordForm.current_password,
                 new_password: passwordForm.new_password,
                 new_password_confirmation: passwordForm.new_password_confirmation,

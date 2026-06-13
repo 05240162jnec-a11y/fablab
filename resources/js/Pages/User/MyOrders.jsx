@@ -88,7 +88,7 @@ export default function MyOrders() {
             setError(null);
             const token = sessionStorage.getItem('auth_token');
 
-            const response = await axios.get('http://127.0.0.1:8000/api/user/product-orders', {
+            const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/user/product-orders`, {
                 headers: {
                     'Accept': 'application/json',
                     'Authorization': `Bearer ${token}`,
@@ -221,7 +221,7 @@ export default function MyOrders() {
 
         if (!imagePath) return null;
 
-        return `http://127.0.0.1:8000/storage/${imagePath}`;
+        return `${(import.meta.env.VITE_API_URL || 'http://192.168.255.97/api').replace('/api','')}/storage/${imagePath}`;
     };
 
     // ✅ Calculate time remaining with seconds
@@ -289,7 +289,7 @@ export default function MyOrders() {
             }
 
             const response = await axios.post(
-                `http://127.0.0.1:8000/api/user/product-orders/${selectedOrder.id}/upload-payment`,
+                `${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/user/product-orders/${selectedOrder.id}/upload-payment`,
                 formData,
                 {
                     headers: {
@@ -328,7 +328,7 @@ export default function MyOrders() {
     const handleViewScreenshot = async (order) => {
         try {
             const token = sessionStorage.getItem('auth_token');
-            const response = await axios.get(`http://127.0.0.1:8000/api/user/product-orders/${order.id}/screenshot`, {
+            const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/user/product-orders/${order.id}/screenshot`, {
                 headers: {
                     'Accept': 'application/json',
                     'Authorization': `Bearer ${token}`,
@@ -365,7 +365,7 @@ export default function MyOrders() {
                     const token = sessionStorage.getItem('auth_token');
 
                     const response = await axios.post(
-                        `http://127.0.0.1:8000/api/user/product-orders/${order.id}/cancel`,
+                        `${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/user/product-orders/${order.id}/cancel`,
                         {},
                         {
                             headers: {
@@ -437,7 +437,7 @@ export default function MyOrders() {
                 try {
                     const token = sessionStorage.getItem('auth_token');
                     const response = await axios.post(
-                        'http://127.0.0.1:8000/api/user/product-orders/bulk-delete',
+                        `${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/user/product-orders/bulk-delete`,
                         { order_ids: selectedOrderIds },
                         {
                             headers: {
@@ -987,7 +987,7 @@ export default function MyOrders() {
                                     <h4 className="text-lg font-semibold text-gray-900 mb-4">Payment Proof</h4>
                                     <div className="bg-gray-50 rounded-lg p-4 flex justify-center">
                                         <img
-                                            src={`http://127.0.0.1:8000/storage/${selectedOrder.payment_screenshot}`}
+                                            src={`${(import.meta.env.VITE_API_URL || 'http://192.168.255.97/api').replace('/api','')}/storage/${selectedOrder.payment_screenshot}`}
                                             alt="Payment Screenshot"
                                             className="w-48 h-auto max-w-full rounded-lg shadow-md cursor-pointer hover:opacity-90 transition-opacity"
                                             onClick={() => setShowScreenshotModal(true)}
@@ -1188,7 +1188,7 @@ export default function MyOrders() {
                         </div>
                         <div className="p-6">
                             <img
-                                src={`http://127.0.0.1:8000/storage/${selectedOrder.payment_screenshot}`}
+                                src={`${(import.meta.env.VITE_API_URL || 'http://192.168.255.97/api').replace('/api','')}/storage/${selectedOrder.payment_screenshot}`}
                                 alt="Payment Screenshot"
                                 className="w-full h-auto rounded-lg"
                             />

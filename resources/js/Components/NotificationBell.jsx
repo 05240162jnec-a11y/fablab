@@ -75,7 +75,7 @@ export default function NotificationBell() {
         sessionStorage.getItem('auth_token') ||
         localStorage.getItem('admin_token') ||
         localStorage.getItem('auth_token');
-    const apiBase = () => `http://127.0.0.1:8000/api/${getPortal()}`;
+    const apiBase = () => `${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/${getPortal()}`;
     const authHdr = () => ({ 'Accept': 'application/json', 'Authorization': `Bearer ${getToken()}` });
 
     const fetchNotifications = async () => {

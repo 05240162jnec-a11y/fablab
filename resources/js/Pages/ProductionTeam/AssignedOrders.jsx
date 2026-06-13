@@ -175,7 +175,7 @@ export default function AssignedOrders() {
             }
 
             for (let i = 0; i < images.length; i++) {
-                const imageUrl = `http://127.0.0.1:8000/storage/${images[i]}`;
+                const imageUrl = `${(import.meta.env.VITE_API_URL || 'http://192.168.255.97/api').replace('/api','')}/storage/${images[i]}`;
                 const filename = `order-${order.id}-image-${i + 1}.jpg`;
                 await downloadImage(imageUrl, filename);
                 await new Promise(resolve => setTimeout(resolve, 500));
@@ -367,13 +367,13 @@ export default function AssignedOrders() {
                                     {(selectedOrder.design_images || (selectedOrder.design_image ? [selectedOrder.design_image] : [])).map((img, index) => (
                                         <div key={index} className="relative group border border-gray-200 rounded-lg overflow-hidden">
                                             <img
-                                                src={`http://127.0.0.1:8000/storage/${img}`}
+                                                src={`${(import.meta.env.VITE_API_URL || 'http://192.168.255.97/api').replace('/api','')}/storage/${img}`}
                                                 alt={`Design ${index + 1}`}
                                                 className="w-full h-64 object-cover"
                                                 onError={(e) => { e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect fill="%23ddd" width="100" height="100"/%3E%3Ctext fill="%23999" x="50%25" y="50%25" text-anchor="middle" dy=".3em"%3ENo Image%3C/text%3E%3C/svg%3E'; }}
                                             />
                                             <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                                <button onClick={() => downloadImage(`http://127.0.0.1:8000/storage/${img}`, `order-${selectedOrder.id}-image-${index + 1}.jpg`)} className="bg-white text-gray-700 px-4 py-2 rounded-lg text-sm font-medium shadow-lg flex items-center gap-2 hover:bg-gray-100 transition">
+                                                <button onClick={() => downloadImage(`${(import.meta.env.VITE_API_URL || 'http://192.168.255.97/api').replace('/api','')}/storage/${img}`, `order-${selectedOrder.id}-image-${index + 1}.jpg`)} className="bg-white text-gray-700 px-4 py-2 rounded-lg text-sm font-medium shadow-lg flex items-center gap-2 hover:bg-gray-100 transition">
                                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
                                                     Download
                                                 </button>

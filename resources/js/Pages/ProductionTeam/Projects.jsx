@@ -47,7 +47,7 @@ export default function Projects() {
             setLoading(true);
             const token = getToken();
 
-            const response = await axios.get('http://127.0.0.1:8000/api/production-team/projects', {
+            const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/production-team/projects`, {
                 headers: {
                     'Accept': 'application/json',
                     'Authorization': `Bearer ${token}`,
@@ -110,7 +110,7 @@ export default function Projects() {
     const confirmBulkDelete = async () => {
         try {
             const token = getToken();
-            await axios.post('http://127.0.0.1:8000/api/production-team/projects/bulk-delete', {
+            await axios.post(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/production-team/projects/bulk-delete`, {
                 ids: selectedProjects
             }, {
                 headers: {
@@ -155,7 +155,7 @@ export default function Projects() {
         try {
             const token = getToken();
             const response = await axios.get(
-                `http://127.0.0.1:8000/api/production-team/projects/${project.id}/preview`,
+                `${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/production-team/projects/${project.id}/preview`,
                 {
                     headers: {
                         'Authorization': `Bearer ${token}`,
@@ -178,7 +178,7 @@ export default function Projects() {
         try {
             const token = getToken();
             const response = await axios.get(
-                `http://127.0.0.1:8000/api/production-team/projects/${project.id}/download`,
+                `${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/production-team/projects/${project.id}/download`,
                 {
                     headers: {
                         'Authorization': `Bearer ${token}`,
@@ -229,7 +229,7 @@ export default function Projects() {
         try {
             const token = getToken();
             await axios.post(
-                `http://127.0.0.1:8000/api/production-team/projects/${selectedProject.id}/reject`,
+                `${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/production-team/projects/${selectedProject.id}/reject`,
                 { reason: rejectionReason },
                 {
                     headers: {
@@ -256,7 +256,7 @@ export default function Projects() {
         try {
             const token = getToken();
             await axios.post(
-                `http://127.0.0.1:8000/api/production-team/projects/${selectedProject.id}/approve`,
+                `${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/production-team/projects/${selectedProject.id}/approve`,
                 {},
                 {
                     headers: {

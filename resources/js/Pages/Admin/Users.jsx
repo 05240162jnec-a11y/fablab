@@ -99,7 +99,7 @@ export default function Users() {
             setLoading(true);
             const token = localStorage.getItem('admin_token');
 
-            const response = await axios.get('http://127.0.0.1:8000/api/admin/users', {
+            const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/users`, {
                 headers: {
                     'Accept': 'application/json',
                     'Authorization': `Bearer ${token}`,
@@ -204,7 +204,7 @@ export default function Users() {
     const confirmToggleStatus = async () => {
         try {
             const token = localStorage.getItem('admin_token');
-            await axios.post(`http://127.0.0.1:8000/api/admin/users/${selectedUser.id}/toggle-status`, {}, {
+            await axios.post(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/users/${selectedUser.id}/toggle-status`, {}, {
                 headers: {
                     'Accept': 'application/json',
                     'Authorization': `Bearer ${token}`,
@@ -227,7 +227,7 @@ export default function Users() {
     const handleSaveEdit = async () => {
         try {
             const token = localStorage.getItem('admin_token');
-            await axios.put(`http://127.0.0.1:8000/api/admin/users/${selectedUser.id}`, editForm, {
+            await axios.put(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/users/${selectedUser.id}`, editForm, {
                 headers: {
                     'Accept': 'application/json',
                     'Content-Type': 'application/json',

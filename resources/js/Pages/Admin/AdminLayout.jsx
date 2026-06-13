@@ -35,7 +35,7 @@ export default function AdminLayout() {
 
             if (token) {
                 try {
-                    const response = await axios.get('http://127.0.0.1:8000/api/admin/profile', {
+                    const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/profile`, {
                         headers: {
                             'Accept': 'application/json',
                             'Authorization': `Bearer ${token}`,

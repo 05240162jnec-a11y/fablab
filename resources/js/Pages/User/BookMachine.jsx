@@ -46,7 +46,7 @@ export default function BookMachine() {
             setLoading(true);
             const authToken = sessionStorage.getItem('auth_token');
 
-            const response = await axios.get('http://127.0.0.1:8000/api/user/machines', {
+            const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/user/machines`, {
                 headers: {
                     'Accept': 'application/json',
                     'Authorization': `Bearer ${authToken}`,
@@ -66,7 +66,7 @@ export default function BookMachine() {
     const fetchUserEnrollments = async () => {
         try {
             const authToken = sessionStorage.getItem('auth_token');
-            const response = await axios.get('http://127.0.0.1:8000/api/user/my-courses', {
+            const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/user/my-courses`, {
                 headers: {
                     'Accept': 'application/json',
                     'Authorization': `Bearer ${authToken}`,
@@ -137,7 +137,7 @@ export default function BookMachine() {
     const fetchBookedDates = async (machineId) => {
         try {
             const authToken = sessionStorage.getItem('auth_token');
-            const response = await axios.get(`http://127.0.0.1:8000/api/user/machines/${machineId}/booked-dates?t=${Date.now()}`, {
+            const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/user/machines/${machineId}/booked-dates?t=${Date.now()}`, {
                 headers: {
                     'Accept': 'application/json',
                     'Authorization': `Bearer ${authToken}`,
@@ -205,7 +205,7 @@ export default function BookMachine() {
             };
 
             const response = await axios.post(
-                'http://127.0.0.1:8000/api/user/bookings',
+                `${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/user/bookings`,
                 payload,
                 {
                     headers: {

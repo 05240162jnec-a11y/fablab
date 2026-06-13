@@ -355,7 +355,7 @@ export default function ProductionTeamInventory() {
             setLoading(true);
             const token = getToken();
             // ✅ Using admin inventory endpoints (shared inventory)
-            const response = await axios.get('http://127.0.0.1:8000/api/admin/inventory', {
+            const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/inventory`, {
                 headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
             });
 
@@ -421,7 +421,7 @@ export default function ProductionTeamInventory() {
     const fetchCurrentUser = async () => {
         try {
             const token = getToken();
-            const response = await axios.get('http://127.0.0.1:8000/api/production-team/profile', {
+            const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/production-team/profile`, {
                 headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
             });
 
@@ -458,7 +458,7 @@ export default function ProductionTeamInventory() {
         try {
             setThresholdLoading(true);
             const token = getToken();
-            const response = await axios.get('http://127.0.0.1:8000/api/admin/inventory/threshold', {
+            const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/inventory/threshold`, {
                 headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
             });
             if (response.data.success) {
@@ -475,7 +475,7 @@ export default function ProductionTeamInventory() {
     const fetchDepartmentsAndUsers = async () => {
         try {
             const token = getToken();
-            const response = await axios.get('http://127.0.0.1:8000/api/admin/inventory/departments-users', {
+            const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/inventory/departments-users`, {
                 headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
             });
             if (response.data.success) {
@@ -490,7 +490,7 @@ export default function ProductionTeamInventory() {
     const fetchProductionTeamMembers = async () => {
         try {
             const token = getToken();
-            const response = await axios.get('http://127.0.0.1:8000/api/admin/inventory/departments-users', {
+            const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/inventory/departments-users`, {
                 headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
             });
 
@@ -566,7 +566,7 @@ export default function ProductionTeamInventory() {
         try {
             setThresholdLoading(true);
             const token = getToken();
-            await axios.post('http://127.0.0.1:8000/api/admin/inventory/threshold', {
+            await axios.post(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/inventory/threshold`, {
                 threshold: newThreshold,
             }, {
                 headers: { Accept: 'application/json', 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -626,7 +626,7 @@ export default function ProductionTeamInventory() {
         try {
             const token = getToken();
 
-            await axios.post('http://127.0.0.1:8000/api/admin/inventory/materials', {
+            await axios.post(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/inventory/materials`, {
                 name: materialForm.name
             }, {
                 headers: {
@@ -752,7 +752,7 @@ export default function ProductionTeamInventory() {
                 received_by_role: userRole,
             };
 
-            await axios.post('http://127.0.0.1:8000/api/admin/inventory/received', payload, {
+            await axios.post(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/inventory/received`, payload, {
                 headers: { Accept: 'application/json', 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
             });
             fetchInventory();
@@ -809,7 +809,7 @@ export default function ProductionTeamInventory() {
                 issued_by: finalIssuedBy,
             };
 
-            await axios.post('http://127.0.0.1:8000/api/admin/inventory/issued', payload, {
+            await axios.post(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/inventory/issued`, payload, {
                 headers: {
                     Accept: 'application/json',
                     'Content-Type': 'application/json',
@@ -838,7 +838,7 @@ export default function ProductionTeamInventory() {
             async () => {
                 try {
                     const token = getToken();
-                    await axios.delete(`http://127.0.0.1:8000/api/admin/inventory/received/${id}`, {
+                    await axios.delete(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/inventory/received/${id}`, {
                         headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
                     });
                     fetchInventory();
@@ -861,7 +861,7 @@ export default function ProductionTeamInventory() {
             async () => {
                 try {
                     const token = getToken();
-                    await axios.delete(`http://127.0.0.1:8000/api/admin/inventory/issued/${id}`, {
+                    await axios.delete(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/inventory/issued/${id}`, {
                         headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
                     });
                     fetchInventory();
@@ -904,7 +904,7 @@ export default function ProductionTeamInventory() {
                     const token = getToken();
 
                     const deletePromises = Array.from(selectedIssued).map(id =>
-                        axios.delete(`http://127.0.0.1:8000/api/admin/inventory/issued/${id}`, {
+                        axios.delete(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/inventory/issued/${id}`, {
                             headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
                         })
                     );

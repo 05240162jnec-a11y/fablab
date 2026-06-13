@@ -63,7 +63,7 @@ export default function Dashboard() {
                 return;
             }
 
-            const response = await axios.get('http://127.0.0.1:8000/api/user/dashboard', {
+            const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/user/dashboard`, {
                 headers: {
                     'Accept': 'application/json',
                     'Authorization': `Bearer ${authToken}`,
@@ -102,9 +102,9 @@ export default function Dashboard() {
 
             // Fetch all 3 chart endpoints in parallel
             const [bookingRes, spendingRes, productsRes] = await Promise.all([
-                axios.get('http://127.0.0.1:8000/api/user/dashboard/booking-activity', { headers }),
-                axios.get('http://127.0.0.1:8000/api/user/dashboard/monthly-spending', { headers }),
-                axios.get('http://127.0.0.1:8000/api/user/dashboard/top-products', { headers }),
+                axios.get(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/user/dashboard/booking-activity`, { headers }),
+                axios.get(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/user/dashboard/monthly-spending`, { headers }),
+                axios.get(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/user/dashboard/top-products`, { headers }),
             ]);
 
             if (bookingRes.data.success) setBookingActivity(bookingRes.data.data);

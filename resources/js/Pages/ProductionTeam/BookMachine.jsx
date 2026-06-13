@@ -33,7 +33,7 @@ export default function ProductionTeamBookMachine() {
             setAllBookingsError(null);
             const token = localStorage.getItem('auth_token');
 
-            const response = await axios.get('http://127.0.0.1:8000/api/admin/bookings', {
+            const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/bookings`, {
                 headers: {
                     'Accept': 'application/json',
                     'Authorization': `Bearer ${token}`,
@@ -62,7 +62,7 @@ export default function ProductionTeamBookMachine() {
             setMyBookingsError(null);
             const token = localStorage.getItem('auth_token');
 
-            const response = await axios.get('http://127.0.0.1:8000/api/user/my-bookings', {
+            const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/user/my-bookings`, {
                 headers: {
                     'Accept': 'application/json',
                     'Authorization': `Bearer ${token}`,
@@ -139,7 +139,7 @@ export default function ProductionTeamBookMachine() {
         try {
             const token = localStorage.getItem('auth_token');
             await axios.post(
-                `http://127.0.0.1:8000/api/user/bookings/${bookingId}/cancel`,
+                `${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/user/bookings/${bookingId}/cancel`,
                 {},
                 { headers: { 'Accept': 'application/json', 'Authorization': `Bearer ${token}` } }
             );

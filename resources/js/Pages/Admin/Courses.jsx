@@ -60,7 +60,7 @@ export default function Courses() {
             setLoadingProductionTeam(true);
             const token = localStorage.getItem('admin_token');
 
-            const response = await axios.get('http://127.0.0.1:8000/api/admin/courses/production-team', {
+            const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/courses/production-team`, {
                 headers: {
                     'Accept': 'application/json',
                     'Authorization': `Bearer ${token}`,
@@ -84,7 +84,7 @@ export default function Courses() {
             setLoading(true);
             const token = localStorage.getItem('admin_token');
 
-            const response = await axios.get('http://127.0.0.1:8000/api/admin/courses', {
+            const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/courses`, {
                 headers: {
                     'Accept': 'application/json',
                     'Authorization': `Bearer ${token}`,
@@ -110,7 +110,7 @@ export default function Courses() {
             setEnrollmentError(null);
             const token = localStorage.getItem('admin_token');
 
-            const response = await axios.get(`http://127.0.0.1:8000/api/admin/courses/${courseId}/enrollments`, {
+            const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/courses/${courseId}/enrollments`, {
                 headers: {
                     'Accept': 'application/json',
                     'Authorization': `Bearer ${token}`,
@@ -193,7 +193,7 @@ export default function Courses() {
             }
 
             const response = await axios.put(
-                `http://127.0.0.1:8000/api/admin/courses/${selectedCourse.id}/enrollments/bulk-update`,
+                `${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/courses/${selectedCourse.id}/enrollments/bulk-update`,
                 { updates },
                 {
                     headers: {
@@ -230,7 +230,7 @@ export default function Courses() {
                 try {
                     const token = localStorage.getItem('admin_token');
 
-                    await axios.delete(`http://127.0.0.1:8000/api/admin/courses/${courseId}/enrollments/${enrollmentId}`, {
+                    await axios.delete(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/courses/${courseId}/enrollments/${enrollmentId}`, {
                         headers: {
                             'Accept': 'application/json',
                             'Authorization': `Bearer ${token}`,
@@ -258,7 +258,7 @@ export default function Courses() {
             const token = localStorage.getItem('admin_token');
 
             const response = await axios.get(
-                `http://127.0.0.1:8000/api/admin/courses/${courseId}/enrollments/download`,
+                `${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/courses/${courseId}/enrollments/download`,
                 {
                     headers: {
                         'Accept': 'text/csv',
@@ -295,7 +295,7 @@ export default function Courses() {
                     const token = localStorage.getItem('admin_token');
 
                     const response = await axios.post(
-                        `http://127.0.0.1:8000/api/admin/courses/${courseId}/enrollments/clear`,
+                        `${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/courses/${courseId}/enrollments/clear`,
                         {},
                         {
                             headers: {
@@ -435,7 +435,7 @@ export default function Courses() {
     const handleToggleRegistration = async () => {
         try {
             const token = localStorage.getItem('admin_token');
-            await axios.post(`http://127.0.0.1:8000/api/admin/courses/${selectedCourse.id}/toggle-registration`, {}, {
+            await axios.post(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/courses/${selectedCourse.id}/toggle-registration`, {}, {
                 headers: {
                     'Accept': 'application/json',
                     'Authorization': `Bearer ${token}`,
@@ -455,7 +455,7 @@ export default function Courses() {
     const confirmDelete = async () => {
         try {
             const token = localStorage.getItem('admin_token');
-            await axios.delete(`http://127.0.0.1:8000/api/admin/courses/${selectedCourse.id}`, {
+            await axios.delete(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/courses/${selectedCourse.id}`, {
                 headers: {
                     'Accept': 'application/json',
                     'Authorization': `Bearer ${token}`,
@@ -490,7 +490,7 @@ export default function Courses() {
                 formData.append('image', formState.image);
             }
 
-            await axios.post('http://127.0.0.1:8000/api/admin/courses', formData, {
+            await axios.post(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/courses`, formData, {
                 headers: {
                     'Accept': 'application/json',
                     'Content-Type': 'multipart/form-data',
@@ -532,7 +532,7 @@ export default function Courses() {
                 formData.append('image', formState.image);
             }
 
-            await axios.post(`http://127.0.0.1:8000/api/admin/courses/${selectedCourse.id}?_method=PUT`, formData, {
+            await axios.post(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/courses/${selectedCourse.id}?_method=PUT`, formData, {
                 headers: {
                     'Accept': 'application/json',
                     'Content-Type': 'multipart/form-data',
@@ -656,7 +656,7 @@ export default function Courses() {
                                 {/* Course Image */}
                                 {course.image ? (
                                     <img
-                                        src={`http://127.0.0.1:8000/storage/${course.image}`}
+                                        src={`${(import.meta.env.VITE_API_URL || 'http://192.168.255.97/api').replace('/api','')}/storage/${course.image}`}
                                         alt={course.title}
                                         className="w-full h-48 object-cover"
                                     />
@@ -725,7 +725,7 @@ export default function Courses() {
                             {/* Course Image */}
                             {selectedCourse.image && (
                                 <img
-                                    src={`http://127.0.0.1:8000/storage/${selectedCourse.image}`}
+                                    src={`${(import.meta.env.VITE_API_URL || 'http://192.168.255.97/api').replace('/api','')}/storage/${selectedCourse.image}`}
                                     alt={selectedCourse.title}
                                     className="w-full h-48 object-cover rounded-lg mb-6"
                                 />

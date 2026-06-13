@@ -136,7 +136,7 @@ export default function Bookings() {
             setInitialLoading(true);
             const token = localStorage.getItem('admin_token');
 
-            const bookingsResponse = await axios.get('http://127.0.0.1:8000/api/admin/bookings', {
+            const bookingsResponse = await axios.get(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/bookings`, {
                 headers: {
                     'Accept': 'application/json',
                     'Authorization': `Bearer ${token}`,
@@ -147,7 +147,7 @@ export default function Bookings() {
                 }
             });
 
-            const ordersResponse = await axios.get('http://127.0.0.1:8000/api/admin/product-orders', {
+            const ordersResponse = await axios.get(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/product-orders`, {
                 headers: {
                     'Accept': 'application/json',
                     'Authorization': `Bearer ${token}`,
@@ -272,7 +272,7 @@ export default function Bookings() {
         try {
             const token = localStorage.getItem('admin_token') || sessionStorage.getItem('auth_token');
             await axios.post(
-                `http://127.0.0.1:8000/api/admin/bookings/${bookingToTerminate}/terminate`,
+                `${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/bookings/${bookingToTerminate}/terminate`,
                 {},
                 { headers: { 'Accept': 'application/json', 'Authorization': `Bearer ${token}` } }
             );
@@ -300,13 +300,13 @@ export default function Bookings() {
 
     const getScreenshotUrl = (order) => {
         if (!order.payment_screenshot) return 'https://via.placeholder.com/400x300?text=No+Image';
-        return `http://127.0.0.1:8000/storage/${order.payment_screenshot}`;
+        return `${(import.meta.env.VITE_API_URL || 'http://192.168.255.97/api').replace('/api','')}/storage/${order.payment_screenshot}`;
     };
 
     const handleViewScreenshot = async (order) => {
         try {
             const token = localStorage.getItem('admin_token');
-            const response = await axios.get(`http://127.0.0.1:8000/api/admin/product-orders/${order.id}/screenshot`, {
+            const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/product-orders/${order.id}/screenshot`, {
                 headers: {
                     'Accept': 'application/json',
                     'Authorization': `Bearer ${token}`,
@@ -343,7 +343,7 @@ export default function Bookings() {
         setApproveLoading(true);
         try {
             const token = localStorage.getItem('admin_token');
-            await axios.post(`http://127.0.0.1:8000/api/admin/product-orders/${selectedOrder.id}/approve`, {}, {
+            await axios.post(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/product-orders/${selectedOrder.id}/approve`, {}, {
                 headers: { 'Accept': 'application/json', 'Authorization': `Bearer ${token}` }
             });
             setActionMessage(`✅ Order ${selectedOrder.order_number} approved!`);
@@ -377,7 +377,7 @@ export default function Bookings() {
         setRejectLoading(true);
         try {
             const token = localStorage.getItem('admin_token');
-            await axios.post(`http://127.0.0.1:8000/api/admin/product-orders/${selectedOrder.id}/reject`, {
+            await axios.post(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/product-orders/${selectedOrder.id}/reject`, {
                 rejection_reason: rejectionReason
             }, {
                 headers: { 'Accept': 'application/json', 'Authorization': `Bearer ${token}` }
@@ -415,7 +415,7 @@ export default function Bookings() {
         setActionLoading(true);
         try {
             const token = localStorage.getItem('admin_token') || sessionStorage.getItem('auth_token');
-            await axios.delete(`http://127.0.0.1:8000/api/admin/product-orders/${orderToDelete.id}`, {
+            await axios.delete(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/product-orders/${orderToDelete.id}`, {
                 headers: { 'Accept': 'application/json', 'Authorization': `Bearer ${token}` }
             });
             setActionMessage(`✅ Order ${orderToDelete.order_number} deleted!`);

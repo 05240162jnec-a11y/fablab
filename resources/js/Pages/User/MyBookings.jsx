@@ -92,7 +92,7 @@ export default function MyBookings() {
             setLoading(true);
             const authToken = localStorage.getItem('auth_token');
 
-            const response = await axios.get(`http://127.0.0.1:8000/api/user/my-bookings?t=${Date.now()}`, {
+            const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/user/my-bookings?t=${Date.now()}`, {
                 headers: {
                     'Accept': 'application/json',
                     'Authorization': `Bearer ${authToken}`,
@@ -146,7 +146,7 @@ export default function MyBookings() {
             const authToken = localStorage.getItem('auth_token');
 
             const response = await axios.post(
-                `http://127.0.0.1:8000/api/user/bookings/${selectedBooking.id}/cancel`,
+                `${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/user/bookings/${selectedBooking.id}/cancel`,
                 {},
                 {
                     headers: {

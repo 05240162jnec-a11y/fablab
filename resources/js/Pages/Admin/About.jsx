@@ -56,8 +56,8 @@ export default function About() {
             const headers = { 'Accept': 'application/json', 'Authorization': `Bearer ${token}` };
 
             const [sectionsRes, membersRes] = await Promise.all([
-                axios.get('http://127.0.0.1:8000/api/admin/about/sections', { headers }),
-                axios.get('http://127.0.0.1:8000/api/admin/about/team-members', { headers }),
+                axios.get(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/about/sections`, { headers }),
+                axios.get(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/about/team-members`, { headers }),
             ]);
 
             if (sectionsRes.data.success) setSections(sectionsRes.data.sections);
@@ -108,7 +108,7 @@ export default function About() {
             formData.append('_method', 'PUT');
 
             const response = await axios.post(
-                `http://127.0.0.1:8000/api/admin/about/sections/${selectedSection.id}`,
+                `${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/about/sections/${selectedSection.id}`,
                 formData,
                 {
                     headers: {
@@ -196,7 +196,7 @@ export default function About() {
             formData.append('twitter_url', memberForm.twitter_url);
 
             const response = await axios.post(
-                'http://127.0.0.1:8000/api/admin/about/team-members',
+                `${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/about/team-members`,
                 formData,
                 {
                     headers: {
@@ -236,7 +236,7 @@ export default function About() {
             formData.append('_method', 'PUT');
 
             const response = await axios.post(
-                `http://127.0.0.1:8000/api/admin/about/team-members/${selectedMember.id}`,
+                `${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/about/team-members/${selectedMember.id}`,
                 formData,
                 {
                     headers: {
@@ -264,7 +264,7 @@ export default function About() {
         try {
             const token = localStorage.getItem('admin_token');
             const response = await axios.post(
-                `http://127.0.0.1:8000/api/admin/about/team-members/${memberId}/toggle-status`,
+                `${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/about/team-members/${memberId}/toggle-status`,
                 {},
                 {
                     headers: {
@@ -295,7 +295,7 @@ export default function About() {
         try {
             const token = localStorage.getItem('admin_token');
             await axios.delete(
-                `http://127.0.0.1:8000/api/admin/about/team-members/${selectedMember.id}`,
+                `${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/about/team-members/${selectedMember.id}`,
                 {
                     headers: {
                         'Accept': 'application/json',

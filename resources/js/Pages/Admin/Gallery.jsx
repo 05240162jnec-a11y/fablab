@@ -54,7 +54,7 @@ export default function Gallery() {
             setLoading(true);
             const adminToken = localStorage.getItem('admin_token');
 
-            const response = await axios.get('http://127.0.0.1:8000/api/admin/gallery', {
+            const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/gallery`, {
                 headers: {
                     'Accept': 'application/json',
                     'Authorization': `Bearer ${adminToken}`,
@@ -128,7 +128,7 @@ export default function Gallery() {
             formDataToSend.append('description', formData.description);
 
             const response = await axios.post(
-                'http://127.0.0.1:8000/api/admin/gallery',
+                `${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/gallery`,
                 formDataToSend,
                 {
                     headers: {
@@ -162,7 +162,7 @@ export default function Gallery() {
             const adminToken = localStorage.getItem('admin_token');
 
             await axios.delete(
-                `http://127.0.0.1:8000/api/admin/gallery/${selectedImage.id}`,
+                `${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/gallery/${selectedImage.id}`,
                 {
                     headers: {
                         'Accept': 'application/json',

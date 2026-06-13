@@ -172,7 +172,7 @@ export default function About() {
     useEffect(() => {
         (async () => {
             try {
-                const res = await axios.get('http://127.0.0.1:8000/api/public/about');
+                const res = await axios.get(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/public/about`);
                 if (res.data.success) {
                     const map = {};
                     res.data.sections.forEach(s => { map[s.section_key] = s; });

@@ -102,7 +102,7 @@ export default function CustomOrders() {
             // Use overrideStatus if provided, otherwise use state
             const currentStatus = overrideStatus !== null ? overrideStatus : statusFilter;
 
-            let url = 'http://127.0.0.1:8000/api/admin/custom-orders?';
+            let url = `${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/custom-orders?`;
             if (searchTerm) url += `search=${searchTerm}&`;
             if (currentStatus) url += `status=${currentStatus}`;
 
@@ -125,7 +125,7 @@ export default function CustomOrders() {
     const fetchProductionTeam = async () => {
         try {
             const authToken = localStorage.getItem('admin_token');
-            const response = await axios.get('http://127.0.0.1:8000/api/admin/custom-orders/production-team', {
+            const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/custom-orders/production-team`, {
                 headers: {
                     'Accept': 'application/json',
                     'Authorization': `Bearer ${authToken}`,
@@ -145,7 +145,7 @@ export default function CustomOrders() {
         try {
             const authToken = localStorage.getItem('admin_token');
             const response = await axios.post(
-                `http://127.0.0.1:8000/api/admin/custom-orders/${selectedOrder.id}/update-price`,
+                `${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/custom-orders/${selectedOrder.id}/update-price`,
                 {
                     estimated_price: priceData.estimated_price,
                     price_breakdown: priceData.price_breakdown // ✅ Send breakdown
@@ -177,7 +177,7 @@ export default function CustomOrders() {
         try {
             const authToken = localStorage.getItem('admin_token');
             const response = await axios.post(
-                `http://127.0.0.1:8000/api/admin/custom-orders/${selectedOrder.id}/verify-payment`,
+                `${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/custom-orders/${selectedOrder.id}/verify-payment`,
                 {
                     action: paymentAction,
                     rejection_reason: paymentAction === 'reject' ? rejectionReason : null,
@@ -220,7 +220,7 @@ export default function CustomOrders() {
         try {
             const authToken = localStorage.getItem('admin_token');
             const response = await axios.post(
-                `http://127.0.0.1:8000/api/admin/custom-orders/${selectedOrder.id}/assign`,
+                `${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/custom-orders/${selectedOrder.id}/assign`,
                 { assigned_to: assignData.assigned_to },
                 {
                     headers: {
@@ -249,7 +249,7 @@ export default function CustomOrders() {
         try {
             const authToken = localStorage.getItem('admin_token');
             const response = await axios.post(
-                `http://127.0.0.1:8000/api/admin/custom-orders/${selectedOrder.id}/reject-design`,
+                `${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/custom-orders/${selectedOrder.id}/reject-design`,
                 {
                     rejection_reason: designRejectionReason,
                 },
@@ -281,7 +281,7 @@ export default function CustomOrders() {
         try {
             const authToken = localStorage.getItem('admin_token');
             const response = await axios.post(
-                'http://127.0.0.1:8000/api/admin/custom-orders/bulk-delete',
+                `${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/custom-orders/bulk-delete`,
                 { order_ids: selectedOrderIds },
                 {
                     headers: {
@@ -531,7 +531,7 @@ export default function CustomOrders() {
                                                             {designImages.length > 0 ? (
                                                                 <>
                                                                     <img
-                                                                        src={`http://127.0.0.1:8000/storage/${designImages[0]}`}
+                                                                        src={`${(import.meta.env.VITE_API_URL || 'http://192.168.255.97/api').replace('/api','')}/storage/${designImages[0]}`}
                                                                         alt={order.title}
                                                                         className="w-full h-full object-cover"
                                                                     />
@@ -627,7 +627,7 @@ export default function CustomOrders() {
                                                         onClick={() => openLightbox(idx)}
                                                     >
                                                         <img
-                                                            src={`http://127.0.0.1:8000/storage/${img}`}
+                                                            src={`${(import.meta.env.VITE_API_URL || 'http://192.168.255.97/api').replace('/api','')}/storage/${img}`}
                                                             alt={`${selectedOrder.title} - Design ${idx + 1}`}
                                                             className="w-full h-full object-cover"
                                                         />
@@ -862,7 +862,7 @@ export default function CustomOrders() {
                                             }}
                                         >
                                             <img
-                                                src={`http://127.0.0.1:8000/storage/${selectedOrder.payment_screenshot}`}
+                                                src={`${(import.meta.env.VITE_API_URL || 'http://192.168.255.97/api').replace('/api','')}/storage/${selectedOrder.payment_screenshot}`}
                                                 alt="Payment proof"
                                                 className="w-full h-full object-contain"
                                             />
@@ -960,7 +960,7 @@ export default function CustomOrders() {
 
                         <div className="bg-white rounded-xl overflow-hidden shadow-2xl">
                             <img
-                                src={`http://127.0.0.1:8000/storage/${selectedOrder.payment_screenshot}`}
+                                src={`${(import.meta.env.VITE_API_URL || 'http://192.168.255.97/api').replace('/api','')}/storage/${selectedOrder.payment_screenshot}`}
                                 alt="Payment Screenshot"
                                 className="w-full h-auto max-h-[80vh] object-contain"
                             />
@@ -1049,7 +1049,7 @@ export default function CustomOrders() {
                                 const designImages = getDesignImages(selectedOrder);
                                 const currentImage = designImages[lightboxImageIndex] || designImages[0];
                                 return (
-                                    <img src={`http://127.0.0.1:8000/storage/${currentImage}`} alt={`${selectedOrder.title} - Design ${lightboxImageIndex + 1}`} className="w-full h-auto max-h-[80vh] object-contain" />
+                                    <img src={`${(import.meta.env.VITE_API_URL || 'http://192.168.255.97/api').replace('/api','')}/storage/${currentImage}`} alt={`${selectedOrder.title} - Design ${lightboxImageIndex + 1}`} className="w-full h-auto max-h-[80vh] object-contain" />
                                 );
                             })()}
                         </div>

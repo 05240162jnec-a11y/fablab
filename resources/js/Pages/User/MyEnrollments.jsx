@@ -23,7 +23,7 @@ export default function MyEnrollments() {
             setLoading(true);
             const authToken = localStorage.getItem('auth_token');
 
-            const response = await axios.get('http://127.0.0.1:8000/api/user/my-courses', {
+            const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/user/my-courses`, {
                 headers: {
                     'Accept': 'application/json',
                     'Authorization': `Bearer ${authToken}`,

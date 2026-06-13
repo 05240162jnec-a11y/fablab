@@ -5,7 +5,7 @@ export default function CertificateManager({ course, onClose, onSuccess }) {
     const [templateFile, setTemplateFile] = useState(null);
     const [previewUrl, setPreviewUrl] = useState(
         course.certificate_template_path
-            ? `http://127.0.0.1:8000/storage/${course.certificate_template_path}`
+            ? `${(import.meta.env.VITE_API_URL || 'http://192.168.255.97/api').replace('/api','')}/storage/${course.certificate_template_path}`
             : null
     );
     const [config, setConfig] = useState(course.certificate_template_config || {});
@@ -112,7 +112,7 @@ export default function CertificateManager({ course, onClose, onSuccess }) {
         try {
             const token = localStorage.getItem('auth_token');
             await axios.post(
-                `http://127.0.0.1:8000/api/admin/courses/${course.id}/certificate-template`,
+                `${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/courses/${course.id}/certificate-template`,
                 formData,
                 {
                     headers: {
@@ -141,7 +141,7 @@ export default function CertificateManager({ course, onClose, onSuccess }) {
         try {
             const token = localStorage.getItem('auth_token');
             await axios.post(
-                `http://127.0.0.1:8000/api/admin/courses/${course.id}/certificate-template`,
+                `${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/courses/${course.id}/certificate-template`,
                 {
                     template_config: JSON.stringify(config),
                     // Don't send template_image - keep existing one
@@ -174,7 +174,7 @@ export default function CertificateManager({ course, onClose, onSuccess }) {
         try {
             const token = localStorage.getItem('auth_token');
             const res = await axios.post(
-                `http://127.0.0.1:8000/api/admin/courses/${course.id}/generate-certificates`,
+                `${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/courses/${course.id}/generate-certificates`,
                 {},
                 {
                     headers: { Authorization: `Bearer ${token}` },

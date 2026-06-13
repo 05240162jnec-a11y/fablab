@@ -381,7 +381,7 @@ export default function UserProjects() {
             }
 
             const response = await axios.get(
-                `http://127.0.0.1:8000/api/user/projects/${project.id}/download`,
+                `${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/user/projects/${project.id}/download`,
                 {
                     headers: {
                         'Authorization': `Bearer ${token}`,

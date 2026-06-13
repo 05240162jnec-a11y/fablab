@@ -53,10 +53,10 @@ export default function Dashboard() {
 
             // Fetch all 4 chart endpoints in parallel
             const [userRes, productsRes, revenueRes, machinesRes] = await Promise.all([
-                axios.get('http://127.0.0.1:8000/api/admin/dashboard/user-distribution', { headers }),
-                axios.get('http://127.0.0.1:8000/api/admin/dashboard/top-products', { headers }),
-                axios.get('http://127.0.0.1:8000/api/admin/dashboard/monthly-revenue', { headers }),
-                axios.get('http://127.0.0.1:8000/api/admin/dashboard/most-booked-machines', { headers }),
+                axios.get(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/dashboard/user-distribution`, { headers }),
+                axios.get(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/dashboard/top-products`, { headers }),
+                axios.get(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/dashboard/monthly-revenue`, { headers }),
+                axios.get(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/admin/dashboard/most-booked-machines`, { headers }),
             ]);
 
             if (userRes.data.success) setUserDistribution(userRes.data.data);

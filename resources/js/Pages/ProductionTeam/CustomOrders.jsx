@@ -76,7 +76,7 @@ export default function ProductionTeamCustomOrders() {
             }
 
             for (let i = 0; i < images.length; i++) {
-                const imageUrl = `http://127.0.0.1:8000/storage/${images[i]}`;
+                const imageUrl = `${(import.meta.env.VITE_API_URL || 'http://192.168.255.97/api').replace('/api','')}/storage/${images[i]}`;
                 const filename = `order-${order.id}-image-${i + 1}.jpg`;
                 await downloadImage(imageUrl, filename);
                 // Small delay between downloads
@@ -186,7 +186,7 @@ export default function ProductionTeamCustomOrders() {
                                                     <div className="flex items-center gap-3">
                                                         {order.design_image ? (
                                                             <img
-                                                                src={`http://127.0.0.1:8000/storage/${order.design_image}`}
+                                                                src={`${(import.meta.env.VITE_API_URL || 'http://192.168.255.97/api').replace('/api','')}/storage/${order.design_image}`}
                                                                 alt="Design"
                                                                 className="w-10 h-10 rounded-lg object-cover border border-gray-200"
                                                             />
@@ -216,7 +216,7 @@ export default function ProductionTeamCustomOrders() {
                                                 <td className="px-6 py-4">
                                                     {order.payment_screenshot ? (
                                                         <a
-                                                            href={`http://127.0.0.1:8000/storage/${order.payment_screenshot}`}
+                                                            href={`${(import.meta.env.VITE_API_URL || 'http://192.168.255.97/api').replace('/api','')}/storage/${order.payment_screenshot}`}
                                                             target="_blank"
                                                             rel="noopener noreferrer"
                                                             className="text-blue-600 hover:text-blue-800 text-sm font-medium underline"
@@ -328,12 +328,12 @@ export default function ProductionTeamCustomOrders() {
                                     {(selectedOrder.design_images || (selectedOrder.design_image ? [selectedOrder.design_image] : [])).map((img, index) => (
                                         <div key={index} className="relative group">
                                             <img
-                                                src={`http://127.0.0.1:8000/storage/${img}`}
+                                                src={`${(import.meta.env.VITE_API_URL || 'http://192.168.255.97/api').replace('/api','')}/storage/${img}`}
                                                 alt={`Design ${index + 1}`}
                                                 className="w-full h-48 object-cover rounded-lg border border-gray-200"
                                             />
                                             <button
-                                                onClick={() => downloadImage(`http://127.0.0.1:8000/storage/${img}`, `order-${selectedOrder.id}-image-${index + 1}.jpg`)}
+                                                onClick={() => downloadImage(`${(import.meta.env.VITE_API_URL || 'http://192.168.255.97/api').replace('/api','')}/storage/${img}`, `order-${selectedOrder.id}-image-${index + 1}.jpg`)}
                                                 className="absolute bottom-2 right-2 bg-white/90 hover:bg-white text-gray-700 px-3 py-1.5 rounded-lg text-sm font-medium shadow-lg opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1"
                                             >
                                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -360,7 +360,7 @@ export default function ProductionTeamCustomOrders() {
                                     <h4 className="font-semibold text-gray-900 mb-2">Payment Screenshot</h4>
                                     <div className="bg-gray-50 rounded-lg p-4 flex justify-center">
                                         <img
-                                            src={`http://127.0.0.1:8000/storage/${selectedOrder.payment_screenshot}`}
+                                            src={`${(import.meta.env.VITE_API_URL || 'http://192.168.255.97/api').replace('/api','')}/storage/${selectedOrder.payment_screenshot}`}
                                             alt="Payment"
                                             className="max-w-md h-auto rounded-lg border border-gray-200"
                                         />

@@ -155,7 +155,7 @@ export default function ShopProducts({
         try {
             const userToken = localStorage.getItem('auth_token');
 
-            const response = await axios.get('http://127.0.0.1:8000/api/user/products', {
+            const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/user/products`, {
                 headers: {
                     'Accept': 'application/json',
                     'Authorization': `Bearer ${userToken}`
@@ -229,7 +229,7 @@ export default function ShopProducts({
             setLoading(true);
             const userToken = localStorage.getItem('auth_token');
 
-            const response = await axios.get('http://127.0.0.1:8000/api/user/products', {
+            const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/user/products`, {
                 headers: {
                     'Accept': 'application/json',
                     'Authorization': `Bearer ${userToken}`
@@ -514,7 +514,7 @@ export default function ShopProducts({
             }
 
             const response = await axios.post(
-                'http://127.0.0.1:8000/api/user/product-orders',
+                `${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/user/product-orders`,
                 formData,
                 {
                     headers: {
@@ -576,10 +576,10 @@ export default function ShopProducts({
     // Get product image URL
     const getProductImage = (product, index = 0) => {
         if (product.images && product.images.length > 0 && product.images[index]) {
-            return `http://127.0.0.1:8000/storage/${product.images[index]}`;
+            return `${(import.meta.env.VITE_API_URL || 'http://192.168.255.97/api').replace('/api','')}/storage/${product.images[index]}`;
         }
         if (product.image) {
-            return `http://127.0.0.1:8000/storage/${product.image}`;
+            return `${(import.meta.env.VITE_API_URL || 'http://192.168.255.97/api').replace('/api','')}/storage/${product.image}`;
         }
         return null;
     };

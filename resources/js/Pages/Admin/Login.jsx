@@ -35,7 +35,7 @@ export default function AdminLogin() {
 
         try {
             // ✅ CHANGED: POST to STANDARD endpoint (not admin endpoint)
-            const response = await axios.post('http://127.0.0.1:8000/api/login', formData, {
+            const response = await axios.post(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/login`, formData, {
                 headers: {
                     'Accept': 'application/json',
                     'Content-Type': 'application/json',

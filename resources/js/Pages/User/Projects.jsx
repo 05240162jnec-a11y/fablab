@@ -1124,8 +1124,8 @@ export default function UserProjects() {
             {/* ===== EDIT PROJECT MODAL ===== */}
             {showEditModal && selectedProject && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full">
-                        <div className="flex items-center justify-between p-6 border-b border-gray-100">
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] flex flex-col">
+                        <div className="flex items-center justify-between p-6 border-b border-gray-100 flex-shrink-0">
                             <div>
                                 <h3 className="text-xl font-bold text-gray-900">Edit & Resubmit Project</h3>
                                 <p className="text-sm text-gray-500 mt-1">Update your project and resubmit for review</p>
@@ -1139,13 +1139,13 @@ export default function UserProjects() {
 
                         {/* Show previous rejection reason */}
                         {selectedProject.admin_comments && (
-                            <div className="mx-6 mt-6 bg-rose-50 border border-rose-200 rounded-lg p-4">
+                            <div className="mx-6 mt-6 bg-rose-50 border border-rose-200 rounded-lg p-4 flex-shrink-0">
                                 <p className="text-sm font-semibold text-rose-800 mb-1">Previous Rejection Reason:</p>
                                 <p className="text-sm text-rose-700">{selectedProject.admin_comments}</p>
                             </div>
                         )}
 
-                        <form onSubmit={handleResubmitProject} className="p-6 space-y-4">
+                        <form onSubmit={handleResubmitProject} className="p-6 space-y-4 overflow-y-auto flex-1">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
                                     Project Title <span className="text-red-500">*</span>
@@ -1255,7 +1255,7 @@ export default function UserProjects() {
                                 </div>
                             </div>
 
-                            <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-100">
+                            <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-100 flex-shrink-0">
                                 <button
                                     type="button"
                                     onClick={closeAllModals}

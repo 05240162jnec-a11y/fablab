@@ -927,7 +927,7 @@ export default function UserProjects() {
                                                 </>
                                             )}
                                         </p>
-                                        <p className="text-xs text-gray-500 mt-1">PDF only, max 10MB</p>
+                                        <p className="text-xs text-gray-500 mt-1">PDF only</p>
                                     </label>
                                 </div>
                             </div>

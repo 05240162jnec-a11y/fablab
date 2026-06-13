@@ -428,8 +428,8 @@ export default function Dashboard() {
                             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
                                 <div className="flex items-center justify-between mb-4">
                                     <div>
-                                        <h4 className="text-base font-bold text-gray-900">Top Products I Order</h4>
-                                        <p className="text-xs text-gray-500 mt-1">Most frequently purchased products</p>
+                                        <h4 className="text-base font-bold text-gray-900">Trending Products</h4>
+                                        <p className="text-xs text-gray-500 mt-1">Most popular products across the shop</p>
                                     </div>
                                     <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
                                         <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -115,6 +115,7 @@ export default function Machines() {
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
     const [selectedMachine, setSelectedMachine] = useState(null);
+    const [lightboxImg, setLightboxImg] = useState(null);
     const [heroSlideIdx, setHeroSlideIdx] = useState(0);
 
     // ✅ Role restriction modal state
@@ -147,9 +148,9 @@ export default function Machines() {
     };
 
     useEffect(() => {
-        const fn = () => setScrolled(window.scrollY > 20);
-        window.addEventListener('scroll', fn);
-        return () => window.removeEventListener('scroll', fn);
+        const fn = e => { if (e.key === 'Escape') { setSelectedMachine(null); setLightboxImg(null); } };
+        window.addEventListener('keydown', fn);
+        return () => window.removeEventListener('keydown', fn);
     }, []);
 
     useEffect(() => {
@@ -277,9 +278,15 @@ export default function Machines() {
                 .machine-card:hover { transform:translateY(-6px); box-shadow:0 24px 52px rgba(0,0,0,.12); }
                 .machine-img-box { width:100%; height:200px; background:#f0f4f8; border:1px solid rgba(0,0,0,.07); border-radius:.85rem; display:flex; align-items:center; justify-content:center; position:relative; overflow:hidden; flex-shrink:0; }
                 @media (min-width:540px) { .machine-img-box { height:220px; } }
-                .machine-img-box img { width:88%; height:88%; object-fit:contain; transition:transform .55s ease; }
+                .machine-img-box img { width:100%; height:100%; object-fit:cover; cursor:zoom-in; transition:transform .55s ease; }
+                .machine-img-zoom-hint { position:absolute; bottom:.6rem; right:.6rem; width:30px; height:30px; border-radius:50%; background:rgba(13,17,23,.55); backdrop-filter:blur(4px); display:flex; align-items:center; justify-content:center; color:white; opacity:0; transition:opacity .25s; pointer-events:none; }
+                .machine-card:hover .machine-img-zoom-hint { opacity:1; }
                 .machine-card:hover .machine-img-box img { transform:scale(1.05); }
                 .machine-status-tag { position:absolute; top:.65rem; left:.65rem; font-size:.6rem; font-weight:700; letter-spacing:.1em; text-transform:uppercase; padding:.2rem .6rem; border-radius:9999px; }
+                .img-lightbox-backdrop { position:fixed; inset:0; z-index:1000; background:rgba(5,10,25,.85); backdrop-filter:blur(8px); display:flex; align-items:center; justify-content:center; padding:1.5rem; animation:fadeIn .2s ease; cursor:zoom-out; }
+                .img-lightbox-img { max-width:92vw; max-height:90vh; object-fit:contain; border-radius:.75rem; box-shadow:0 32px 80px rgba(0,0,0,.4); animation:slideUp .25s ease; cursor:default; }
+                .img-lightbox-close { position:absolute; top:1.25rem; right:1.25rem; width:40px; height:40px; border-radius:50%; background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.25); display:flex; align-items:center; justify-content:center; cursor:pointer; color:white; transition:all .2s; z-index:2; }
+                .img-lightbox-close:hover { background:rgba(255,255,255,.25); }
                 .tag-available   { background:var(--green); color:white; }
                 .tag-maintenance { background:var(--red);   color:white; }
                 .tag-in-use      { background:var(--blue);  color:white; }
@@ -360,9 +367,16 @@ export default function Machines() {
                 .social-btn:hover { background:var(--blue); border-color:var(--blue); color:white; transform:translateY(-2px); }
             `}</style>
 
-            {/* ✅ Machine Modal */}
-            {selectedMachine && (
-                <MachineModal machine={selectedMachine} onClose={() => setSelectedMachine(null)} isLoggedIn={isLoggedIn} isRegularUser={isRegularUser} onRestrict={restrictAlert} />
+            {/* ✅ Image Lightbox */}
+            {lightboxImg && (
+                <div className="img-lightbox-backdrop" onClick={() => setLightboxImg(null)}>
+                    <button className="img-lightbox-close" onClick={() => setLightboxImg(null)} aria-label="Close">
+                        <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                    <img src={lightboxImg} alt="Machine full view" className="img-lightbox-img" onClick={e => e.stopPropagation()} />
+                </div>
             )}
 
             {/* ✅ Role Restriction Modal */}
@@ -487,8 +501,18 @@ export default function Machines() {
                                     <Reveal key={m.id} delay={Math.min(idx % 3 * 0.1, 0.3)}>
                                         <div className="machine-card">
                                             <div className="machine-img-box">
-                                                <img src={imgSrc} alt={m.name} onError={e => { e.currentTarget.src = FALLBACK; }} />
+                                                <img
+                                                    src={imgSrc}
+                                                    alt={m.name}
+                                                    onError={e => { e.currentTarget.src = FALLBACK; }}
+                                                    onClick={() => setLightboxImg(imgSrc)}
+                                                />
                                                 <span className={`machine-status-tag ${statusClass(m.status)}`}>{statusLabel(m.status)}</span>
+                                                <div className="machine-img-zoom-hint">
+                                                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16zM11 8v6M8 11h6" />
+                                                    </svg>
+                                                </div>
                                             </div>
                                             <div className="machine-card-body">
                                                 {m.type && <span className="machine-card-type">{m.type}</span>}

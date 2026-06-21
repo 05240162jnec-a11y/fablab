@@ -31,13 +31,13 @@ class User extends Authenticatable implements MustVerifyEmail
         'password',
         'gender',
         'phone',
+        'country_code',
         'role',
         'department',
         'year_of_study',
         'is_active',
         'profile_photo',
     ];
-
     /**
      * The attributes that should be hidden for serialization.
      *

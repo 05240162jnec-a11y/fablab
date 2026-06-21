@@ -82,7 +82,7 @@ export default function Register() {
             setLoading(false); return;
         }
         try {
-            const response = await axios.post(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/register`, formData);
+            const response = await axios.post(`${import.meta.env.VITE_API_URL || 'http://192.168.255.97/api'}/register`, { ...formData, country_code: countryCode });
             setMessage('✅ ' + response.data.message);
             setFormData({ name: '', email: '', password: '', password_confirmation: '', gender: '', phone: '', role: 'student', department: '', year_of_study: '' });
             setTimeout(() => navigate('/login'), 2000);

@@ -767,7 +767,9 @@ export default function MyOrders() {
                                                     <td className="px-6 py-4">
                                                         <div className="flex items-center justify-between gap-3">
                                                             <span className="text-sm font-semibold text-gray-900">{formatCurrency(order.total_amount)}</span>
-                                                            <WhatsAppButton message={getWhatsAppMessage(order)} size="sm" />
+                                                            {order.status !== 'cancelled' && (
+                                                                <WhatsAppButton message={getWhatsAppMessage(order)} size="sm" />
+                                                            )}
                                                         </div>
                                                     </td>
                                                 </tr>
@@ -1012,7 +1014,9 @@ export default function MyOrders() {
 
                             {/* Action Buttons */}
                             <div className="text-center mt-6 flex gap-3 justify-center items-center">
-                                <WhatsAppButton message={getWhatsAppMessage(selectedOrder)} size="lg" />
+                                {selectedOrder.status !== 'cancelled' && (
+                                    <WhatsAppButton message={getWhatsAppMessage(selectedOrder)} size="lg" />
+                                )}
                                 {selectedOrder.status === 'rejected' &&
                                     !selectedOrder.permanently_rejected &&
                                     canReuploadPayment(selectedOrder) && (

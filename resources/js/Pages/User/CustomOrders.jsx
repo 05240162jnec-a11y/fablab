@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import axios from 'axios';
+import WhatsAppButton from '../../Components/WhatsAppButton';
 
 export default function CustomOrders() {
     // Modal States
@@ -357,6 +358,16 @@ export default function CustomOrders() {
 
     const capitalize = (str) => str.charAt(0).toUpperCase() + str.slice(1);
 
+    // ✅ Build WhatsApp pre-filled message for this custom order
+    const getWhatsAppMessage = (order) => {
+        const userName = (() => {
+            try { return JSON.parse(sessionStorage.getItem('user') || '{}')?.name || 'a user'; }
+            catch { return 'a user'; }
+        })();
+        const orderRef = order.order_number ? `${order.order_number} - ` : '';
+        return `Hi, this is ${userName}. I'd like to discuss my custom order ${orderRef}${order.title}.`;
+    };
+
     const filteredOrders = (orders || []).filter(order => {
         if (filter === 'all') return true;
         if (filter === 'payment_rejected') return order.status === 'payment_rejected';
@@ -474,6 +485,11 @@ export default function CustomOrders() {
                                                 )}
                                             </div>
                                         </div>
+                                        {order.status !== 'cancelled' && (
+                                            <div className="absolute bottom-3 right-3 z-10">
+                                                <WhatsAppButton message={getWhatsAppMessage(order)} size="sm" />
+                                            </div>
+                                        )}
                                     </div>
                                 ))}
                             </div>
@@ -608,6 +624,9 @@ export default function CustomOrders() {
                         </div>
                         <div className="px-6 py-4 border-t border-gray-100 flex-shrink-0 bg-gray-50">
                             <div className="flex items-center justify-end gap-3">
+                                {selectedOrder.status !== 'cancelled' && (
+                                    <WhatsAppButton message={getWhatsAppMessage(selectedOrder)} size="md" />
+                                )}
                                 {!selectedOrder.payment_verified_at && selectedOrder.status !== 'completed' && selectedOrder.status !== 'cancelled' && (
                                     <button onClick={() => handleCancelOrder(selectedOrder.id)} className="px-4 py-2 text-sm font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors">Cancel Order</button>
                                 )}

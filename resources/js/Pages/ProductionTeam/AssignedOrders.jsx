@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import axios from 'axios';
+import WhatsAppButton from '../../Components/WhatsAppButton';
 
 export default function AssignedOrders() {
     const [orders, setOrders] = useState([]);
@@ -206,6 +207,17 @@ export default function AssignedOrders() {
         );
     };
 
+    // ✅ Build WhatsApp pre-filled message to contact the customer for this order
+    const getCustomerWhatsAppMessage = (order) => {
+        const staffName = (() => {
+            try { return JSON.parse(sessionStorage.getItem('user') || '{}')?.name || 'the Production Team'; }
+            catch { return 'the Production Team'; }
+        })();
+        const orderTitle = order.title || order.description || 'your order';
+        const orderRef = order.order_number ? ` (${order.order_number})` : '';
+        return `Hi ${order.user_name}, this is ${staffName} from JNEC Fab Lab regarding your custom order "${orderTitle}"${orderRef}.`;
+    };
+
     if (loading) {
         return (
             <div className="p-6 flex items-center justify-center h-64">
@@ -274,6 +286,12 @@ export default function AssignedOrders() {
                                                     ✅ Complete
                                                 </button>
                                             )}
+                                            <WhatsAppButton
+                                                message={getCustomerWhatsAppMessage(order)}
+                                                phone={order.user_phone}
+                                                countryCode={order.user_country_code}
+                                                size="sm"
+                                            />
                                         </div>
                                     </td>
                                 </tr>
@@ -389,6 +407,12 @@ export default function AssignedOrders() {
                                 </div>
                             </div>
                             <div className="flex gap-3 pt-4 border-t border-gray-200">
+                                <WhatsAppButton
+                                    message={getCustomerWhatsAppMessage(selectedOrder)}
+                                    phone={selectedOrder.user_phone}
+                                    countryCode={selectedOrder.user_country_code}
+                                    size="lg"
+                                />
                                 {selectedOrder.status === 'assigned' && (
                                     <button onClick={(e) => { closeModals(); setTimeout(() => handleStatusUpdate(selectedOrder.id, 'in_progress', e), 100); }} className="flex-1 px-4 py-2.5 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition font-medium flex items-center justify-center gap-2">
                                         <span>▶</span> Start Production

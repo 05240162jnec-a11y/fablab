@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import axios from 'axios';
+import WhatsAppButton from '../../Components/WhatsAppButton';
 
 export default function CustomOrders() {
     // Data States
@@ -390,6 +391,16 @@ export default function CustomOrders() {
         return [];
     };
 
+    // ✅ Build WhatsApp pre-filled message to contact the customer for this order
+    const getCustomerWhatsAppMessage = (order) => {
+        const staffName = (() => {
+            try { return JSON.parse(sessionStorage.getItem('user') || '{}')?.name || 'the FabLab Team'; }
+            catch { return 'the FabLab Team'; }
+        })();
+        const customerName = order.user?.name || 'there';
+        return `Hi ${customerName}, this is ${staffName} from JNEC Fab Lab regarding your custom order "${order.title}" (${order.order_number}).`;
+    };
+
     return (
         <div className="flex-1">
             <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
@@ -554,7 +565,15 @@ export default function CustomOrders() {
                                                     </div>
                                                 </td>
                                                 <td className="px-6 py-4">
-                                                    <p className="text-sm text-gray-900">{order.user?.name || 'Unknown'}</p>
+                                                    <div className="flex items-center gap-2">
+                                                        <p className="text-sm text-gray-900">{order.user?.name || 'Unknown'}</p>
+                                                        <WhatsAppButton
+                                                            message={getCustomerWhatsAppMessage(order)}
+                                                            phone={order.user?.phone}
+                                                            countryCode={order.user?.country_code}
+                                                            size="sm"
+                                                        />
+                                                    </div>
                                                 </td>
                                                 <td className="px-6 py-4">
                                                     <p className={`text-sm font-medium ${order.estimated_price ? 'text-green-700' : 'text-gray-400'}`}>
@@ -691,6 +710,12 @@ export default function CustomOrders() {
                         </div>
 
                         <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex flex-wrap items-center justify-end gap-3">
+                            <WhatsAppButton
+                                message={getCustomerWhatsAppMessage(selectedOrder)}
+                                phone={selectedOrder.user?.phone}
+                                countryCode={selectedOrder.user?.country_code}
+                                size="md"
+                            />
                             <button
                                 onClick={() => setShowDetailsModal(false)}
                                 className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-200 rounded-lg transition-colors"

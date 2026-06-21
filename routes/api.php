@@ -22,6 +22,14 @@ Route::get('/home/projects', [\App\Http\Controllers\Api\AdminProjectController::
 Route::get('/home/gallery', [\App\Http\Controllers\Api\GalleryController::class, 'index']);       // ✅ Public gallery listing
 Route::get('/home/faq',     [\App\Http\Controllers\Api\FAQController::class, 'index']);            // ✅ Public FAQ listing
 
+// ✅ Public WhatsApp contact number (for negotiation feature on bookings/orders)
+Route::get('/settings/whatsapp-number', function () {
+    return response()->json([
+        'success' => true,
+        'number' => \App\Models\Setting::getFablabWhatsappNumber(),
+    ]);
+});
+
 // ✅ Public About page data
 Route::get('/public/about', [App\Http\Controllers\Api\PublicAboutController::class, 'index']);
 

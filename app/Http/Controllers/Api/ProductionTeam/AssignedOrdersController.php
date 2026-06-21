@@ -25,7 +25,11 @@ public function index()
     $formatted = $orders->map(function ($order) {
         return [
             'id' => $order->id,
+            'order_number' => $order->order_number,
+            'title' => $order->title,
             'user_name' => $order->user->name ?? 'Unknown Customer',
+            'user_phone' => $order->user->phone ?? null,
+            'user_country_code' => $order->user->country_code ?? 'BT',
             'description' => $order->description,
             'status' => $order->status,
             'deadline' => $order->deadline ? $order->deadline->format('Y-m-d') : null,

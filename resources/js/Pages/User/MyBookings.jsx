@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
+import WhatsAppButton from '../../Components/WhatsAppButton';
 
 export default function MyBookings() {
     // Booking States
@@ -208,6 +209,14 @@ export default function MyBookings() {
         return `${startStr} - ${endStr}`;
     };
 
+    const getWhatsAppMessage = (booking) => {
+        const userName = (() => {
+            try { return JSON.parse(sessionStorage.getItem('user') || '{}')?.name || 'a user'; }
+            catch { return 'a user'; }
+        })();
+        return `Hi, this is ${userName}. I'd like to discuss my booking for ${booking.machine?.name || 'a machine'} on ${formatDateRange(booking.start_date, booking.end_date)}.`;
+    };
+
     const filteredBookings = bookings.filter(booking => {
         if (filterStatus === 'booked' && booking.status !== 'booked') return false;
         if (filterStatus === 'cancelled' && booking.status !== 'cancelled') return false;
@@ -319,6 +328,7 @@ export default function MyBookings() {
                                             </div>
                                             <div className="flex flex-col items-end gap-3">
                                                 <button className="text-blue-600 hover:text-blue-700 font-medium text-sm flex items-center gap-1">View Details <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg></button>
+                                                <WhatsAppButton message={getWhatsAppMessage(booking)} size="sm" />
                                             </div>
                                         </div>
                                     </div>
@@ -393,13 +403,14 @@ export default function MyBookings() {
                                 </div>
                             )}
 
-                            {selectedBooking.status === 'booked' && (
-                                <div className="flex gap-3 pt-4 border-t border-gray-100">
+                            <div className="flex items-center gap-3 pt-4 border-t border-gray-100">
+                                {selectedBooking.status === 'booked' && (
                                     <button onClick={() => openCancelConfirm(selectedBooking.id)} disabled={cancelling} className="flex-1 px-6 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-all shadow-md hover:shadow-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed">
                                         {cancelling ? 'Cancelling...' : 'Cancel Booking'}
                                     </button>
-                                </div>
-                            )}
+                                )}
+                                <WhatsAppButton message={getWhatsAppMessage(selectedBooking)} size="lg" />
+                            </div>
                         </div>
                     </div>
                 </div>

@@ -104,7 +104,8 @@ export default function UserLayout() {
     const confirmLogout = () => {
         setShowLogoutConfirm(false);
         sessionStorage.clear();
-        localStorage.clear();
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('user');
         navigate('/login', { replace: true });
     };
 

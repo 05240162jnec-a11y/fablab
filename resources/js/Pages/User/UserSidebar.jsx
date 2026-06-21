@@ -25,7 +25,8 @@ export default function UserSidebar({ onLogout }) {
     const confirmLogout = () => {
         setShowLogoutConfirm(false);
         sessionStorage.clear();
-        localStorage.clear(); // ✅ Wipe ALL localStorage on logout
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('user');
         if (onLogout) onLogout();
         window.location.href = '/login';
     };

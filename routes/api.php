@@ -315,18 +315,18 @@ Route::get('/email/verify/{id}/{hash}', function (Request $request) {
     $user = \App\Models\User::find($request->route('id'));
     
     if (!$user || !hash_equals((string) $request->route('hash'), sha1($user->getEmailForVerification()))) {
-        return redirect('http://127.0.0.1:8000/verification/invalid');
+        return redirect('http://192.168.255.97/verification/invalid');
     }
     
     if ($user->hasVerifiedEmail()) {
-        return redirect('http://127.0.0.1:8000/verification/success');
+        return redirect('http://192.168.255.97/verification/success');
     }
 
     if ($user->markEmailAsVerified()) {
         event(new Verified($user));
     }
 
-    return redirect('http://127.0.0.1:8000/verification/success');
+    return redirect('http://192.168.255.97/verification/success');
 })->middleware(['signed', 'throttle:6,1'])->name('verification.verify');
 
 // ==========================================

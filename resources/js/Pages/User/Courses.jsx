@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
 import { useDialog } from '../../Components/UniformDialogManager';
+import WhatsAppButton from '../../Components/WhatsAppButton';
 
 export default function Courses() {
     const { showAlert, showConfirm } = useDialog();
@@ -240,6 +241,15 @@ export default function Courses() {
     // Check if user is student (shows dept/year fields)
     const isStudent = userData?.role === 'student';
 
+    // ✅ Build WhatsApp pre-filled message for this course
+    const getWhatsAppMessage = (course) => {
+        const userName = (() => {
+            try { return JSON.parse(sessionStorage.getItem('user') || '{}')?.name || 'a user'; }
+            catch { return 'a user'; }
+        })();
+        return `Hi, this is ${userName}. I'd like to ask about the course "${course.title}".`;
+    };
+
     return (
         <>
             {/* Loading State */}
@@ -331,6 +341,9 @@ export default function Courses() {
 
                                     {/* Push button to bottom */}
                                     <div className="mt-auto pt-2">
+                                        <div className="flex justify-end mb-2">
+                                            <WhatsAppButton message={getWhatsAppMessage(course)} size="sm" />
+                                        </div>
                                         {/* Enroll/Unenroll Button - Fixed position at bottom */}
                                         <button
                                             onClick={() => {
@@ -536,6 +549,7 @@ export default function Courses() {
 
                             {/* Modal Footer */}
                             <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-end gap-3 sticky bottom-0">
+                                <WhatsAppButton message={getWhatsAppMessage(selectedCourse)} size="md" />
                                 <button
                                     type="button"
                                     onClick={closeEnrollModal}

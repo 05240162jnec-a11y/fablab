@@ -53,8 +53,8 @@ export default function Footer() {
                         <ul className="space-y-2 text-sm text-gray-600">
                             <li>Fab Lab, JNEC Campus, Dewathang,</li>
                             <li>Samdrupjongkhar.</li>
-                            <li className="mt-4">fablab@jnec.ac.in</li>
-                            <li>+975 77653429</li>
+                            <li className="mt-4">fablab.jnec@rub.edu.bt</li>
+                            <li>+975 17789864</li>
                         </ul>
 
                         {/* ← ADMIN LOGIN LINK (Subtle) */}

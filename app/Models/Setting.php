@@ -59,7 +59,7 @@ class Setting extends Model
      */
     public static function getFablabWhatsappNumber()
     {
-        return static::get('fablab_whatsapp_number', '97577809291');
+        return static::get('fablab_whatsapp_number', '97517789864');
     }
     /**
      * ✅ NEW: Map a country_code (e.g. 'BT') to its international dialing code (e.g. '975')

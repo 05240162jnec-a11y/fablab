@@ -137,6 +137,7 @@ export default function Shop() {
 
     const isLoggedIn = !!sessionStorage.getItem('auth_token');
     const userRole = (() => { try { return JSON.parse(sessionStorage.getItem('user') || '{}')?.role; } catch { return null; } })();
+    const userId = (() => { try { return JSON.parse(sessionStorage.getItem('user') || localStorage.getItem('user') || '{}')?.id; } catch { return null; } })();
     const isRegularUser = !isLoggedIn || (userRole !== 'admin' && userRole !== 'production_team');
     const getProjectsLink = () => {
         if (!isLoggedIn) return '/projects';
@@ -196,19 +197,29 @@ export default function Shop() {
     const handleAddToCart = useCallback((product, qty = 1) => {
         if (!isLoggedIn) { showToast('Please login to add to cart', 'warn'); return; }
         if (!isRegularUser) { showToast('This feature is only available for regular users.', 'warn'); return; }
+
         setCart(prev => {
             const existing = prev.find(i => i.id === product.id);
-            if (existing) return prev.map(i => i.id === product.id ? { ...i, qty: i.qty + qty } : i);
-            return [...prev, { ...product, qty }];
+            const updated = existing
+                ? prev.map(i => i.id === product.id ? { ...i, qty: i.qty + qty } : i)
+                : [...prev, { ...product, qty }];
+
+            // Sync to localStorage so user dashboard picks it up
+            if (userId) {
+                try {
+                    const stored = JSON.parse(localStorage.getItem(`cart_${userId}`) || '[]');
+                    const existingStored = stored.find(i => i.id === product.id);
+                    const updatedStored = existingStored
+                        ? stored.map(i => i.id === product.id ? { ...i, qty: i.qty + qty, quantity: (i.quantity || i.qty || 0) + qty } : i)
+                        : [...stored, { ...product, qty, quantity: qty }];
+                    localStorage.setItem(`cart_${userId}`, JSON.stringify(updatedStored));
+                } catch (e) { console.error('Cart sync error', e); }
+            }
+
+            return updated;
         });
         showToast(`"${product.name}" added to cart`, 'success');
-    }, [isLoggedIn, showToast]);
-
-    const handleBuyNow = useCallback((product, qty = 1) => {
-        if (!isLoggedIn) { showToast('Please login to place an order', 'warn'); return; }
-        if (!isRegularUser) { showToast('This feature is only available for regular users.', 'warn'); return; }
-        navigate('/user/shop-orders', { state: { product, qty } });
-    }, [isLoggedIn, isRegularUser, navigate, showToast]);
+    }, [isLoggedIn, isRegularUser, userId, showToast]);
 
     let displayed = products.filter(p =>
         p.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -699,11 +710,11 @@ export default function Shop() {
                             </div>
                             <div className="footer-contact-item">
                                 <svg width="16" height="16" fill="none" stroke="#475569" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
-                                <span className="footer-contact-text">fablab@jnec.ac.in</span>
+                                <span className="footer-contact-text">fablab.jnec@rub.edu.bt</span>
                             </div>
                             <div className="footer-contact-item">
                                 <svg width="16" height="16" fill="none" stroke="#475569" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
-                                <span className="footer-contact-text">+975 77653429</span>
+                                <span className="footer-contact-text">+975 17789864</span>
                             </div>
                         </div>
                     </div>

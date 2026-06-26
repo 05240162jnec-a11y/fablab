@@ -148,12 +148,7 @@ export default function Projects() {
     const isLoggedIn = !!sessionStorage.getItem('auth_token');
     const userRole = (() => { try { return JSON.parse(sessionStorage.getItem('user') || '{}')?.role; } catch { return null; } })();
     const isRegularUser = !isLoggedIn || (userRole !== 'admin' && userRole !== 'production_team');
-    const getProjectsLink = () => {
-        if (!isLoggedIn) return '/projects';
-        if (userRole === 'admin') return '/admin/projects';
-        if (userRole === 'production_team') return '/production-team/projects';
-        return '/user/projects';
-    };
+    const getProjectsLink = () => '/projects';
     const restrictUser = (cb) => {
         if (!isLoggedIn) { navigate('/login'); return; }
         if (!isRegularUser) { restrictAlert(); return; }

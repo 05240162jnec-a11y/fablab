@@ -113,12 +113,7 @@ export default function Home() {
     const isLoggedIn = !!sessionStorage.getItem('auth_token');
     const userRole = (() => { try { return JSON.parse(sessionStorage.getItem('user') || '{}')?.role; } catch { return null; } })();
     const isRegularUser = !isLoggedIn || (userRole !== 'admin' && userRole !== 'production_team');
-    const getProjectsLink = () => {
-        if (!isLoggedIn) return '/projects';
-        if (userRole === 'admin') return '/admin/projects';
-        if (userRole === 'production_team') return '/production-team/projects';
-        return '/user/projects';
-    };
+    const getProjectsLink = () => '/projects';
     const handleLogout = () => {
         sessionStorage.clear();
         localStorage.clear();

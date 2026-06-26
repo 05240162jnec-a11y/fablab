@@ -234,7 +234,9 @@ export default function Products() {
 
         if (filesToAdd.length > 0) {
             const newPreviewImages = [...previewImages, ...filesToAdd.map(file => URL.createObjectURL(file))];
-            const newFormDataImages = [...formData.images, ...filesToAdd];
+            // Keep only existing File objects, then append new files
+            const existingFiles = formData.images.filter(img => img instanceof File);
+            const newFormDataImages = [...existingFiles, ...filesToAdd];
 
             setPreviewImages(newPreviewImages);
             setFormData(prev => ({ ...prev, images: newFormDataImages }));
@@ -474,7 +476,9 @@ export default function Products() {
             data.append('_method', 'PUT');
 
             formData.images.forEach((image, index) => {
-                data.append(`images[${index}]`, image);
+                if (image instanceof File) {
+                    data.append(`images[${index}]`, image);
+                }
             });
 
             const response = await axios.post(
@@ -1088,13 +1092,35 @@ export default function Products() {
                                     {/* Left Column - Thumbnail Preview */}
                                     <div>
                                         <div className="text-sm font-semibold text-gray-700 mb-3">Thumbnail Image</div>
-                                        <div className="aspect-square bg-gray-100 rounded-xl border-2 border-dashed border-gray-300 overflow-hidden">
+                                        <label className="aspect-square bg-gray-100 rounded-xl border-2 border-dashed border-gray-300 overflow-hidden relative group cursor-pointer block">
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                className="hidden"
+                                                onChange={(e) => {
+                                                    const file = e.target.files[0];
+                                                    if (file) {
+                                                        const newPreviews = [...previewImages];
+                                                        newPreviews[0] = URL.createObjectURL(file);
+                                                        setPreviewImages(newPreviews);
+                                                        const newImages = [...formData.images];
+                                                        newImages[0] = file;
+                                                        setFormData(prev => ({ ...prev, images: newImages }));
+                                                        setHasUnsavedChanges(true);
+                                                    }
+                                                }}
+                                            />
                                             {previewImages.length > 0 ? (
-                                                <img
-                                                    src={previewImages[0]}
-                                                    alt="Thumbnail Preview"
-                                                    className="w-full h-full object-cover"
-                                                />
+                                                <>
+                                                    <img
+                                                        src={previewImages[0]}
+                                                        alt="Thumbnail Preview"
+                                                        className="w-full h-full object-cover"
+                                                    />
+                                                    <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <p className="text-white text-sm font-medium">Click to replace thumbnail</p>
+                                                    </div>
+                                                </>
                                             ) : (
                                                 <div className="w-full h-full flex items-center justify-center">
                                                     <svg className="w-16 h-16 text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1103,7 +1129,7 @@ export default function Products() {
                                                     <p className="text-sm text-gray-500">No Image</p>
                                                 </div>
                                             )}
-                                        </div>
+                                        </label>
                                     </div>
 
                                     {/* Right Column - Form Fields */}

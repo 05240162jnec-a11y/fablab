@@ -426,9 +426,16 @@ export default function Products() {
             data.append('stock', formData.stock);
 
             if (formData.images && formData.images.length > 0) {
+                // Always send thumbnail at index 0 if it's a new file
                 formData.images.forEach((image, index) => {
                     if (image instanceof File) {
                         data.append(`images[${index}]`, image);
+                    }
+                });
+                // Tell backend which existing images to keep (by their paths)
+                previewImages.forEach((img, index) => {
+                    if (typeof img === 'string' && img.startsWith('http')) {
+                        data.append(`existing_images[${index}]`, img);
                     }
                 });
             }
@@ -475,9 +482,19 @@ export default function Products() {
             data.append('stock', formData.stock);
             data.append('_method', 'PUT');
 
+            // Send new File uploads with their position index
             formData.images.forEach((image, index) => {
                 if (image instanceof File) {
-                    data.append(`images[${index}]`, image);
+                    data.append(`new_images[${index}]`, image);
+                }
+            });
+
+            // Send existing image URLs so backend knows what to keep and in what order
+            previewImages.forEach((img, index) => {
+                if (typeof img === 'string') {
+                    // Extract just the storage path from the full URL
+                    const path = img.includes('/storage/') ? img.split('/storage/')[1] : img;
+                    data.append(`existing_images[${index}]`, path);
                 }
             });
 
@@ -1092,22 +1109,29 @@ export default function Products() {
                                     {/* Left Column - Thumbnail Preview */}
                                     <div>
                                         <div className="text-sm font-semibold text-gray-700 mb-3">Thumbnail Image</div>
-                                        <label className="aspect-square bg-gray-100 rounded-xl border-2 border-dashed border-gray-300 overflow-hidden relative group cursor-pointer block">
+                                        <label className="block w-full bg-gray-100 rounded-xl border-2 border-dashed border-gray-300 overflow-hidden relative group cursor-pointer" style={{ aspectRatio: '1/1' }}>
                                             <input
                                                 type="file"
                                                 accept="image/*"
                                                 className="hidden"
                                                 onChange={(e) => {
                                                     const file = e.target.files[0];
-                                                    if (file) {
-                                                        const newPreviews = [...previewImages];
+                                                    if (!file) return;
+                                                    // Replace preview at index 0 only
+                                                    const newPreviews = [...previewImages];
+                                                    if (newPreviews.length === 0) {
+                                                        newPreviews.push(URL.createObjectURL(file));
+                                                    } else {
                                                         newPreviews[0] = URL.createObjectURL(file);
-                                                        setPreviewImages(newPreviews);
-                                                        const newImages = [...formData.images];
-                                                        newImages[0] = file;
-                                                        setFormData(prev => ({ ...prev, images: newImages }));
-                                                        setHasUnsavedChanges(true);
                                                     }
+                                                    setPreviewImages(newPreviews);
+                                                    // Replace file at index 0 only, keep rest as-is
+                                                    const newImages = [...formData.images];
+                                                    newImages[0] = file;
+                                                    setFormData(prev => ({ ...prev, images: newImages }));
+                                                    setHasUnsavedChanges(true);
+                                                    // Reset the input so same file can be picked again
+                                                    e.target.value = '';
                                                 }}
                                             />
                                             {previewImages.length > 0 ? (
@@ -1115,7 +1139,7 @@ export default function Products() {
                                                     <img
                                                         src={previewImages[0]}
                                                         alt="Thumbnail Preview"
-                                                        className="w-full h-full object-cover"
+                                                        className="absolute inset-0 w-full h-full object-cover"
                                                     />
                                                     <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                                                         <p className="text-white text-sm font-medium">Click to replace thumbnail</p>

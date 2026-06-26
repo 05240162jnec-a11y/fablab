@@ -80,54 +80,75 @@ class ProductController extends Controller
      * Update an existing product.
      */
     public function update(Request $request, Product $product)
-    {
-        $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:255',
-            'description' => 'required|string',
-            'size' => 'required|string|max:100',
-            'price' => 'required|numeric|min:0',
-            'stock' => 'required|integer|min:0',
-            'images.*' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
-        ]);
+{
+    $validator = Validator::make($request->all(), [
+        'name' => 'required|string|max:255',
+        'description' => 'required|string',
+        'size' => 'required|string|max:100',
+        'price' => 'required|numeric|min:0',
+        'stock' => 'required|integer|min:0',
+        'new_images.*' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+    ]);
 
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation failed',
-                'errors' => $validator->errors()
-            ], 422);
-        }
-
-        $product->update([
-            'name' => $request->name,
-            'description' => $request->description,
-            'size' => $request->size,
-            'price' => $request->price,
-            'stock' => $request->stock,
-        ]);
-
-        // ✅ Handle new image uploads (max 5: 1 thumbnail + 4 others)
-        if ($request->hasFile('images')) {
-            $imagePaths = $product->images ?? [];
-            $files = is_array($request->images) ? $request->images : [$request->images];
-            
-            foreach ($files as $index => $image) {
-                if (count($imagePaths) >= 5) break;  // ✅ Changed from 4 to 5
-                if ($image && $image->isValid()) {
-                    $path = $image->store('products', 'public');
-                    $imagePaths[] = $path;
-                }
-            }
-            $product->images = $imagePaths;
-            $product->save();
-        }
-
+    if ($validator->fails()) {
         return response()->json([
-            'success' => true,
-            'message' => 'Product updated successfully',
-            'product' => $product
-        ]);
+            'success' => false,
+            'message' => 'Validation failed',
+            'errors' => $validator->errors()
+        ], 422);
     }
+
+    $product->update([
+        'name' => $request->name,
+        'description' => $request->description,
+        'size' => $request->size,
+        'price' => $request->price,
+        'stock' => $request->stock,
+    ]);
+
+    // Build final image array by merging existing + new uploads by index
+    $existingImages = $request->input('existing_images', []); // index => path
+    $newImages = $request->file('new_images', []);            // index => file
+
+    // Collect all indices
+    $allIndices = array_unique(array_merge(
+        array_keys($existingImages),
+        array_keys($newImages)
+    ));
+    sort($allIndices);
+
+    $finalImages = [];
+    foreach ($allIndices as $index) {
+        if (isset($newImages[$index]) && $newImages[$index]->isValid()) {
+            // New file uploaded for this position — delete old if exists
+            if (isset($existingImages[$index])) {
+                Storage::disk('public')->delete($existingImages[$index]);
+            }
+            $finalImages[$index] = $newImages[$index]->store('products', 'public');
+        } elseif (isset($existingImages[$index])) {
+            // Keep existing image at this position
+            $finalImages[$index] = $existingImages[$index];
+        }
+    }
+
+    // Delete old images not in the final set
+    $oldImages = $product->images ?? [];
+    foreach ($oldImages as $oldPath) {
+        if (!in_array($oldPath, $finalImages)) {
+            Storage::disk('public')->delete($oldPath);
+        }
+    }
+
+    ksort($finalImages);
+    $product->images = array_values($finalImages);
+    $product->save();
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Product updated successfully',
+        'product' => $product
+    ]);
+}
 
     /**
      * Toggle product status.

@@ -139,8 +139,15 @@ export default function Shop() {
     const isRegularUser = !isLoggedIn || (userRole !== 'admin' && userRole !== 'production_team');
     const getProjectsLink = () => '/projects';
     const handleLogout = () => {
+        // Get userId before clearing, so cart is preserved
+        const currentUserId = (() => {
+            try { return JSON.parse(sessionStorage.getItem('user') || '{}')?.id; } catch { return null; }
+        })();
         sessionStorage.clear();
-        localStorage.clear();
+        // Only clear auth keys, NOT the cart
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('user');
+        // cart_${currentUserId} stays in localStorage so it persists on next login
         window.location.href = '/';
     };
 

@@ -46,10 +46,7 @@ function ProjectModal({ project, onClose, isLoggedIn, isRegularUser, userRole })
     if (!project) return null;
     const col = avatarColor(project.user?.name || '');
     const handleDownload = () => {
-        if (!isLoggedIn) return;
-        if (userRole === 'admin') { window.location.href = '/admin/projects'; return; }
-        if (userRole === 'production_team') { window.location.href = '/production-team/projects'; return; }
-        window.open(`${API_BASE}/user/projects/${project.id}/download`, '_blank');
+        window.open(`${API_BASE}/public/projects/${project.id}/download`, '_blank');
     };
     return (
         <div className="modal-backdrop" onClick={onClose}>
@@ -92,35 +89,12 @@ function ProjectModal({ project, onClose, isLoggedIn, isRegularUser, userRole })
                         )}
                         <div className="modal-actions">
                             {project.document_path && (
-                                isLoggedIn && isRegularUser ? (
-                                    <button className="btn-modal-download" onClick={handleDownload}>
-                                        <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                        </svg>
-                                        Download Document
-                                    </button>
-                                ) : isLoggedIn && userRole === 'admin' ? (
-                                    <a href="/admin/projects" className="btn-modal-download">
-                                        <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                                        </svg>
-                                        Manage Projects
-                                    </a>
-                                ) : isLoggedIn && userRole === 'production_team' ? (
-                                    <a href="/production-team/projects" className="btn-modal-download">
-                                        <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                                        </svg>
-                                        Manage Projects
-                                    </a>
-                                ) : (
-                                    <Link to="/login" className="btn-modal-download" onClick={onClose}>
-                                        <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
-                                        </svg>
-                                        Login to Download
-                                    </Link>
-                                )
+                                <button className="btn-modal-download" onClick={handleDownload}>
+                                    <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                    </svg>
+                                    Documentation
+                                </button>
                             )}
                             <button className="btn-modal-close-action" onClick={onClose}>Close</button>
                         </div>
@@ -586,16 +560,10 @@ export default function Projects() {
                                                 </div>
                                                 <button className="btn-read-more-proj" onClick={e => { e.stopPropagation(); setSelected(project); }}>Read More</button>
                                                 {hasDoc && (
-                                                    isLoggedIn && isRegularUser ? (
-                                                        <button className="btn-doc-proj" onClick={e => { e.stopPropagation(); window.open(`${API_BASE}/user/projects/${project.id}/download`, '_blank'); }}>
-                                                            <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                                                            Documentation
-                                                        </button>
-                                                    ) : isLoggedIn && !isRegularUser ? (
-                                                        <a href="/admin/projects" className="btn-doc-proj" onClick={e => e.stopPropagation()}>Manage Projects</a>
-                                                    ) : (
-                                                        <Link to="/login" className="btn-doc-proj" onClick={e => e.stopPropagation()}>Documentation</Link>
-                                                    )
+                                                    <button className="btn-doc-proj" onClick={e => { e.stopPropagation(); window.open(`${API_BASE}/public/projects/${project.id}/download`, '_blank'); }}>
+                                                        <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                                                        Documentation
+                                                    </button>
                                                 )}
                                             </div>
                                         </div>
@@ -639,11 +607,11 @@ export default function Projects() {
                             </div>
                             <div className="footer-contact-item">
                                 <svg width="16" height="16" fill="none" stroke="#475569" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
-                                <span className="footer-contact-text">fablab@jnec.ac.in</span>
+                                <span className="footer-contact-text">fablab.jnec@rub.edu.bt</span>
                             </div>
                             <div className="footer-contact-item">
                                 <svg width="16" height="16" fill="none" stroke="#475569" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
-                                <span className="footer-contact-text">+975 77653429</span>
+                                <span className="footer-contact-text">+975 17789864</span>
                             </div>
                         </div>
                     </div>

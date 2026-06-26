@@ -193,27 +193,29 @@ export default function Shop() {
         if (!isLoggedIn) { showToast('Please login to add to cart', 'warn'); return; }
         if (!isRegularUser) { showToast('This feature is only available for regular users.', 'warn'); return; }
 
-        setCart(prev => {
-            const existing = prev.find(i => i.id === product.id);
-            const updated = existing
-                ? prev.map(i => i.id === product.id ? { ...i, qty: i.qty + qty } : i)
-                : [...prev, { ...product, qty }];
+        // Check if already in cart BEFORE setCart
+        const alreadyInCart = cart.find(i => i.id === product.id);
+        if (alreadyInCart) {
+            showToast(`"${product.name}" is already in your cart`, 'warn');
+            return;
+        }
 
+        setCart(prev => {
+            const updated = [...prev, { ...product, qty }];
             if (userId) {
                 try {
                     const stored = JSON.parse(localStorage.getItem(`cart_${userId}`) || '[]');
                     const existingStored = stored.find(i => i.id === product.id);
-                    const updatedStored = existingStored
-                        ? stored.map(i => i.id === product.id ? { ...i, qty: i.qty + qty, quantity: (i.quantity || i.qty || 0) + qty } : i)
-                        : [...stored, { ...product, qty, quantity: qty }];
-                    localStorage.setItem(`cart_${userId}`, JSON.stringify(updatedStored));
+                    if (!existingStored) {
+                        const updatedStored = [...stored, { ...product, qty, quantity: qty }];
+                        localStorage.setItem(`cart_${userId}`, JSON.stringify(updatedStored));
+                    }
                 } catch (e) { console.error('Cart sync error', e); }
             }
-
             return updated;
         });
         showToast(`"${product.name}" added to cart`, 'success');
-    }, [isLoggedIn, isRegularUser, userId, showToast]);
+    }, [isLoggedIn, isRegularUser, userId, cart, showToast]);
 
     const handleBuyNow = useCallback((product, qty = 1) => {
         if (!isLoggedIn) { showToast('Please login to place an order', 'warn'); return; }

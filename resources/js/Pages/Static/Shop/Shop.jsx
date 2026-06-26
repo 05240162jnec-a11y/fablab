@@ -131,7 +131,13 @@ export default function Shop() {
     const [selected, setSelected] = useState(null);
     const [toast, setToast] = useState(null);
     const [heroIdx, setHeroIdx] = useState(0);
-    const [cart, setCart] = useState([]);
+    const [cart, setCart] = useState(() => {
+        try {
+            const uid = JSON.parse(sessionStorage.getItem('user') || '{}')?.id;
+            if (!uid) return [];
+            return JSON.parse(localStorage.getItem(`cart_${uid}`) || '[]');
+        } catch { return []; }
+    });
 
     const isLoggedIn = !!sessionStorage.getItem('auth_token');
     const userRole = (() => { try { return JSON.parse(sessionStorage.getItem('user') || '{}')?.role; } catch { return null; } })();

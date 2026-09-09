@@ -16,11 +16,15 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 WORKDIR /var/www/html
 
-# Copy all local files
+# Copy all local files (including start.sh)
 COPY . .
 
 # CRITICAL: Overwrite the default Apache config with our custom one
 COPY apache.conf /etc/apache2/sites-available/000-default.conf
+
+# Move start.sh to the correct location and make it executable
+RUN mv /var/www/html/start.sh /usr/local/bin/start.sh \
+    && chmod +x /usr/local/bin/start.sh
 
 # Install dependencies
 RUN composer install --no-dev --optimize-autoloader

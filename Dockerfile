@@ -1,7 +1,19 @@
 # Start with a base image that has PHP 8.2 and Apache web server built-in
 FROM php:8.2-apache
 
-# Install necessary PHP extensions for Laravel and databases
+# Install necessary system dependencies AND the PostgreSQL libraries
+RUN apt-get update && apt-get install -y \
+    git \
+    curl \
+    libpng-dev \
+    libonig-dev \
+    libxml2-dev \
+    libzip-dev \
+    libpq-dev \
+    zip \
+    unzip
+
+# Install PHP extensions for Laravel and databases
 RUN docker-php-ext-install pdo_mysql pdo_pgsql mbstring exif pcntl bcmath gd zip
 
 # Enable Apache's rewrite module (CRITICAL for Laravel routing to work)

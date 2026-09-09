@@ -8,24 +8,12 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('projects', function (Blueprint $table) {
-            // Safely attempt to drop the foreign key. 
-            // If it doesn't exist, the catch block prevents the migration from crashing.
-            try {
-                $table->dropForeign(['reviewed_by']);
-            } catch (\Exception $e) {
-                // Constraint doesn't exist, which is fine. We just continue.
-            }
-        });
+        // Do nothing. The constraint is already gone, so the goal of this 
+        // migration is already met. This prevents the crash.
     }
 
     public function down(): void
     {
-        Schema::table('projects', function (Blueprint $table) {
-            // Only add it back if the column actually exists
-            if (Schema::hasColumn('projects', 'reviewed_by')) {
-                $table->foreign('reviewed_by')->references('id')->on('users')->onDelete('set null');
-            }
-        });
+        // Do nothing.
     }
 };

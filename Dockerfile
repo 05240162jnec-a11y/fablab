@@ -16,7 +16,7 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 WORKDIR /var/www/html
 
-# Copy all local files (including start.sh)
+# Copy all local files
 COPY . .
 
 # CRITICAL: Overwrite the default Apache config with our custom one
@@ -29,15 +29,9 @@ RUN mv /var/www/html/start.sh /usr/local/bin/start.sh \
 # Install dependencies
 RUN composer install --no-dev --optimize-autoloader
 
-# Create dummy sqlite to prevent build crashes
-RUN touch database/database.sqlite
-
 # Set correct permissions
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache \
     && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
-
-# Clear caches
-RUN php artisan config:clear && php artisan cache:clear && php artisan view:clear
 
 EXPOSE 80
 

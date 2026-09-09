@@ -33,18 +33,27 @@ WORKDIR /var/www/html
 # Copy all local files
 COPY . .
 
+# Copy the startup script and make it executable
+COPY start.sh /usr/local/bin/start.sh
+RUN chmod +x /usr/local/bin/start.sh
+
 # Install dependencies
 RUN composer install --no-dev --optimize-autoloader
+
+# Create dummy sqlite to prevent build crashes
+RUN touch database/database.sqlite
 
 # Set correct permissions for Laravel
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache \
     && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
 
-# Clear caches and run database migrations automatically
+# Clear caches (without migrations)
 RUN php artisan config:clear \
     && php artisan cache:clear \
-    && php artisan view:clear \
-    && php artisan migrate --force
+    && php artisan view:clear
 
 # Expose port 80
 EXPOSE 80
+
+# Use our custom startup script instead of default Apache
+CMD ["/usr/local/bin/start.sh"]

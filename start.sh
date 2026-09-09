@@ -1,9 +1,10 @@
 #!/bin/bash
 
-# Run migrations on startup
+echo "Waiting for database to be ready..."
+sleep 10
+
 echo "Running migrations..."
 php artisan migrate --force
 
-# Start Apache
 echo "Starting Apache..."
-apache2-foreground
+exec apache2-foreground

@@ -16,11 +16,12 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 WORKDIR /var/www/html
 
-# Copy all local files
+# Copy all local files (including start.sh)
 COPY . .
 
-# CRITICAL: Overwrite Apache config to point to public folder
-COPY apache.conf /etc/apache2/sites-available/000-default.conf
+# FOOLPROOF: Change Apache DocumentRoot to the public folder using sed
+RUN sed -i 's|/var/www/html|/var/www/html/public|g' /etc/apache2/sites-available/000-default.conf
+RUN sed -i 's|/var/www/|/var/www/html/public/|g' /etc/apache2/apache2.conf
 
 # Move start.sh to the correct location and make it executable
 RUN mv /var/www/html/start.sh /usr/local/bin/start.sh \

@@ -19,6 +19,10 @@ WORKDIR /var/www/html
 # Copy all local files
 COPY . .
 
+# Move start.sh to the correct location and make it executable
+RUN mv /var/www/html/start.sh /usr/local/bin/start.sh \
+    && chmod +x /usr/local/bin/start.sh
+
 # Install dependencies
 RUN composer install --no-dev --optimize-autoloader
 

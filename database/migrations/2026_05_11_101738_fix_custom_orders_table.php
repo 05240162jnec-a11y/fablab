@@ -9,22 +9,46 @@ return new class extends Migration
     public function up()
     {
         Schema::table('custom_orders', function (Blueprint $table) {
-            // Make order_number nullable
-            $table->string('order_number')->nullable()->change();
+            // Make order_number nullable (ONLY if the column exists)
+            if (Schema::hasColumn('custom_orders', 'order_number')) {
+                $table->string('order_number')->nullable()->change();
+            }
             
-            // Remove unused columns (optional)
-            $table->dropColumn(['material', 'color', 'dimensions', 'deadline']);
+            // Remove unused columns (ONLY if they exist)
+            if (Schema::hasColumn('custom_orders', 'material')) {
+                $table->dropColumn('material');
+            }
+            if (Schema::hasColumn('custom_orders', 'color')) {
+                $table->dropColumn('color');
+            }
+            if (Schema::hasColumn('custom_orders', 'dimensions')) {
+                $table->dropColumn('dimensions');
+            }
+            if (Schema::hasColumn('custom_orders', 'deadline')) {
+                $table->dropColumn('deadline');
+            }
         });
     }
 
     public function down()
     {
         Schema::table('custom_orders', function (Blueprint $table) {
-            $table->string('order_number')->nullable(false)->change();
-            $table->string('material')->nullable();
-            $table->string('color')->nullable();
-            $table->string('dimensions')->nullable();
-            $table->date('deadline')->nullable();
+            // Reverse the changes (ONLY if columns exist)
+            if (Schema::hasColumn('custom_orders', 'order_number')) {
+                $table->string('order_number')->nullable(false)->change();
+            }
+            if (Schema::hasColumn('custom_orders', 'material')) {
+                $table->string('material')->nullable();
+            }
+            if (Schema::hasColumn('custom_orders', 'color')) {
+                $table->string('color')->nullable();
+            }
+            if (Schema::hasColumn('custom_orders', 'dimensions')) {
+                $table->string('dimensions')->nullable();
+            }
+            if (Schema::hasColumn('custom_orders', 'deadline')) {
+                $table->date('deadline')->nullable();
+            }
         });
     }
 };

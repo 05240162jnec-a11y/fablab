@@ -11,6 +11,9 @@ RUN docker-php-ext-install pdo_mysql pdo_pgsql mbstring exif pcntl bcmath gd zip
 # Disable default MPM and enable prefork (required for PHP)
 RUN a2dismod mpm_event && a2enmod mpm_prefork rewrite
 
+# Install Composer properly
+RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+
 WORKDIR /var/www/html
 
 # Copy all local files

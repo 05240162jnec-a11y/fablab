@@ -8,20 +8,15 @@ RUN apt-get update && apt-get install -y \
 # Install PHP extensions
 RUN docker-php-ext-install pdo_mysql pdo_pgsql mbstring exif pcntl bcmath gd zip
 
-# Enable Apache rewrite module
-RUN a2dismod mpm_event
-RUN a2enmod mpm_prefork
-RUN a2enmod rewrite
-
-# Install Composer
-COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+# Disable default MPM and enable prefork (required for PHP)
+RUN a2dismod mpm_event && a2enmod mpm_prefork rewrite
 
 WORKDIR /var/www/html
 
 # Copy all local files
 COPY . .
 
-# CRITICAL: DELETE the local .env file so it doesn't override Render's variables!
+# CRITICAL: DELETE the local .env file so it doesn't override Railway's variables!
 RUN rm -f .env
 
 # BULLETPROOF: Overwrite default Apache config with our custom one

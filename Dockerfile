@@ -9,6 +9,8 @@ RUN apt-get update && apt-get install -y \
 RUN docker-php-ext-install pdo_mysql pdo_pgsql mbstring exif pcntl bcmath gd zip
 
 # Enable Apache rewrite module
+RUN a2dismod mpm_event
+RUN a2enmod mpm_prefork
 RUN a2enmod rewrite
 
 # Install Composer
